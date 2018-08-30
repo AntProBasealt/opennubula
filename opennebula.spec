@@ -20,8 +20,8 @@
 
 Name: opennebula
 Summary: Cloud computing solution for Data Center Virtualization
-Version: 5.4.15
-Release: alt2%ubt
+Version: 5.6.0
+Release: alt1%ubt
 License: Apache
 Group: System/Servers
 Url: https://opennebula.org
@@ -317,34 +317,34 @@ export DESTDIR=%buildroot
 ./install.sh -p
 
 # systemd units
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula.service %buildroot%_unitdir/opennebula.service
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula-scheduler.service %buildroot%_unitdir/opennebula-scheduler.service
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula-sunstone.service %buildroot%_unitdir/opennebula-sunstone.service
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula-gate.service  %buildroot%_unitdir/opennebula-gate.service
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula-econe.service %buildroot%_unitdir/opennebula-econe.service
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula-flow.service  %buildroot%_unitdir/opennebula-flow.service
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula-novnc.service %buildroot%_unitdir/opennebula-novnc.service
+install -p -D -m 644 share/pkgs/ALT/opennebula.service %buildroot%_unitdir/opennebula.service
+install -p -D -m 644 share/pkgs/ALT/opennebula-scheduler.service %buildroot%_unitdir/opennebula-scheduler.service
+install -p -D -m 644 share/pkgs/ALT/opennebula-sunstone.service %buildroot%_unitdir/opennebula-sunstone.service
+install -p -D -m 644 share/pkgs/ALT/opennebula-gate.service  %buildroot%_unitdir/opennebula-gate.service
+install -p -D -m 644 share/pkgs/ALT/opennebula-econe.service %buildroot%_unitdir/opennebula-econe.service
+install -p -D -m 644 share/pkgs/ALT/opennebula-flow.service  %buildroot%_unitdir/opennebula-flow.service
+install -p -D -m 644 share/pkgs/ALT/opennebula-novnc.service %buildroot%_unitdir/opennebula-novnc.service
 
 # Init scripts
-install -p -D -m 755 share/pkgs/ALTLinux/opennebula %buildroot%_initdir/opennebula
-install -p -D -m 755 share/pkgs/ALTLinux/opennebula-sunstone %buildroot%_initdir/opennebula-sunstone
-install -p -D -m 755 share/pkgs/ALTLinux/opennebula-gate  %buildroot%_initdir/opennebula-gate
-install -p -D -m 755 share/pkgs/ALTLinux/opennebula-econe %buildroot%_initdir/opennebula-econe
-install -p -D -m 755 share/pkgs/ALTLinux/opennebula-flow  %buildroot%_initdir/opennebula-flow
-install -p -D -m 755 share/pkgs/ALTLinux/opennebula-novnc %buildroot%_initdir/opennebula-novnc
+install -p -D -m 755 share/pkgs/ALT/opennebula %buildroot%_initdir/opennebula
+install -p -D -m 755 share/pkgs/ALT/opennebula-sunstone %buildroot%_initdir/opennebula-sunstone
+install -p -D -m 755 share/pkgs/ALT/opennebula-gate  %buildroot%_initdir/opennebula-gate
+install -p -D -m 755 share/pkgs/ALT/opennebula-econe %buildroot%_initdir/opennebula-econe
+install -p -D -m 755 share/pkgs/ALT/opennebula-flow  %buildroot%_initdir/opennebula-flow
+install -p -D -m 755 share/pkgs/ALT/opennebula-novnc %buildroot%_initdir/opennebula-novnc
 
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula.conf %buildroot%_tmpfilesdir/opennebula.conf
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula-node.conf %buildroot%_tmpfilesdir/opennebula-node.conf
+install -p -D -m 644 share/pkgs/ALT/opennebula.conf %buildroot%_tmpfilesdir/opennebula.conf
+install -p -D -m 644 share/pkgs/ALT/opennebula-node.conf %buildroot%_tmpfilesdir/opennebula-node.conf
 
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula-polkit.rules %buildroot%_sysconfdir/polkit-1/rules.d/50-opennebula.rules
+install -p -D -m 644 share/pkgs/ALT/opennebula-polkit.rules %buildroot%_sysconfdir/polkit-1/rules.d/50-opennebula.rules
 
 # sudoers
 mkdir -p %buildroot%_sysconfdir/sudoers.d
-install -p -D -m 440 share/pkgs/ALTLinux/opennebula.sudoers %buildroot%_sysconfdir/sudoers.d/opennebula
+install -p -D -m 440 share/pkgs/ALT/opennebula.sudoers %buildroot%_sysconfdir/sudoers.d/opennebula
 
 # logrotate
 mkdir -p %buildroot%_logrotatedir
-install -p -D -m 644 share/pkgs/ALTLinux/opennebula.logrotate %buildroot%_logrotatedir/opennebula
+install -p -D -m 644 share/pkgs/ALT/opennebula.logrotate %buildroot%_logrotatedir/opennebula
 
 # Java
 install -p -D -m 644 src/oca/java/jar/org.opennebula.client.jar %buildroot%_javadir/org.opennebula.client.jar
@@ -688,6 +688,9 @@ fi
 ################################################################################
 
 %changelog
+* Thu Aug 30 2018 Alexey Shabalin <shaba@altlinux.org> 5.6.0-alt1%ubt
+- 5.6.0
+
 * Tue Jun 26 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.15-alt2%ubt
 - backport patches from upstream/one-5.4 branch
 

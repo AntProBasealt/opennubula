@@ -1,0 +1,13 @@
+
+/var/log/one/*.log {
+    weekly
+    rotate 52
+    delaycompress
+    dateext
+    dateformat -%Y%m%d-%s
+    missingok
+    notifempty
+    copytruncate
+    compress
+    su oneadmin oneadmin
+}

@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+# opennebula-novnc	OpenNebula novnc server.
+#
+# chkconfig: - 66 34
+# description: OpenNebula novnc server
+# processname: novnc-server
+# config:  /etc/one/sunstone-server.conf
+# pidfile: /var/lock/one/.novnc.lock
+#
+### BEGIN INIT INFO
+# Provides:          opennebula-novnc
+# Required-Start:    $remote_fs $syslog opennebula
+# Required-Stop:     $remote_fs $syslog opennebula
+# Default-Start:     3 4 5
+# Default-Stop:      0 1 2 6
+# Short-Description: novnc init script
+# Description:       OpenNebula novnc server
+### END INIT INFO
+
+
+# Do not load RH compatibility interface.
+WITHOUT_RC_COMPAT=1
+
+# Source function library.
+. /etc/init.d/functions
+
+NAME=novnc-server
+PIDFILE=/var/lock/one/.novnc.lock
+LOCKFILE=/var/lock/subsys/$NAME
+RETVAL=0
+
+start()
+{
+	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --user oneadmin -- $NAME start
+	RETVAL=$?
+	return $RETVAL
+}
+
+stop()
+{
+	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --user oneadmin -- $NAME stop
+	RETVAL=$?
+	return $RETVAL
+}
+
+restart()
+{
+	stop
+	start
+}
+
+# See how we were called.
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart|reload)
+		restart
+		;;
+	condstop)
+		if [ -e "$LOCKFILE" ]; then
+			stop
+		fi
+		;;
+	condrestart)
+		if [ -e "$LOCKFILE" ]; then
+			restart
+		fi
+		;;
+	condreload)
+		if [ -e "$LOCKFILE" ]; then
+			reload
+		fi
+		;;
+	status)
+		status --pidfile "$PIDFILE" --expect-user oneadmin -- $NAME
+		RETVAL=$?
+		;;
+	*)
+		msg_usage "${0##*/} {start|stop|reload|restart|condstop|condrestart|condreload|status}"
+		RETVAL=1
+esac
+
+exit $RETVAL

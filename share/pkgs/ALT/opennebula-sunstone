@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+# opennebula-sunstone	OpenNebula Sunstone Web interface.
+#
+# chkconfig: - 66 34
+# description: OpenNebula Sunstone Web interface
+# processname: sunstone-server
+# config:  /etc/one/sunstone-server.conf
+# pidfile: /var/run/one/sunstone.pid
+#
+### BEGIN INIT INFO
+# Provides:          opennebula-sunstone
+# Required-Start:    $remote_fs $syslog opennebula
+# Required-Stop:     $remote_fs $syslog opennebula
+# Default-Start:     3 4 5
+# Default-Stop:      0 1 2 6
+# Short-Description: Sunstone Web interface
+# Description:       OpenNebula Sunstone web interface cloud initialisation script
+### END INIT INFO
+
+
+# Do not load RH compatibility interface.
+WITHOUT_RC_COMPAT=1
+
+# Source function library.
+. /etc/init.d/functions
+
+NAME=sunstone-server
+PIDFILE=/var/run/one/sunstone.pid
+LOCKFILE=/var/lock/subsys/$NAME
+RETVAL=0
+
+start()
+{
+	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --user oneadmin -- $NAME start-sunstone
+	RETVAL=$?
+	return $RETVAL
+}
+
+stop()
+{
+	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --user oneadmin -- $NAME stop-sunstone
+	RETVAL=$?
+	return $RETVAL
+}
+
+restart()
+{
+	stop
+	start
+}
+
+# See how we were called.
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart|reload)
+		restart
+		;;
+	condstop)
+		if [ -e "$LOCKFILE" ]; then
+			stop
+		fi
+		;;
+	condrestart)
+		if [ -e "$LOCKFILE" ]; then
+			restart
+		fi
+		;;
+	condreload)
+		if [ -e "$LOCKFILE" ]; then
+			reload
+		fi
+		;;
+	status)
+		status --pidfile "$PIDFILE" --expect-user oneadmin -- ruby
+		RETVAL=$?
+		;;
+	*)
+		msg_usage "${0##*/} {start|stop|reload|restart|condstop|condrestart|condreload|status}"
+		RETVAL=1
+esac
+
+exit $RETVAL

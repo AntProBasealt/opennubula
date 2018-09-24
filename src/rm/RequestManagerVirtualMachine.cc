@@ -478,6 +478,8 @@ void VirtualMachineAction::request_execute(xmlrpc_c::paramList const& paramList,
 
     int    rc;
 
+    std::string memory, cpu;
+
     Nebula& nd = Nebula::instance();
     DispatchManager * dm = nd.get_dm();
 
@@ -486,6 +488,8 @@ void VirtualMachineAction::request_execute(xmlrpc_c::paramList const& paramList,
 
     AuthRequest::Operation op;
     History::VMAction action;
+
+    VirtualMachineTemplate quota_tmpl;
 
     VirtualMachine * vm;
 
@@ -513,6 +517,21 @@ void VirtualMachineAction::request_execute(xmlrpc_c::paramList const& paramList,
         return;
     }
 
+    vm->get_template_attribute("MEMORY", memory);
+    vm->get_template_attribute("CPU", cpu);
+
+    quota_tmpl.add("RUNNING_MEMORY", memory);
+    quota_tmpl.add("RUNNING_CPU", cpu);
+    quota_tmpl.add("RUNNING_VMS", 1);
+
+    quota_tmpl.add("VMS", 0);
+    quota_tmpl.add("MEMORY", 0);
+    quota_tmpl.add("CPU", 0);
+
+    RequestAttributes& att_aux(att);
+    att_aux.uid = vm->get_uid();
+    att_aux.gid = vm->get_gid();
+
     if (vm->is_imported() && !vm->is_imported_action_supported(action))
     {
         att.resp_msg = "Action \"" + action_st + "\" is not supported for "
@@ -524,18 +543,15 @@ void VirtualMachineAction::request_execute(xmlrpc_c::paramList const& paramList,
         return;
     }
 
-    if (vm->is_vrouter() && !VirtualRouter::is_action_supported(action))
+    vm->unlock();
+
+     if ( action == History::RESUME_ACTION && 
+             !quota_authorization(&quota_tmpl, Quotas::VIRTUALMACHINE, att_aux, 
+                 att.resp_msg) )
     {
-        att.resp_msg = "Action \"" + action_st + "\" is not supported for "
-            "virtual router VMs";
-
         failure_response(ACTION, att);
-
-        vm->unlock();
         return;
     }
-
-    vm->unlock();
 
     switch (action)
     {
@@ -922,7 +938,7 @@ void VirtualMachineDeploy::request_execute(xmlrpc_c::paramList const& paramList,
     }
 
     // ------------------------------------------------------------------------
-    // deploy the VM
+    // deploy the VM (import/deploy unlocks the vm object)
     // ------------------------------------------------------------------------
 
     if (vm->is_imported())
@@ -933,8 +949,6 @@ void VirtualMachineDeploy::request_execute(xmlrpc_c::paramList const& paramList,
     {
         dm->deploy(vm, att);
     }
-
-    vm->unlock();
 
     success_response(id, att);
 }
@@ -1082,15 +1096,6 @@ void VirtualMachineMigrate::request_execute(xmlrpc_c::paramList const& paramList
     if (vm->is_imported() && !vm->is_imported_action_supported(action))
     {
         att.resp_msg = "Migration is not supported for imported VMs";
-        failure_response(ACTION, att);
-
-        vm->unlock();
-        return;
-    }
-
-    if (vm->is_vrouter() && !VirtualRouter::is_action_supported(action))
-    {
-        att.resp_msg = "Migration is not supported for virtual router VMs";
         failure_response(ACTION, att);
 
         vm->unlock();
@@ -1611,50 +1616,25 @@ void VirtualMachineMonitoring::request_execute(
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-void VirtualMachineAttach::request_execute(xmlrpc_c::paramList const& paramList,
-                                            RequestAttributes& att)
+void VirtualMachineAttach::request_execute(
+        xmlrpc_c::paramList const&  paramList,
+        RequestAttributes&          att)
 {
-    Nebula&           nd = Nebula::instance();
-    DispatchManager * dm = nd.get_dm();
+    VirtualMachine *        vm;
+    VirtualMachineTemplate  tmpl;
 
-    VirtualMachineTemplate tmpl;
-    PoolObjectAuth         vm_perms;
-
-    VirtualMachine *     vm;
-
-    int    rc;
-    bool   volatile_disk;
+    int     rc;
 
     int     id       = xmlrpc_c::value_int(paramList.getInt(1));
     string  str_tmpl = xmlrpc_c::value_string(paramList.getString(2));
 
     // -------------------------------------------------------------------------
-    // Parse Disk template
+    // Check if the VM is a Virtual Router
     // -------------------------------------------------------------------------
-
-    rc = tmpl.parse_str_or_xml(str_tmpl, att.resp_msg);
-
-    if ( rc != 0 )
-    {
-        failure_response(INTERNAL, att);
-        return;
-    }
-
-    // -------------------------------------------------------------------------
-    // Authorize the operation & check quotas
-    // -------------------------------------------------------------------------
-
-    if ( vm_authorization(id, 0, &tmpl, att, 0, 0, 0, auth_op) == false )
-    {
-        return;
-    }
-
     if ((vm = get_vm(id, att)) == 0)
     {
         return;
     }
-
-    vm->get_permissions(vm_perms);
 
     if ( !vm->hasHistory() )
     {
@@ -1665,17 +1645,87 @@ void VirtualMachineAttach::request_execute(xmlrpc_c::paramList const& paramList,
         return;
     }
 
-    volatile_disk = set_volatile_disk_info(vm, vm->get_ds_id(), tmpl);
-
-    if (vm->is_vrouter() &&
-            !VirtualRouter::is_action_supported(History::DISK_ATTACH_ACTION))
+    if (vm->is_vrouter())
     {
         att.resp_msg = "Action is not supported for virtual router VMs";
-        failure_response(ACTION, att);
+        failure_response(Request::ACTION, att);
 
         vm->unlock();
         return;
     }
+
+    vm->unlock();
+
+    // -------------------------------------------------------------------------
+    // Parse NIC template
+    // -------------------------------------------------------------------------
+    rc = tmpl.parse_str_or_xml(str_tmpl, att.resp_msg);
+
+    if ( rc != 0 )
+    {
+        failure_response(INTERNAL, att);
+        return;
+    }
+
+    // -------------------------------------------------------------------------
+    // Perform the attach
+    // -------------------------------------------------------------------------
+    ErrorCode ec = request_execute(id, tmpl, att);
+
+    if ( ec == SUCCESS )
+    {
+        success_response(id, att);
+    }
+    else
+    {
+        failure_response(ec, att);
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+Request::ErrorCode VirtualMachineAttach::request_execute(int id,
+        VirtualMachineTemplate& tmpl, RequestAttributes& att)
+{
+    Nebula&           nd = Nebula::instance();
+    DispatchManager * dm = nd.get_dm();
+
+    PoolObjectAuth         vm_perms;
+
+    VirtualMachine *     vm;
+
+    int    rc;
+    bool   volatile_disk;
+
+    // -------------------------------------------------------------------------
+    // Authorize the operation & check quotas
+    // -------------------------------------------------------------------------
+
+    if ( vm_authorization(id, 0, &tmpl, att, 0, 0, 0, auth_op) == false )
+    {
+        return AUTHORIZATION;
+    }
+
+    if (!att.is_admin())
+    {
+        string aname;
+
+        if (tmpl.check_restricted(aname))
+        {
+            att.resp_msg = "DISK includes a restricted attribute " + aname;
+            return AUTHORIZATION;
+        }
+    }
+
+    if ((vm = get_vm(id, att)) == 0)
+    {
+        return NO_EXISTS;
+    }
+
+    vm->get_permissions(vm_perms);
+
+    volatile_disk = set_volatile_disk_info(vm, vm->get_ds_id(), tmpl);
 
     vm->unlock();
 
@@ -1688,7 +1738,7 @@ void VirtualMachineAttach::request_execute(xmlrpc_c::paramList const& paramList,
 
     if (quota_resize_authorization(id, &deltas, att_quota) == false)
     {
-        return;
+        return AUTHORIZATION;
     }
 
     if (volatile_disk == false)
@@ -1696,7 +1746,7 @@ void VirtualMachineAttach::request_execute(xmlrpc_c::paramList const& paramList,
         if ( quota_authorization(&tmpl, Quotas::IMAGE, att_quota) == false )
         {
             quota_rollback(&deltas, Quotas::VM, att_quota);
-            return;
+            return AUTHORIZATION;
         }
     }
 
@@ -1711,14 +1761,10 @@ void VirtualMachineAttach::request_execute(xmlrpc_c::paramList const& paramList,
             quota_rollback(&tmpl, Quotas::IMAGE, att_quota);
         }
 
-        failure_response(ACTION, att);
-    }
-    else
-    {
-        success_response(id, att);
+        return ACTION;
     }
 
-    return;
+    return SUCCESS;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1751,7 +1797,7 @@ void VirtualMachineDetach::request_execute(xmlrpc_c::paramList const& paramList,
         return;
     }
 
-    if (vm->is_vrouter() && !VirtualRouter::is_action_supported(History::NIC_DETACH_ACTION))
+    if (vm->is_vrouter())
     {
         att.resp_msg = "Action is not supported for virtual router VMs";
         failure_response(ACTION, att);
@@ -2211,8 +2257,7 @@ void VirtualMachineAttachNic::request_execute(
         return;
     }
 
-    if (vm->is_vrouter() &&
-            !VirtualRouter::is_action_supported(History::NIC_ATTACH_ACTION))
+    if (vm->is_vrouter())
     {
         att.resp_msg = "Action is not supported for virtual router VMs";
         failure_response(Request::ACTION, att);
@@ -2347,8 +2392,7 @@ void VirtualMachineDetachNic::request_execute(
         return;
     }
 
-    if (vm->is_vrouter() &&
-            !VirtualRouter::is_action_supported(History::NIC_DETACH_ACTION))
+    if (vm->is_vrouter())
     {
         att.resp_msg = "Action is not supported for virtual router VMs";
         failure_response(Request::ACTION, att);

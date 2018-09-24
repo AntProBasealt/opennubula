@@ -292,15 +292,21 @@ Configures an OpenNebula node providing kvm.
 %setup
 
 %build
-export PATH="$PATH:$PWD/src/sunstone/public/node_modules/grunt/bin"
+export PATH="$PATH:$PWD/src/sunstone/public/node_modules/.bin"
 export npm_config_devdir="$PWD/src/sunstone/public/node_modules/.node-gyp"
 
 pushd src/sunstone/public
 npm rebuild
+
+# from ./build.sh
+bower -o install
+grunt --gruntfile ./Gruntfile.js sass
+grunt --gruntfile ./Gruntfile.js requirejs
+mv -f dist/main.js dist/main-dist.js
 popd
 
 # Compile OpenNebula
-scons -j2 mysql=yes new_xmlrpc=yes sunstone=yes
+scons -j2 mysql=yes new_xmlrpc=yes sunstone=no
 
 # build man pages
 pushd share/man
@@ -315,6 +321,9 @@ popd
 %install
 export DESTDIR=%buildroot
 ./install.sh -p
+touch %buildroot%oneadmin_home/sunstone/main.js
+rm -f %buildroot%_libexecdir/one/sunstone/public/dist/main.js
+ln -r -s %buildroot%oneadmin_home/sunstone/main.js %buildroot%_libexecdir/one/sunstone/public/dist/main.js
 
 # systemd units
 install -p -D -m 644 share/pkgs/ALT/opennebula.service %buildroot%_unitdir/opennebula.service
@@ -463,6 +472,7 @@ fi
 %dir %attr(0770, root, oneadmin) %_logdir/one
 %dir %attr(0775, root, oneadmin) %_runtimedir/one
 %dir %attr(0775, root, oneadmin) %_lockdir/one
+%dir %attr(0770, root, oneadmin) %oneadmin_home
 
 ################################################################################
 # node-kvm - files
@@ -515,6 +525,7 @@ fi
 %files sunstone
 %_libexecdir/one/sunstone/*
 %_libexecdir/one/ruby/OpenNebulaVNC.rb
+%_libexecdir/one/ruby/OpenNebulaAddons.rb
 %_libexecdir/one/ruby/cloud/econe/*
 
 %_bindir/sunstone-server
@@ -552,6 +563,9 @@ fi
 
 %_datadir/one/websockify/*
 
+
+%dir %attr(0770, root, oneadmin) %oneadmin_home/sunstone
+%attr(0770, root, oneadmin) %oneadmin_home/sunstone/main.js
 
 %defattr(0640, root, oneadmin, 0750)
 %config(noreplace) %_sysconfdir/one/sunstone-server.conf
@@ -616,6 +630,7 @@ fi
 %_libexecdir/one/ruby/ec2_driver.rb
 %_libexecdir/one/ruby/onedb/*
 %_libexecdir/one/ruby/one_vnm.rb
+%_libexecdir/one/ruby/opennebula_driver.rb
 %_libexecdir/one/ruby/OpenNebulaDriver.rb
 %_libexecdir/one/ruby/scripts_common.rb
 %_libexecdir/one/ruby/ssh_stream.rb
@@ -643,6 +658,7 @@ fi
 %config(noreplace) %_sysconfdir/one/az_driver.conf
 %config %_sysconfdir/one/az_driver.default
 %config %_sysconfdir/one/vcenter_driver.default
+%config(noreplace) %_sysconfdir/one/vcenter_driver.conf
 %config(noreplace) %_sysconfdir/one/auth/server_x509_auth.conf
 %config(noreplace) %_sysconfdir/one/auth/ldap_auth.conf
 %config(noreplace) %_sysconfdir/one/auth/x509_auth.conf

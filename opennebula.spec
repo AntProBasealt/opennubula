@@ -115,6 +115,7 @@ Requires: xmlrpc-c
 Requires: nfs-utils
 Requires: wget
 Requires: curl
+Requires: rsync
 Requires: iputils
 Obsoletes: %name-ozones
 #TODO: Requires http://rubygems.org/gems/net-ldap
@@ -258,6 +259,7 @@ Requires: nfs-utils
 Requires: bridge-utils
 Requires: ipset
 Requires: pciutils
+Requires: rsync
 Requires: %name-common = %EVR
 
 %description node-kvm

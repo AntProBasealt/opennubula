@@ -21,7 +21,7 @@
 Name: opennebula
 Summary: Cloud computing solution for Data Center Virtualization
 Version: 5.6.1
-Release: alt1%ubt
+Release: alt1
 License: Apache
 Group: System/Servers
 Url: https://opennebula.org
@@ -32,7 +32,7 @@ Source0: %name-%version.tar
 # Build Requires
 ################################################################################
 
-BuildRequires(pre): rpm-build-ubt rpm-build-ruby
+BuildRequires(pre): rpm-build-ruby
 BuildRequires: gcc-c++
 BuildRequires: libcurl-devel
 BuildRequires: libxml2-devel libxmlrpc-devel liblzma-devel
@@ -706,7 +706,7 @@ fi
 ################################################################################
 
 %changelog
-* Mon Sep 24 2018 Alexey Shabalin <shaba@altlinux.org> 5.6.1-alt1%ubt
+* Mon Sep 24 2018 Alexey Shabalin <shaba@altlinux.org> 5.6.1-alt1
 - 5.6.1
 
 * Thu Aug 30 2018 Alexey Shabalin <shaba@altlinux.org> 5.6.0-alt1%ubt

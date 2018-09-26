@@ -474,7 +474,7 @@ fi
 %dir %attr(0770, root, oneadmin) %_logdir/one
 %dir %attr(0775, root, oneadmin) %_runtimedir/one
 %dir %attr(0775, root, oneadmin) %_lockdir/one
-%dir %attr(0770, root, oneadmin) %oneadmin_home
+%dir %attr(0750, oneadmin, oneadmin) %oneadmin_home
 
 ################################################################################
 # node-kvm - files
@@ -642,7 +642,6 @@ fi
 %_man1dir/*
 %doc LICENSE NOTICE
 
-%dir %attr(0750, oneadmin, oneadmin) %oneadmin_home
 %dir %attr(0750, oneadmin, oneadmin) %oneadmin_home/datastores
 %dir %attr(0750, oneadmin, oneadmin) %oneadmin_home/remotes
 

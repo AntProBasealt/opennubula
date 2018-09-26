@@ -642,13 +642,13 @@ fi
 %_man1dir/*
 %doc LICENSE NOTICE
 
-%dir %attr(0750, oneadmin, oneadmin) %_sharedstatedir/one
-%dir %attr(0750, oneadmin, oneadmin) %_sharedstatedir/one/datastores
-%dir %attr(0750, oneadmin, oneadmin) %_sharedstatedir/one/remotes
+%dir %attr(0750, oneadmin, oneadmin) %oneadmin_home
+%dir %attr(0750, oneadmin, oneadmin) %oneadmin_home/datastores
+%dir %attr(0750, oneadmin, oneadmin) %oneadmin_home/remotes
 
-%attr(-, oneadmin, oneadmin) %_sharedstatedir/one/datastores/*
-%attr(-, oneadmin, oneadmin) %_sharedstatedir/one/vms
-%config(noreplace) %attr(-, oneadmin, oneadmin) %_sharedstatedir/one/remotes/*
+%attr(-, oneadmin, oneadmin) %oneadmin_home/datastores/*
+%attr(-, oneadmin, oneadmin) %oneadmin_home/vms
+%config(noreplace) %attr(-, oneadmin, oneadmin) %oneadmin_home/remotes/*
 
 %defattr(0640, root, oneadmin, 0750)
 %config(noreplace) %_sysconfdir/one/defaultrc

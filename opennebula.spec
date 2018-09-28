@@ -708,66 +708,63 @@ fi
 * Mon Sep 24 2018 Alexey Shabalin <shaba@altlinux.org> 5.6.1-alt1
 - 5.6.1
 
-* Thu Aug 30 2018 Alexey Shabalin <shaba@altlinux.org> 5.6.0-alt1%ubt
-- 5.6.0
-
-* Tue Jun 26 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.15-alt2%ubt
+* Tue Jun 26 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.15-alt2.S1
 - backport patches from upstream/one-5.4 branch
 
-* Tue Jun 19 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.15-alt1%ubt
+* Tue Jun 19 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.15-alt1
 - 5.4.15
 
-* Sat Jun 09 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.13-alt1%ubt
+* Sat Jun 09 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.13-alt1
 - 5.4.13
 - build man pages
 - add Restart=on-failure for services
 
-* Sat May 12 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.12-alt1%ubt
+* Sat May 12 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.12-alt1
 - 5.4.12
 
-* Tue Apr 03 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.10-alt1%ubt
+* Tue Apr 03 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.10-alt1
 - 5.4.10
 
-* Wed Feb 28 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.8-alt1%ubt
+* Wed Feb 28 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.8-alt1
 - 5.4.8
 
-* Sat Feb 17 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.7-alt1%ubt
+* Sat Feb 17 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.7-alt1
 - 5.4.7
 - rename ALT logo altlinux -> alt
 
-* Sat Jan 27 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.6-alt1%ubt
+* Sat Jan 27 2018 Alexey Shabalin <shaba@altlinux.ru> 5.4.6-alt1
 - 5.4.6
 
-* Thu Dec 14 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.5-alt1%ubt
+* Thu Dec 14 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.5-alt1
 - 5.4.5
 - fix install ALTLinux logo
 - update Requires: libvirt-qemu to libvirt-kvm in node-kvm package
 
-* Tue Dec 05 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.4-alt1%ubt
+* Tue Dec 05 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.4-alt1
 - 5.4.4
 
-* Wed Nov 08 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.3-alt1%ubt
+* Wed Nov 08 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.3-alt1
 - 5.4.3
 
-* Wed Oct 11 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.2-alt1%ubt
+* Wed Oct 11 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.2-alt1
 - 5.4.2
 
-* Tue Sep 19 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.1-alt1%ubt
+* Tue Sep 19 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.1-alt1
 - 5.4.1
 
-* Wed Sep 13 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.0-alt5%ubt
+* Wed Sep 13 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.0-alt5
 - update to one-5.4 branch
 
-* Fri Sep 08 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.0-alt4%ubt
+* Fri Sep 08 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.0-alt4
 - add user oneadmin to wheel group for allow run sudo
 
-* Tue Sep 05 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.0-alt3%ubt
+* Tue Sep 05 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.0-alt3
 - fix run sunstone (add nodejs and bower modules to source)
 
-* Tue Sep 05 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.0-alt2%ubt
+* Tue Sep 05 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.0-alt2
 - update to one-5.4 branch
 - fix post scripts
 - rename package client to tools
 
-* Wed Aug 30 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.0-alt1%ubt
+* Wed Aug 30 2017 Alexey Shabalin <shaba@altlinux.ru> 5.4.0-alt1
 - Initial build (based on upstream spec)

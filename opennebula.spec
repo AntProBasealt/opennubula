@@ -511,6 +511,7 @@ fi
 %_libexecdir/one/ruby/vcenter_driver/*
 
 %_libexecdir/one/ruby/OpenNebula.rb
+%_libexecdir/one/ruby/scripts_common.rb
 
 %_libexecdir/one/ruby/cloud/CloudClient.rb
 %_libexecdir/one/ruby/cloud/CloudAuth.rb
@@ -635,7 +636,6 @@ fi
 %_libexecdir/one/ruby/one_vnm.rb
 %_libexecdir/one/ruby/opennebula_driver.rb
 %_libexecdir/one/ruby/OpenNebulaDriver.rb
-%_libexecdir/one/ruby/scripts_common.rb
 %_libexecdir/one/ruby/ssh_stream.rb
 %_libexecdir/one/ruby/VirtualMachineDriver.rb
 %_libexecdir/one/sh/*

@@ -44,7 +44,7 @@ BuildRequires: ruby
 BuildRequires: scons
 BuildRequires: java-1.8.0-openjdk-devel rpm-build-java ws-commons-util xmlrpc-common xmlrpc-client
 BuildRequires: zlib-devel
-BuildRequires: node node-gyp npm
+BuildRequires: node node-gyp npm node-devel
 BuildRequires: ronn
 BuildRequires: groff-base
 
@@ -293,6 +293,13 @@ Configures an OpenNebula node providing kvm.
 
 %prep
 %setup
+
+
+# add symlink to node headers
+node_ver=$(node -v | sed -e "s/v//")
+mkdir -p src/sunstone/public/node_modules/.node-gyp/$node_ver/include
+ln -s %_includedir/node src/sunstone/public/node_modules/.node-gyp/$node_ver/include/node
+echo "9" > src/sunstone/public/node_modules/.node-gyp/$node_ver/installVersion
 
 %build
 export PATH="$PATH:$PWD/src/sunstone/public/node_modules/.bin"

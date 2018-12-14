@@ -21,7 +21,7 @@
 Name: opennebula
 Summary: Cloud computing solution for Data Center Virtualization
 Version: 5.6.2
-Release: alt2
+Release: alt3
 License: Apache
 Group: System/Servers
 Url: https://opennebula.org
@@ -713,6 +713,10 @@ fi
 ################################################################################
 
 %changelog
+* Fri Dec 14 2018 Alexey Shabalin <shaba@altlinux.org> 5.6.2-alt3
+- move scripts_common.rb to ruby package for allow install sunstone without server package
+- build with system node headers from node-devel package
+
 * Wed Nov 14 2018 Alexey Shabalin <shaba@altlinux.org> 5.6.2-alt2
 - update Requires
 

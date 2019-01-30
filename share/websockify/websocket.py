@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 
 '''
 Python WebSocket library with support for "wss://" encryption.

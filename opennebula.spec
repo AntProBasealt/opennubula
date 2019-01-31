@@ -13,7 +13,7 @@ Url: https://opennebula.org
 
 Source0: %name-%version.tar
 
-BuildRequires(pre): rpm-build-ruby
+BuildRequires(pre): rpm-build-ruby rpm-build-python3
 BuildRequires: gcc-c++
 BuildRequires: libcurl-devel
 BuildRequires: libxml2-devel libxmlrpc-devel liblzma-devel
@@ -56,6 +56,7 @@ Requires: openssh-clients
 
 Requires: %name-common = %EVR
 Requires: ruby-%name = %EVR
+Requires: ruby-stdlibs
 
 %description tools
 OpenNebula.org is an open-source project aimed at building the industry
@@ -84,6 +85,13 @@ Requires: wget
 Requires: curl
 Requires: rsync
 Requires: iputils
+Requires: ruby-aws-sdk
+Requires: ruby-amazon-ec2
+Requires: ruby-azure
+Requires: ruby-nokogiri
+Requires: ruby-mysql2
+Requires: sqlite3-ruby
+Requires: ruby-sequel
 Obsoletes: %name-ozones
 #TODO: Requires http://rubygems.org/gems/net-ldap
 
@@ -105,6 +113,14 @@ Group: Development/Ruby
 BuildArch: noarch
 Provides: %name-ruby = %EVR
 Obsoletes: %name-ruby < %EVR
+
+Requires: ruby-stdlibs
+Requires: ruby-rbvmomi
+Requires: ruby-xmlrpc
+Requires: ruby-nokogiri
+Requires: ruby-ox
+Requires: ruby-curb
+Requires: ruby-net-ldap
 
 #Requires: ruby
 #Requires: rubygems
@@ -139,7 +155,10 @@ BuildArch: noarch
 
 Requires: %name-common = %EVR
 Requires: ruby-%name = %EVR
-Requires: ruby-rack-handler-webrick ruby-sinatra ruby-tilt ruby-rack-protection ruby-nokogiri
+Requires: ruby-stdlibs
+Requires: ruby-rack-handler-webrick ruby-sinatra ruby-tilt
+Requires: ruby-rack-protection ruby-nokogiri ruby-dalli ruby-zendesk_api
+Requires: ruby-uuidtools
 
 %description sunstone
 Browser based UI for administrating a OpenNebula cloud. Also includes
@@ -152,6 +171,8 @@ BuildArch: noarch
 
 Requires: %name-common = %EVR
 Requires: ruby-%name = %EVR
+Requires: ruby-stdlibs
+Requires: ruby-sinatra
 
 %description gate
 Transfer information from Virtual Machines to OpenNebula
@@ -163,7 +184,8 @@ BuildArch: noarch
 
 Requires: %name-common = %EVR
 Requires: ruby-%name = %EVR
-Requires: ruby-treetop ruby-parse-cron
+Requires: ruby-stdlibs
+Requires: ruby-treetop ruby-parse-cron ruby-sinatra
 
 %description flow
 Manage OpenNebula Services

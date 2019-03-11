@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -122,7 +122,7 @@ void get_image_attribute(VirtualMachine * vm,
     // ----------------------------------------------
     // Get the attribute template from the image
     // ----------------------------------------------
-    img = ipool->get(iid);
+    img = ipool->get_ro(iid);
 
     if ( img == 0 )
     {
@@ -199,7 +199,7 @@ void get_network_attribute(VirtualMachine * vm,
     // ----------------------------------------------
     // Get the attribute template from the image
     // ----------------------------------------------
-    vn = vnpool->get(vnet_id);
+    vn = vnpool->get_ro(vnet_id);
 
     if ( vn == 0 )
     {
@@ -232,7 +232,7 @@ void get_user_attribute(VirtualMachine * vm,
 
     attr_value.clear();
 
-    user = upool->get(vm->get_uid());
+    user = upool->get_ro(vm->get_uid());
 
     if ( user == 0 )
     {

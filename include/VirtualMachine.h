@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -876,6 +876,14 @@ public:
 
     /**
      * Function to print the VirtualMachine object into a string in
+     * XML format, with reduced information
+     *  @param xml the resulting XML string
+     *  @return a reference to the generated string
+     */
+    string& to_xml_short(string& xml);
+
+    /**
+     * Function to print the VirtualMachine object into a string in
      * XML format, with extended information (full history records)
      *  @param xml the resulting XML string
      *  @return a reference to the generated string
@@ -977,6 +985,14 @@ public:
     // Timers & Requirements
     // ------------------------------------------------------------------------
     /**
+     *   @return time when the VM was created (in epoch)
+     */
+    time_t get_stime() const
+    {
+        return stime;
+    };
+
+    /**
      *  Gets time from last information polling.
      *    @return time of last poll (epoch) or 0 if never polled
      */
@@ -1045,8 +1061,9 @@ public:
     /**
      *  Releases all disk images taken by this Virtual Machine
      *    @param quotas disk space to free from image datastores
+     *    @param check_state to update image state based on VM state
      */
-    void release_disk_images(vector<Template *>& quotas);
+    void release_disk_images(vector<Template *>& quotas, bool check_state);
 
     /**
      *  @return reference to the VirtualMachine disks
@@ -1151,6 +1168,8 @@ public:
      *    @param  files space separated list of paths to be included in the CBD
      *    @param  disk_id CONTEXT/DISK_ID attribute value
      *    @param  password Password to encrypt the token, if it is set
+     *    @param  only_auto boolean to generate context only for vnets
+     *            with NETWORK_MODE = auto
      *    @return -1 in case of error, 0 if the VM has no context, 1 on success
      */
     int generate_context(string &files, int &disk_id, const string& password);
@@ -1428,6 +1447,26 @@ public:
         return nic;
     }
 
+    /**
+     * Deletes the alias of the NIC that was in the process of being attached/detached
+     */
+    void delete_attach_alias(VirtualMachineNic *nic)
+    {
+        std::set<int> a_ids;
+
+        one_util::split_unique(nic->vector_value("ALIAS_IDS"), ',', a_ids);
+
+        for(std::set<int>::iterator it = a_ids.begin(); it != a_ids.end(); it++)
+        {
+            VirtualMachineNic * nic_a = nics.delete_nic(*it);
+
+            if ( nic_a != 0)
+            {
+                obj_template->remove(nic_a->vector_attribute());
+            }
+        }
+    }
+
     // ------------------------------------------------------------------------
     // Disk Snapshot related functions
     // ------------------------------------------------------------------------
@@ -1459,11 +1498,13 @@ public:
      *    @param disk_id of the disk
      *    @param snap_id of the snapshot
      *    @param error if any
+     *    @param revert true if the cause of changing the active snapshot
+     *                  is because a revert
      *    @return -1 if error
      */
-    int revert_disk_snapshot(int disk_id, int snap_id)
+    int revert_disk_snapshot(int disk_id, int snap_id, bool revert)
     {
-        return disks.revert_snapshot(disk_id, snap_id);
+        return disks.revert_snapshot(disk_id, snap_id, revert);
     }
 
     /**
@@ -1479,6 +1520,19 @@ public:
             Template **vm_quotas, bool& io, bool& vo)
     {
         disks.delete_snapshot(disk_id, snap_id, ds_quotas, vm_quotas, io, vo);
+    }
+
+    /**
+     *  Renames the snap_id from the list
+     *    @param disk_id of the disk
+     *    @param snap_id of the snapshot
+     *    @param new_name of the snapshot
+     *    @return 0 on success
+     */
+    int rename_disk_snapshot(int disk_id, int snap_id, const string& new_name,
+            string& error_str)
+    {
+        return disks.rename_snapshot(disk_id, snap_id, new_name, error_str);
     }
 
     /**
@@ -1607,6 +1661,21 @@ public:
     {
         disks.clear_cloning_image_id(image_id, source);
     }
+
+    /**
+     *  Get network leases with NETWORK_MODE = auto for this Virtual Machine
+     *    @pram tmpl with the scheduling results for the auto NICs
+     *    @param estr description if any
+     *    @return 0 if success
+     */
+    int get_auto_network_leases(VirtualMachineTemplate * tmpl, string &estr);
+
+    /**
+     *  Check if a tm_mad is valid for the Virtual Machine Disks and set
+     *  clone_target and ln_target
+     *  @param tm_mad is the tm_mad for system datastore chosen
+     */
+    int check_tm_mad_disks(const string& tm_mad, string& error);
 
 private:
 
@@ -1822,6 +1891,10 @@ private:
      */
     string& to_xml_extended(string& xml, int n_history) const;
 
+    string& to_json(string& json) const;
+
+    string& to_token(string& text) const;
+
     // -------------------------------------------------------------------------
     // Attribute Parser
     // -------------------------------------------------------------------------
@@ -1940,9 +2013,12 @@ private:
      *  netowrking updates.
      *    @param context attribute of the VM
      *    @param error string if any
+     *    @param  only_auto boolean to generate context only for vnets 
+     *            with NETWORK_MODE = auto
      *    @return 0 on success
      */
-    int generate_network_context(VectorAttribute * context, string& error);
+    int generate_network_context(VectorAttribute * context, string& error, 
+            bool only_auto);
 
     /**
      *  Deletes the NETWORK related CONTEXT section for the given nic, i.e.
@@ -1950,6 +2026,14 @@ private:
      *    @param nicid the id of the NIC
      */
     void clear_nic_context(int nicid);
+
+    /**
+     *  Deletes the NETWORK ALIAS related CONTEXT section for the given nic, i.e.
+     *  ETH_<id>_ALIAS<aliasid>
+     *    @param nicid the id of the NIC
+     *    @param aliasid the idx of the ALIAS
+     */
+    void clear_nic_alias_context(int nicid, int aliasidx);
 
     /**
      *  Generate the PCI related CONTEXT setions, i.e. PCI_*. This function
@@ -1971,9 +2055,11 @@ private:
      *  Parse the "CONTEXT" attribute of the template by substituting
      *  $VARIABLE, $VARIABLE[ATTR] and $VARIABLE[ATTR, ATTR = VALUE]
      *    @param error_str Returns the error reason, if any
+     *    @param  only_auto boolean to parse only the context for vnets
+     *            with NETWORK_MODE = auto
      *    @return 0 on success
      */
-    int parse_context(string& error_str);
+    int parse_context(string& error_str, bool all_nics);
 
     /**
      * Parses the current contents of the context vector attribute, without
@@ -1990,7 +2076,7 @@ private:
     // Management helpers: NIC, DISK and VMGROUP
     // -------------------------------------------------------------------------
     /**
-     *  Get all network leases for this Virtual Machine
+     *  Get network leases (no auto NICs, NETWORK_MODE != auto) for this VM
      *  @return 0 if success
      */
     int get_network_leases(string &error_str);

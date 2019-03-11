@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -202,7 +202,7 @@ string * VirtualMachineManager::format_message(
     ostringstream oss;
 
     string ds_tmpl = "";
-    Datastore * ds = ds_pool->get(ds_id);
+    Datastore * ds = ds_pool->get_ro(ds_id);
 
     if ( ds != 0 )
     {
@@ -355,6 +355,7 @@ void VirtualMachineManager::deploy_action(int vid)
 
     int uid = vm->get_created_by_uid();
     int owner_id = vm->get_uid();
+
     vm->unlock();
 
     password = Nebula::instance().get_upool()->get_token_password(uid, owner_id);
@@ -560,9 +561,12 @@ void VirtualMachineManager::shutdown_action(
     VirtualMachine *                    vm;
     const VirtualMachineManagerDriver * vmd;
 
+    string        hostname;
     string        vm_tmpl;
     string *      drv_msg;
     ostringstream os;
+
+    int      ds_id;
 
     // Get the VM from the pool
     vm = vmpool->get(vid);
@@ -585,9 +589,26 @@ void VirtualMachineManager::shutdown_action(
         goto error_driver;
     }
 
+    // Use previous host if it is a migration
+    if ( vm->get_lcm_state() == VirtualMachine::SAVE_MIGRATE )
+    {
+        if (!vm->hasPreviousHistory())
+        {
+            goto error_previous_history;
+        }
+
+        hostname        = vm->get_previous_hostname();
+        ds_id           = vm->get_previous_ds_id();
+    }
+    else
+    {
+        hostname        = vm->get_hostname();
+        ds_id           = vm->get_ds_id();
+    }
+
     // Invoke driver method
     drv_msg = format_message(
-        vm->get_hostname(),
+        hostname,
         "",
         vm->get_deploy_id(),
         "",
@@ -597,7 +618,7 @@ void VirtualMachineManager::shutdown_action(
         "",
         "",
         vm->to_xml(vm_tmpl),
-        vm->get_ds_id(),
+        ds_id,
         -1);
 
     vmd->shutdown(vid, *drv_msg);
@@ -610,6 +631,10 @@ void VirtualMachineManager::shutdown_action(
 
 error_history:
     os << "shutdown_action, VM has no history";
+    goto error_common;
+
+error_previous_history:
+    os << "save_action, VM has no previous history";
     goto error_common;
 
 error_driver:
@@ -775,8 +800,10 @@ void VirtualMachineManager::cancel_action(
     VirtualMachine * vm;
     ostringstream    os;
 
+    string   hostname;
     string   vm_tmpl;
     string * drv_msg;
+    int ds_id;
 
     const VirtualMachineManagerDriver *   vmd;
 
@@ -801,9 +828,26 @@ void VirtualMachineManager::cancel_action(
         goto error_driver;
     }
 
+    // Use previous host if it is a migration
+    if ( vm->get_lcm_state() == VirtualMachine::SAVE_MIGRATE )
+    {
+        if (!vm->hasPreviousHistory())
+        {
+            goto error_previous_history;
+        }
+
+        hostname        = vm->get_previous_hostname();
+        ds_id           = vm->get_previous_ds_id();
+    }
+    else
+    {
+        hostname        = vm->get_hostname();
+        ds_id           = vm->get_ds_id();
+    }
+
     // Invoke driver method
     drv_msg = format_message(
-        vm->get_hostname(),
+        hostname,
         "",
         vm->get_deploy_id(),
         "",
@@ -813,7 +857,7 @@ void VirtualMachineManager::cancel_action(
         "",
         "",
         vm->to_xml(vm_tmpl),
-        vm->get_ds_id(),
+        ds_id,
         -1);
 
     vmd->cancel(vid, *drv_msg);
@@ -826,6 +870,10 @@ void VirtualMachineManager::cancel_action(
 
 error_history:
     os << "cancel_action, VM has no history";
+    goto error_common;
+
+error_previous_history:
+    os << "save_action, VM has no previous history";
     goto error_common;
 
 error_driver:
@@ -1210,6 +1258,7 @@ void VirtualMachineManager::restore_action(
 
     int uid = vm->get_created_by_uid();
     int owner_id = vm->get_uid();
+
     vm->unlock();
 
     password = Nebula::instance().get_upool()->get_token_password(uid, owner_id);
@@ -2359,8 +2408,24 @@ void VirtualMachineManager::detach_nic_action(
     string        vm_tmpl;
     string *      drv_msg;
     string        error_str;
+    string  prolog_cmd;
+    string  disk_path;
+    string  password;
 
     // Get the VM from the pool
+    vm = vmpool->get(vid);
+
+    if (vm == 0)
+    {
+        return;
+    }
+
+    int uid = vm->get_created_by_uid();
+    int owner_id = vm->get_uid();
+    vm->unlock();
+
+    password = Nebula::instance().get_upool()->get_token_password(uid, owner_id);
+
     vm = vmpool->get(vid);
 
     if (vm == 0)
@@ -2381,6 +2446,11 @@ void VirtualMachineManager::detach_nic_action(
         goto error_driver;
     }
 
+    if ( do_context_command(vm, password, prolog_cmd, disk_path) == -1 )
+    {
+        goto error_no_tm_command;
+    }
+
     // Invoke driver method
     drv_msg = format_message(
         vm->get_hostname(),
@@ -2389,9 +2459,9 @@ void VirtualMachineManager::detach_nic_action(
         "",
         "",
         "",
+        prolog_cmd,
         "",
-        "",
-        "",
+        disk_path,
         vm->to_xml(vm_tmpl),
         vm->get_ds_id(),
         -1);
@@ -2412,6 +2482,11 @@ error_history:
 error_driver:
     os.str("");
     os << "detach_nic_action, error getting driver " << vm->get_vmm_mad();
+    goto error_common;
+
+error_no_tm_command:
+    os.str("");
+    os << "Cannot set context disk to update it for VM " << vm->get_oid();
     goto error_common;
 
 error_common:

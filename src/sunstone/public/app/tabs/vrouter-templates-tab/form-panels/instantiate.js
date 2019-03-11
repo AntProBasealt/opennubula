@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -94,6 +94,7 @@ define(function(require) {
         forceIPv6:true,
         forceIPv4:true,
         management: true,
+        hide_auto_button: true,
         securityGroups: Config.isFeatureEnabled("secgroups")});
 
     $(".vr_attributes #name", context).on("input", function(){

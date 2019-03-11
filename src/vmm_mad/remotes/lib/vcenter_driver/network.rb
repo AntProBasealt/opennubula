@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -164,7 +164,7 @@ class Network
                    "VCENTER_PORTGROUP_TYPE=\"#{network_type}\"\n"\
                    "VCENTER_NET_REF=\"#{network_ref}\"\n"\
                    "VCENTER_INSTANCE_ID=\"#{vcenter_uuid}\"\n"\
-                   "OPENNEBULA_MANAGED=\"NO\"\n"
+                   "VCENTER_IMPORTED=\"YES\"\n"
 
         if unmanaged == "wild"
             template += "VCENTER_FROM_WILD=\"#{template_id}\"\n"

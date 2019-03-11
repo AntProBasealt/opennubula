@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -79,7 +79,7 @@ void HostMonitoring::request_execute(
     int id  = xmlrpc_c::value_int(paramList.getInt(1));
     int rc;
 
-    ostringstream oss;
+    std::string oss;
 
     if ( basic_authorization(id, att) == false )
     {
@@ -95,7 +95,7 @@ void HostMonitoring::request_execute(
         return;
     }
 
-    success_response(oss.str(), att);
+    success_response(oss, att);
 
     return;
 }

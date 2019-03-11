@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -27,6 +27,8 @@
 #include "ClusterPool.h"
 
 #include "NebulaUtil.h"
+
+#include "Nebula.h"
 
 #define TO_UPPER(S) transform(S.begin(),S.end(),S.begin(),(int(*)(int))toupper)
 
@@ -139,21 +141,17 @@ LIST OF MANDATORY ARGUMENTS FOR NETWORK DEFINITION
 | ovswitch_vxlan | yes     | no     | OUTER or AUTOMATIC_OUTER |                |
 +----------------+---------+--------+--------------------------+----------------+
 */
-int VirtualNetwork::parse_phydev_vlans(string& estr)
+int VirtualNetwork::parse_phydev_vlans(const Template* tmpl, const string& vn_mad, const string& phydev, 
+                                       const string& bridge, const bool auto_id, const string& vlan_id, 
+                                       const bool auto_outer, const string& outer_id, string& estr)
 {
     bool check_phydev = false;
     bool check_bridge = false;
     bool check_vlan   = false;
     bool check_outer  = false;
 
-    bool check_other  = false;
-    vector<string> other;
-
     switch (VirtualNetwork::str_to_driver(vn_mad))
     {
-        case VirtualNetwork::VCENTER:
-            other.push_back("VCENTER_NET_REF");
-
         case VirtualNetwork::DUMMY:
             check_bridge = true;
             break;
@@ -168,6 +166,7 @@ int VirtualNetwork::parse_phydev_vlans(string& estr)
             check_outer  = true;
 
         case VirtualNetwork::BRIDGE:
+        case VirtualNetwork::VCENTER:
         case VirtualNetwork::OVSWITCH:
         case VirtualNetwork::EBTABLES:
         case VirtualNetwork::FW:
@@ -189,31 +188,16 @@ int VirtualNetwork::parse_phydev_vlans(string& estr)
         return -1;
     }
 
-    if ( check_vlan && !vlan_id_automatic && vlan_id.empty() )
+    if ( check_vlan && !auto_id && vlan_id.empty() )
     {
         estr = "VLAN_ID (or AUTOMATIC) is mandatory for driver " + vn_mad;
         return -1;
     }
 
-    if ( check_outer && !outer_vlan_id_automatic && outer_vlan_id.empty() )
+    if ( check_outer && !auto_outer && outer_id.empty() )
     {
         estr = "OUTER_VLAN_ID (or AUTOMATIC) is mandatory for driver " + vn_mad;
         return -1;
-    }
-
-    if ( check_other )
-    {
-        vector<string>::iterator it;
-        string value;
-
-        for ( it = other.begin(); it != other.end() ; ++it)
-        {
-            if (!PoolObjectSQL::get_template_attribute((*it).c_str(), value))
-            {
-                estr = *it + " is mandatory for driver " + vn_mad;
-                return -1;
-            }
-        }
     }
 
     return 0;
@@ -228,8 +212,52 @@ int VirtualNetwork::insert(SqlDB * db, string& error_str)
     ostringstream       ose;
 
     string sg_str, vis;
+    
+    string value;
+    string name;
+    string prefix;
 
+    
     int rc, num_ars;
+
+    ostringstream oss;
+
+    // ------------------------------------------------------------------------
+    // Set a name if the VN has not got one (and is created via template)
+    // ------------------------------------------------------------------------
+
+    obj_template->get("TEMPLATE_ID", value);
+    obj_template->erase("TEMPLATE_ID");
+
+    if (!value.empty())
+    {
+        obj_template->add("TEMPLATE_ID", value);
+    }
+    
+    obj_template->get("NAME",name);
+    obj_template->erase("NAME");
+
+    obj_template->get("TEMPLATE_NAME", prefix);
+    obj_template->erase("TEMPLATE_NAME");
+
+    if (prefix.empty() && name.empty())
+    {
+        goto error_name;
+    }
+
+    if (name.empty() == true)
+    {
+        oss.str("");
+        oss << prefix << "-" << oid;
+        name = oss.str();
+    }
+
+    if ( !PoolObjectSQL::name_is_valid(name, error_str) )
+    {
+        goto error_name;
+    }
+
+    this->name = name;
 
     //--------------------------------------------------------------------------
     // VirtualNetwork Attributes from the template
@@ -242,12 +270,6 @@ int VirtualNetwork::insert(SqlDB * db, string& error_str)
     //
     // Note: VLAN_IDs if not set will be allocated in VirtualNetworkPool
     //--------------------------------------------------------------------------
-    erase_template_attribute("NAME",name);
-
-    if (name.empty())
-    {
-        goto error_name;
-    }
 
     erase_template_attribute("VN_MAD", vn_mad);
 
@@ -272,14 +294,26 @@ int VirtualNetwork::insert(SqlDB * db, string& error_str)
     // -------------------------------------------------------------------------
     // Check consistency for PHYDEV, BRIDGE and VLAN_IDs based on the driver
     // -------------------------------------------------------------------------
-    rc = parse_phydev_vlans(error_str);
+    rc = parse_phydev_vlans(obj_template, vn_mad, phydev, bridge, vlan_id_automatic, vlan_id, 
+                            outer_vlan_id_automatic, outer_vlan_id, error_str);
 
     if (rc != 0)
     {
         goto error_parse;
     }
 
-    if (bridge.empty())
+    erase_template_attribute("BRIDGE_TYPE", bridge_type);
+
+    rc = parse_bridge_type(vn_mad, error_str);
+
+    if (rc != 0)
+    {
+        goto error_common;
+    }
+
+    add_template_attribute("BRIDGE_TYPE", bridge_type);
+
+    if (bridge.empty() && bridge_type != "none")
     {
         ostringstream oss;
 
@@ -564,7 +598,8 @@ string& VirtualNetwork::to_xml_extended(string& xml, bool extended,
             lock_db_to_xml(lock_str) <<
             perms_to_xml(perm_str) <<
             Clusterable::to_xml(clusters_xml)    <<
-            "<BRIDGE>" << one_util::escape_xml(bridge) << "</BRIDGE>";
+            "<BRIDGE>" << one_util::escape_xml(bridge) << "</BRIDGE>"
+            "<BRIDGE_TYPE>" << one_util::escape_xml(bridge_type) << "</BRIDGE_TYPE>";
 
     if (parent_vid != -1)
     {
@@ -663,6 +698,7 @@ int VirtualNetwork::from_xml(const string &xml_str)
 
     xpath(vn_mad, "/VNET/VN_MAD", "");
     xpath(phydev, "/VNET/PHYDEV", "");
+    xpath(bridge_type, "/VNET/BRIDGE_TYPE", "");
 
     xpath(vlan_id, "/VNET/VLAN_ID", "");
     xpath(outer_vlan_id, "/VNET/OUTER_VLAN_ID", "");
@@ -784,6 +820,12 @@ int VirtualNetwork::nic_attribute(
     set<int> cluster_ids = get_cluster_ids();
 
     nic->replace("CLUSTER_ID", one_util::join(cluster_ids, ','));
+
+
+    if (!bridge_type.empty())
+    {
+        nic->replace("BRIDGE_TYPE", bridge_type);
+    }
 
     for (it = inherit_attrs.begin(); it != inherit_attrs.end(); it++)
     {
@@ -1308,4 +1350,47 @@ void VirtualNetwork::get_security_groups(set<int> & sgs)
     }
 
     ar_pool.get_all_security_groups(sgs);
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+int VirtualNetwork::parse_bridge_type(const string &vn_mad, string &error_str)
+{
+    const VectorAttribute* vatt;
+    std::string br_type;
+
+    ostringstream oss;
+
+    if ( Nebula::instance().get_vn_conf_attribute(vn_mad, vatt) != 0 )
+    {
+        goto error_conf;
+    }
+
+    if ( vatt->vector_value("BRIDGE_TYPE", br_type) == -1)
+    {
+        goto error;
+    }
+    else
+    {
+        if (str_to_bridge_type(br_type) == UNDEFINED)
+        {
+            goto error;
+        }
+        bridge_type = br_type;
+    }
+
+    return 0;
+
+error_conf:
+    oss << "VN_MAD named \"" << vn_mad << "\" is not defined in oned.conf";
+    goto error_common;
+
+error:
+    oss << "Attribute bridge type in VN_MAD_CONF for "
+        << vn_mad << " is missing or has wrong value in oned.conf";
+
+error_common:
+    error_str = oss.str();
+    return -1;
 }

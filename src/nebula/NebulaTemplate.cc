@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -157,8 +157,8 @@ void OpenNebulaTemplate::set_multiple_conf_default()
     set_conf_ds("ssh",            "",                     "NO");
     set_conf_ds("vmfs",           "BRIDGE_LIST",          "NO");
     set_conf_ds("vcenter",
-		"VCENTER_INSTANCE_ID, VCENTER_DS_REF, VCENTER_DC_REF, VCENTER_HOST, VCENTER_USER, VCENTER_PASSWORD",
-		"NO");
+        "VCENTER_INSTANCE_ID, VCENTER_DS_REF, VCENTER_DC_REF, VCENTER_HOST, VCENTER_USER, VCENTER_PASSWORD",
+        "NO");
     set_conf_ds("ceph",
                 "DISK_TYPE,BRIDGE_LIST,CEPH_HOST,CEPH_USER,CEPH_SECRET",
                 "NO");
@@ -199,6 +199,34 @@ void OpenNebulaTemplate::set_multiple_conf_default()
     set_conf_auth("server_x509", "NO", "NO", "-1");
 
     register_multiple_conf_default("AUTH_MAD_CONF");
+
+/*
+#*******************************************************************************
+# Virtual Network Configuration
+#*******************************************************************************
+#dummy
+#802.1Q
+#ebtables
+#fw
+#ovswitch
+#vxlan
+#vcenter
+#ovswitch_vxlan
+#bridge
+#******
+*/
+
+    set_conf_vn("dummy", "linux");
+    set_conf_vn("802.1Q", "linux");
+    set_conf_vn("ebtables", "linux");
+    set_conf_vn("fw", "linux");
+    set_conf_vn("ovswitch", "openvswitch");
+    set_conf_vn("vxlan", "linux");
+    set_conf_vn("vcenter", "vcenter_port_groups");
+    set_conf_vn("ovswitch_vxlan", "openvswitch");
+    set_conf_vn("bridge", "linux");
+
+    register_multiple_conf_default("VN_MAD_CONF");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -357,6 +385,23 @@ void OpenNebulaTemplate::set_conf_auth(const std::string& name,
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
+void OpenNebulaTemplate::set_conf_vn(const std::string& name,
+                                         const std::string& bridge_type)
+{
+    VectorAttribute *   vattribute;
+    std::map<std::string,std::string>  vvalue;
+
+    vvalue.insert(make_pair("NAME", name));
+    vvalue.insert(make_pair("BRIDGE_TYPE", bridge_type));
+
+    vattribute = new VectorAttribute("VN_MAD_CONF", vvalue);
+    conf_default.insert(make_pair(vattribute->name(), vattribute));
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+
 void OpenNebulaTemplate::set_conf_default()
 {
     VectorAttribute *   vattribute;
@@ -402,7 +447,7 @@ void OpenNebulaTemplate::set_conf_default()
     set_conf_single("LISTEN_ADDRESS", "0.0.0.0");
     set_conf_single("SCRIPTS_REMOTE_DIR", "/var/tmp/one");
     set_conf_single("VM_SUBMIT_ON_HOLD", "NO");
-    set_conf_single("API_LIST_ORDER", "ASC");
+    set_conf_single("API_LIST_ORDER", "DESC");
 
     //DB CONFIGURATION
     vvalue.insert(make_pair("BACKEND","sqlite"));
@@ -500,7 +545,7 @@ void OpenNebulaTemplate::set_conf_default()
     set_conf_single("TIMEOUT", "15");
     set_conf_single("RPC_LOG", "NO");
     set_conf_single("MESSAGE_SIZE", "1073741824");
-    set_conf_single("LOG_CALL_FORMAT", "Req:%i UID:%u %m invoked %l");
+    set_conf_single("LOG_CALL_FORMAT", "Req:%i UID:%u IP:%A %m invoked %l");
 
 /*
 #*******************************************************************************
@@ -749,6 +794,7 @@ static int _set_vm_auth_ops(const std::string& ops_str,
             ops_set.set(History::DISK_SNAPSHOT_CREATE_ACTION);
             ops_set.set(History::DISK_SNAPSHOT_DELETE_ACTION);
             ops_set.set(History::DISK_SNAPSHOT_REVERT_ACTION);
+            ops_set.set(History::DISK_SNAPSHOT_RENAME_ACTION);
         }
         else if ( the_op == "terminate" )
         {

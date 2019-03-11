@@ -4,6 +4,7 @@ link_logo:
 text_link_logo:
 confirm_vms: false
 filter-view: true
+do_count_animation: true
 enabled_tabs:
     - dashboard-tab
     - instances-top-tab
@@ -22,6 +23,7 @@ enabled_tabs:
     - marketplaceapps-tab
     - network-top-tab
     - vnets-tab
+    - vnets-templates-tab
     - vnets-topology-tab
     #- secgroups-tab
     - infrastructure-top-tab
@@ -65,6 +67,12 @@ features:
 
     # True to show the host datatable to instantiate VM
     show_host_instantiate: false
+
+    # True to show context section to instantiate Network
+    show_context_instantiate_vnet: true
+
+    # True to show context section to instantiate Network
+    show_security_instantiate_vnet: true
 
     # True to show an input to specify the the VMs and Template path/folder where a vCenter VM will
     # deployed to
@@ -244,6 +252,8 @@ tabs:
             Template.delete_dialog: true
             Template.share: false
             Template.unshare: false
+            Template.lockU: true
+            Template.unlock: false
             Template.edit_labels: true
             Template.menu_labels: true
         template_creation_tabs:
@@ -391,11 +401,14 @@ tabs:
             VM.snapshot_delete: true
             VM.disk_snapshot_create: false
             VM.disk_snapshot_revert: false
+            VM.disk_snapshot_rename: false
             VM.disk_snapshot_delete: false
             VM.resched: true
             VM.unresched: true
             VM.save_as_template: true
             VM.updateconf: true
+            VM.lockU: true
+            VM.unlock: true
             VM.edit_labels: true
             VM.menu_labels: true
     oneflow-services-tab:
@@ -478,6 +491,8 @@ tabs:
             VirtualRouter.delete: true
             VirtualRouter.attachnic: true
             VirtualRouter.detachnic: true
+            VirtualRouter.lockU: true
+            VirtualRouter.unlock: true
             VirtualRouter.edit_labels: true
             VirtualRouter.menu_labels: true
     infrastructure-top-tab:
@@ -633,6 +648,8 @@ tabs:
             Image.snapshot_flatten: false
             Image.snapshot_revert: false
             Image.snapshot_delete: false
+            Image.lockU: true
+            Image.unlock: false
             Image.edit_labels: true
             Image.menu_labels: true
     files-tab:
@@ -691,6 +708,8 @@ tabs:
             MarketPlace.chgrp: true
             MarketPlace.chmod: true
             MarketPlace.delete: true
+            MarketPlace.lockU: true
+            MarketPlace.unlock: true
             MarketPlace.edit_labels: true
             MarketPlace.menu_labels: true
     marketplaceapps-tab:
@@ -767,8 +786,46 @@ tabs:
             Network.add_ar: true
             Network.remove_ar: true
             Network.update_ar: true
+            Network.lockU: true
+            Network.unlock: true
             Network.edit_labels: true
             Network.menu_labels: true
+    vnets-templates-tab:
+        panel_tabs:
+            vnet_template_info_tab: true
+            vnet_template_ar_list_tab: true
+            vnet_template_sg_list_tab: true
+            vnet_template_clusters_tab: true
+            vnet_template_template_tab: true
+        table_columns:
+            - 0         # Checkbox
+            - 1         # ID
+            - 2         # Name
+            - 3         # Owner
+            - 4         # Group
+            - 6         # Cluster
+            #- 10       # Labels
+            #- 11       # Search data
+        actions:
+            VNTemplate.refresh: true
+            VNTemplate.create_dialog: true
+            VNTemplate.instantiate_vnets: true
+            VNTemplate.update_dialog: true
+            VNTemplate.rename: true
+            VNTemplate.chown: true
+            VNTemplate.chgrp: true
+            VNTemplate.chmod: true
+            VNTemplate.delete: true
+            VNTemplate.hold_lease: true
+            VNTemplate.release_lease: true
+            VNTemplate.add_ar: true
+            VNTemplate.remove_ar: true
+            VNTemplate.update_ar: true
+            VNTemplate.update: true
+            VNTemplate.lockU: true
+            VNTemplate.unlock: true
+            VNTemplate.edit_labels: true
+            VNTemplate.menu_labels: true
     vnets-topology-tab:
         panel_tabs:
         actions:
@@ -856,3 +913,5 @@ tabs:
            VMGroup.chmod: true
            VMGroup.chown: true
            VMGroup.chgrp: true
+           VMGroup.lockU: true
+           VMGroup.unlock: true

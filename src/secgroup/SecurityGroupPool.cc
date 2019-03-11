@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -38,7 +38,7 @@ SecurityGroupPool::SecurityGroupPool(SqlDB * db):PoolSQL(db,SecurityGroup::table
 
         Nebula& nd         = Nebula::instance();
         UserPool * upool   = nd.get_upool();
-        User *    oneadmin = upool->get(0);
+        User *    oneadmin = upool->get_ro(0);
 
         string error;
 
@@ -169,7 +169,7 @@ void SecurityGroupPool::get_security_group_rules(int vmid, int sgid,
 
             VectorAttribute* rule = *rule_it;
 
-            VirtualNetwork* vnet  = vnet_pool->get(vnet_id);
+            VirtualNetwork* vnet  = vnet_pool->get_ro(vnet_id);
 
             if (vnet == 0)
             {

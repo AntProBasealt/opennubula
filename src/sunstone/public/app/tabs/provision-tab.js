@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -736,6 +736,7 @@ define(function(require) {
     require("./vms-tab/dialogs/attach-disk"),
     require("./vms-tab/dialogs/disk-snapshot"),
     require("./vms-tab/dialogs/disk-saveas"),
+    require("./vms-tab/dialogs/disk-snapshot-rename"),
     require("./vms-tab/dialogs/attach-nic"),
     require("./vms-tab/dialogs/revert"),
     require("./vms-tab/dialogs/snapshot"),

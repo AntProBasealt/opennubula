@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -298,6 +298,16 @@ define(function(require) {
     "VROUTER_IP6_ULA"
   ];
 
+  var NIC_ALIAS_IP_ATTRS = [
+    "IP",
+    "IP6",
+    "IP6_GLOBAL",
+    "IP6_ULA",
+    "VROUTER_IP",
+    "VROUTER_IP6_GLOBAL",
+    "VROUTER_IP6_ULA"
+  ];
+
   var EXTERNAL_NETWORK_ATTRIBUTES = [
     'GUEST_IP',
     'GUEST_IP_ADDRESSES',
@@ -447,6 +457,14 @@ define(function(require) {
       var action_obj = params.data.extra_param;
       OpenNebulaAction.simple_action(params, RESOURCE, "migrate", action_obj);
     },
+    "migrate_poff": function(params) {
+      var action_obj = params.data.extra_param;
+      OpenNebulaAction.simple_action(params, RESOURCE, "migrate_poff", action_obj);
+    },
+    "migrate_poff_hard": function(params) {
+      var action_obj = params.data.extra_param;
+      OpenNebulaAction.simple_action(params, RESOURCE, "migrate_poff_hard", action_obj);
+    },
     "disk_saveas": function(params) {
       var action_obj = params.data.extra_param;
       OpenNebulaAction.simple_action(params, RESOURCE, "disk_saveas", action_obj);
@@ -470,6 +488,10 @@ define(function(require) {
     "disk_snapshot_revert": function(params) {
       var action_obj = params.data.extra_param;
       OpenNebulaAction.simple_action(params, RESOURCE, "disk_snapshot_revert", action_obj);
+    },
+    "disk_snapshot_rename": function(params) {
+      var action_obj = params.data.extra_param;
+      OpenNebulaAction.simple_action(params, RESOURCE, "disk_snapshot_rename", action_obj);
     },
     "disk_snapshot_delete": function(params) {
       var action_obj = params.data.extra_param;
@@ -642,6 +664,7 @@ define(function(require) {
       return MIGRATE_ACTION_STR[stateId];
     },
     "ipsStr": ipsStr,
+    "aliasStr": aliasStr,
     "retrieveExternalIPs": retrieveExternalIPs,
     "retrieveExternalNetworkAttrs": retrieveExternalNetworkAttrs,
     "isNICGraphsSupported": isNICGraphsSupported,
@@ -776,6 +799,38 @@ define(function(require) {
     {
       $.each(nic, function(index, value) {
         $.each(NIC_IP_ATTRS, function(j, attr){
+          if (value[attr]) {
+            ips.push(value[attr]);
+          }
+        });
+      });
+    }
+
+    if (ips.length > 0) {
+      return ips.join(divider);
+    } else {
+      return '--';
+    }
+  };
+
+  // Return the Alias or several Aliases of a VM
+  function aliasStr(element, divider) {
+    var divider = divider || "<br>"
+    var nic_alias = element.TEMPLATE.NIC_ALIAS;
+    var ips = [];
+
+    if (nic_alias == undefined){
+      nic_alias = [];
+    }
+
+    if (!$.isArray(nic_alias)) {
+      nic_alias = [nic_alias];
+    }
+
+    if(ips.length==0)
+    {
+      $.each(nic_alias, function(index, value) {
+        $.each(NIC_ALIAS_IP_ATTRS, function(j, attr){
           if (value[attr]) {
             ips.push(value[attr]);
           }

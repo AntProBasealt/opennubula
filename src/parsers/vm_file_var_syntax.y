@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -113,7 +113,7 @@ int get_image_path(VirtualMachine * vm,
             delete vfile;
         }
 
-        img = ipool->get(val1, uid);
+        img = ipool->get_ro(val1, uid);
 
         if ( img == 0 )
         {
@@ -134,7 +134,7 @@ int get_image_path(VirtualMachine * vm,
 
         if ( !is.fail() )
         {
-            img = ipool->get(iid);
+            img = ipool->get_ro(iid);
         }
 
         if ( img == 0 )
@@ -157,11 +157,11 @@ int get_image_path(VirtualMachine * vm,
 
     img->get_permissions(perm);
 
-    img->unlock();
+    img->unlock();;
 
     set<int> gids;
 
-    user = upool->get(vm->get_uid());
+    user = upool->get_ro(vm->get_uid());
 
     if (user != 0)
     {

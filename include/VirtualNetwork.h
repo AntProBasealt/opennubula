@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -64,6 +64,14 @@ public:
         BRIDGE         = 9
     };
 
+    enum BridgeType {
+        UNDEFINED           = 0,
+        LINUX               = 1,
+        OPENVSWITCH         = 2,
+        VCENTER_PORT_GROUPS = 3,
+        BRNONE              = 4
+    };
+
     static string driver_to_str(VirtualNetworkDriver ob)
     {
         switch (ob)
@@ -124,6 +132,57 @@ public:
             return NONE;
         }
     };
+
+    static string bridge_type_to_str(BridgeType ob)
+    {
+        switch (ob)
+        {
+            case UNDEFINED:
+            case LINUX:
+                return "linux";
+            case OPENVSWITCH:
+                return "openvswitch";
+            case VCENTER_PORT_GROUPS:
+                return "vcenter_port_groups";
+            case BRNONE:
+                return "none";
+                break;
+        }
+    };
+
+    static BridgeType str_to_bridge_type(const string& ob)
+    {
+        if ( ob == "linux" )
+        {
+            return LINUX;
+        }
+        else if ( ob == "openvswitch" )
+        {
+            return OPENVSWITCH;
+        }
+        else if ( ob == "vcenter_port_groups" )
+        {
+            return VCENTER_PORT_GROUPS;
+        }
+        else if (ob == "none")
+        {
+            return BRNONE;
+        }
+        else
+        {
+            return UNDEFINED;
+        }
+    };
+
+    /**
+     *  Check consistency of PHYDEV, BRIDGE and VLAN attributes depending on
+     *  the network driver
+     *    @param error_str describing the error
+     *    @return 0 on success -1 otherwise
+     */
+    static int parse_phydev_vlans(const Template* tmpl, const string& vn_mad, const string& phydev, 
+                                  const string& bridge, const bool auto_id, const string& vlan_id, 
+                                  const bool auto_outer, const string& outer_id, string& estr);
 
     // *************************************************************************
     // Virtual Network Public Methods
@@ -575,6 +634,11 @@ private:
      */
     ObjectCollection vrouters;
 
+    /**
+     *  Bridge type of the VirtualNetwork
+     */
+    string bridge_type;
+
     // *************************************************************************
     // VLAN ID functions
     // *************************************************************************
@@ -590,14 +654,6 @@ private:
      */
     void parse_vlan_id(const char * id_name, const char * auto_name,
             string& id, bool& auto_id);
-
-    /**
-     *  Check consistency of PHYDEV, BRIDGE and VLAN attributes depending on
-     *  the network driver
-     *    @param error_str describing the error
-     *    @return 0 on success -1 otherwise
-     */
-    int parse_phydev_vlans(string& error_str);
 
     // *************************************************************************
     // Address allocation funtions
@@ -643,6 +699,17 @@ private:
     {
         return ar_pool.allocate_by_ip6(ip, ot, oid, nic, inherit);
     }
+
+    // *************************************************************************
+    // BRIDGE TYPE functions
+    // *************************************************************************
+
+    /**
+     *  This function parses the BRIDGE TYPE attribute.
+     *
+     *    @param br_type the bridge type associated to the nic
+     */
+    int parse_bridge_type(const string &vn_mad, string &error_str);
 
     // *************************************************************************
     // DataBase implementation (Private)

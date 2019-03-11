@@ -1,6 +1,8 @@
 
 # OpenNebula
 
+[![Build Status](https://travis-ci.org/OpenNebula/one.svg?branch=master)](https://travis-ci.org/OpenNebula/one)
+
 ## Description
 
 OpenNebula is an open-source project delivering a simple but feature-rich and
@@ -33,6 +35,7 @@ Additionally, to build OpenNebula from source you need:
 * **flex** >= 2.5 (optional, only needed to rebuild the parsers)
 * **bison** >= 2.3 (optional, only needed to rebuild the parsers)
 * **libxml2-dev**
+* **libvncserver-dev** (optional, only needed to build svncterm_server)
 
 ### Ruby Libraries Requirements
 
@@ -115,6 +118,7 @@ The argument expression *[OPTIONAL]* is used to set non-default values for:
         new_xmlrpc  yes if you have an xmlrpc-c version >= 1.31
         sunstone    yes if you want to build sunstone minified files
         systemd     yes if you want to build systemd support
+        svncterm    no if you want to skip building vnc support for LXD drivers
 
 
 ### Installation
@@ -141,6 +145,8 @@ where **install_options** can be one or more of:
     -r      remove Opennebula, only useful if -d was not specified,
             otherwise rm -rf $ONE_LOCATION would do the job
     -p      do not install OpenNebula Sunstone non-minified files
+    -G      install only OpenNebula Gate
+    -f      install only OpenNebula Flow
     -h      prints installer help
 
 
@@ -168,7 +174,7 @@ Support: https://opennebula.org/support
 
 ## License
 
-Copyright 2002-2018, OpenNebula Project, OpenNebula Systems (formerly C12G Labs)
+Copyright 2002-2019, OpenNebula Project, OpenNebula Systems (formerly C12G Labs)
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may
 not use this file except in compliance with the License. You may obtain

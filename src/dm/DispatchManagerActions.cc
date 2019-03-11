@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -181,7 +181,8 @@ int DispatchManager::import(VirtualMachine * vm, const RequestAttributes& ra)
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int DispatchManager::migrate(VirtualMachine * vm, const RequestAttributes& ra)
+int DispatchManager::migrate(VirtualMachine * vm, int poff_migrate,
+        const RequestAttributes& ra)
 {
     ostringstream oss;
     int           vid;
@@ -202,7 +203,21 @@ int DispatchManager::migrate(VirtualMachine * vm, const RequestAttributes& ra)
          vm->get_state() == VirtualMachine::POWEROFF ||
          vm->get_state() == VirtualMachine::SUSPENDED)
     {
-        lcm->trigger(LCMAction::MIGRATE, vid, ra);
+        switch (poff_migrate) {
+            case 0:
+                lcm->trigger(LCMAction::MIGRATE, vid, ra);
+                break;
+            case 1:
+                lcm->trigger(LCMAction::POFF_MIGRATE, vid, ra);
+                break;
+            case 2:
+                lcm->trigger(LCMAction::POFF_HARD_MIGRATE, vid, ra);
+                break;
+
+            default: /* Defaults to <5.8 behavior */
+                lcm->trigger(LCMAction::MIGRATE, vid, ra);
+                break;
+        }
     }
     else
     {
@@ -263,7 +278,7 @@ error:
 /* ************************************************************************** */
 /* ************************************************************************** */
 
-void DispatchManager::free_vm_resources(VirtualMachine * vm)
+void DispatchManager::free_vm_resources(VirtualMachine * vm, bool check_images)
 {
     vector<Template *> ds_quotas;
 
@@ -298,7 +313,7 @@ void DispatchManager::free_vm_resources(VirtualMachine * vm)
 
     vm->release_vmgroup();
 
-    vm->release_disk_images(ds_quotas);
+    vm->release_disk_images(ds_quotas, check_images);
 
     vm->set_state(VirtualMachine::DONE);
 
@@ -397,7 +412,7 @@ int DispatchManager::terminate(int vid, bool hard, const RequestAttributes& ra,
         case VirtualMachine::HOLD:
         case VirtualMachine::CLONING:
         case VirtualMachine::CLONING_FAILURE:
-            free_vm_resources(vm);
+            free_vm_resources(vm, true);
             break;
 
         case VirtualMachine::DONE:
@@ -462,7 +477,7 @@ int DispatchManager::undeploy(int vid, bool hard, const RequestAttributes& ra,
 {
     ostringstream oss;
 
-    VirtualMachine * vm = vmpool->get(vid);
+    VirtualMachine * vm = vmpool->get_ro(vid);
 
     if ( vm == 0 )
     {
@@ -517,7 +532,7 @@ int DispatchManager::poweroff (int vid, bool hard, const RequestAttributes& ra,
 {
     ostringstream oss;
 
-    VirtualMachine * vm = vmpool->get(vid);
+    VirtualMachine * vm = vmpool->get_ro(vid);
 
     if ( vm == 0 )
     {
@@ -688,7 +703,7 @@ int DispatchManager::stop(int vid, const RequestAttributes& ra,
 {
     ostringstream oss;
 
-    VirtualMachine * vm = vmpool->get(vid);
+    VirtualMachine * vm = vmpool->get_ro(vid);
 
     if ( vm == 0 )
     {
@@ -735,7 +750,7 @@ int DispatchManager::suspend(int vid, const RequestAttributes& ra,
 {
     ostringstream oss;
 
-    VirtualMachine * vm = vmpool->get(vid);
+    VirtualMachine * vm = vmpool->get_ro(vid);
 
     if ( vm == 0 )
     {
@@ -1078,7 +1093,7 @@ int DispatchManager::delete_vm(VirtualMachine * vm, const RequestAttributes& ra,
 
     if(host_id != -1)
     {
-        Host * host = hpool->get(host_id);
+        Host * host = hpool->get_ro(host_id);
 
         if ( host == 0 )
         {
@@ -1115,7 +1130,7 @@ int DispatchManager::delete_vm(VirtualMachine * vm, const RequestAttributes& ra,
                 tm->trigger(TMAction::EPILOG_DELETE, vid);
             }
 
-            free_vm_resources(vm);
+            free_vm_resources(vm, true);
         break;
 
         case VirtualMachine::STOPPED:
@@ -1129,7 +1144,7 @@ int DispatchManager::delete_vm(VirtualMachine * vm, const RequestAttributes& ra,
                 tm->trigger(TMAction::EPILOG_DELETE, vid);
             }
 
-            free_vm_resources(vm);
+            free_vm_resources(vm, true);
         break;
 
         case VirtualMachine::INIT:
@@ -1137,7 +1152,7 @@ int DispatchManager::delete_vm(VirtualMachine * vm, const RequestAttributes& ra,
         case VirtualMachine::HOLD:
         case VirtualMachine::CLONING:
         case VirtualMachine::CLONING_FAILURE:
-            free_vm_resources(vm);
+            free_vm_resources(vm, true);
         break;
 
         case VirtualMachine::ACTIVE:
@@ -1254,6 +1269,49 @@ int DispatchManager::delete_recreate(VirtualMachine * vm,
     }
 
     return rc;
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+int DispatchManager::delete_vm_db(VirtualMachine * vm,
+            const RequestAttributes& ra, string& error_str)
+{
+    ostringstream oss;
+
+    int cpu, mem, disk;
+    vector<VectorAttribute *> pci;
+
+    int vid = vm->get_oid();
+
+    oss << "Deleting VM from DB " << vm->get_oid();
+    NebulaLog::log("DiM",Log::DEBUG,oss);
+
+    switch (vm->get_state())
+    {
+        case VirtualMachine::SUSPENDED:
+        case VirtualMachine::POWEROFF:
+        case VirtualMachine::ACTIVE:
+            vm->get_requirements(cpu, mem, disk, pci);
+
+            hpool->del_capacity(vm->get_hid(), vid, cpu, mem, disk, pci);
+
+        case VirtualMachine::STOPPED:
+        case VirtualMachine::UNDEPLOYED:
+        case VirtualMachine::INIT:
+        case VirtualMachine::PENDING:
+        case VirtualMachine::HOLD:
+        case VirtualMachine::CLONING:
+        case VirtualMachine::CLONING_FAILURE:
+            free_vm_resources(vm, false);
+        break;
+
+        case VirtualMachine::DONE:
+            vm->unlock();
+        break;
+    }
+
+    return 0;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1709,7 +1767,14 @@ int DispatchManager::attach_nic(int vid, VirtualMachineTemplate* tmpl,
 
         vm->set_etime(the_time);
 
-        vm->set_action(History::NIC_ATTACH_ACTION, ra.uid, ra.gid, ra.req_id);
+        if ( tmpl->get("NIC") != 0 )
+        {
+            vm->set_action(History::NIC_ATTACH_ACTION, ra.uid, ra.gid, ra.req_id);
+        }
+        else
+        {
+            vm->set_action(History::ALIAS_ATTACH_ACTION, ra.uid, ra.gid, ra.req_id);
+        }
 
         vmpool->update_history(vm);
 
@@ -1800,7 +1865,14 @@ int DispatchManager::detach_nic(int vid, int nic_id,const RequestAttributes& ra,
 
         vm->set_etime(the_time);
 
-        vm->set_action(History::NIC_DETACH_ACTION, ra.uid, ra.gid, ra.req_id);
+        if ( !vm->get_nic(nic_id)->is_alias() )
+        {
+            vm->set_action(History::NIC_DETACH_ACTION, ra.uid, ra.gid, ra.req_id);
+        }
+        else
+        {
+            vm->set_action(History::ALIAS_DETACH_ACTION, ra.uid, ra.gid, ra.req_id);
+        }
 
         vmpool->update_history(vm);
 

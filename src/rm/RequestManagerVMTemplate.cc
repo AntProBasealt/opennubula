@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -43,7 +43,7 @@ void VMTemplateInstantiate::request_execute(xmlrpc_c::paramList const& paramList
         clone_template = xmlrpc_c::value_boolean(paramList.getBoolean(5));
     }
 
-    VMTemplate * tmpl = static_cast<VMTemplatePool* > (pool)->get(id);
+    VMTemplate * tmpl = static_cast<VMTemplatePool* > (pool)->get_ro(id);
 
     if ( tmpl == 0 )
     {
@@ -146,7 +146,7 @@ Request::ErrorCode VMTemplateInstantiate::request_execute(int id, string name,
     /* ---------------------------------------------------------------------- */
     /* Get, check and clone the template                                      */
     /* ---------------------------------------------------------------------- */
-    rtmpl = tpool->get(id);
+    rtmpl = tpool->get_ro(id);
 
     if ( rtmpl == 0 )
     {
@@ -314,8 +314,6 @@ Request::ErrorCode VMTemplateInstantiate::merge(
                 const string    &str_uattrs,
                 RequestAttributes& att)
 {
-
-
 	int rc;
 
 	VirtualMachineTemplate  uattrs;

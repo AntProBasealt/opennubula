@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -57,13 +57,25 @@ define(function(require) {
     "VM.migrate" : {
       type: "action",
       text: Locale.tr("Migrate"),
-      layout: "vmsplanification_buttons",
+      layout: "vmsmigration_buttons",
+      custom_classes : "state-dependent"
+    },
+    "VM.migrate_poff" : {
+      type: "action",
+      text: Locale.tr("Migrate") + ' <span class="label secondary radius">' + Locale.tr("Poweroff") + '</span>',
+      layout: "vmsmigration_buttons",
+      custom_classes : "state-dependent"
+    },
+    "VM.migrate_poff_hard" : {
+      type: "action",
+      text: Locale.tr("Migrate") + ' <span class="label secondary radius">' + Locale.tr("Poweroff-hard") + '</span>',
+      layout: "vmsmigration_buttons",
       custom_classes : "state-dependent"
     },
     "VM.migrate_live" : {
       type: "action",
       text: Locale.tr("Migrate") + ' <span class="label secondary radius">' + Locale.tr("live") + '</span>',
-      layout: "vmsplanification_buttons",
+      layout: "vmsmigration_buttons",
       custom_classes : "state-dependent"
     },
     "VM.hold" : {
@@ -170,6 +182,7 @@ define(function(require) {
                     <option value="0">' + Locale.tr("failure") + '</option>\
                     <option value="3">' + Locale.tr("delete") + '</option>\
                     <option value="4">' + Locale.tr("delete-recreate") + '</option>\
+                    <option value="5">' + Locale.tr("delete-db") + '</option>\
                   </select>'              ,
       tip: Locale.tr("Recovers a stuck VM that is waiting for a driver operation. \
                     The recovery may be done by failing, succeeding or retrying the current operation. \
@@ -177,7 +190,8 @@ define(function(require) {
                     was successful or not, or if it can be retried.\
                     <br/>\
                     <br/>Delete: This will delete the selected VMs\
-                    <br/>Delete-recreate: This will delete and recreate VMs to PENDING state"),
+                    <br/>Delete-recreate: This will delete and recreate VMs to PENDING state\
+                    <br/>Delete-db: This will delete the selected VMs, but will not perform any action on the hypervisor"),
       custom_classes : "state-dependent"
     },
     "VM.startvnc" : {

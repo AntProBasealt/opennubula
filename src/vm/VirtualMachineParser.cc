@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -112,7 +112,7 @@ int VirtualMachine::set_os_file(VectorAttribute* os, const string& base_name,
 
     img_id = img_ids.back();
 
-    img = ipool->get(img_id);
+    img = ipool->get_ro(img_id);
 
     if ( img == 0 )
     {
@@ -157,7 +157,7 @@ int VirtualMachine::set_os_file(VectorAttribute* os, const string& base_name,
         return -1;
     }
 
-    ds = ds_pool->get(ds_id);
+    ds = ds_pool->get_ro(ds_id);
 
     if ( ds == 0 )
     {

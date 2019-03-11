@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -59,8 +59,9 @@ public:
      *    @param vid the VM id
      *    @param hid the id of the target host
      *    @param resched the machine is going to be rescheduled
+     *    @param extra template with result nics
      */
-    int dispatch(int vid, int hid, int dsid, bool resched) const;
+    int dispatch(int vid, int hid, int dsid, bool resched, const string& extra_template) const;
 
     /**
      *  Update the VM template
@@ -164,8 +165,8 @@ protected:
     {
         ostringstream oss;
 
-        oss << "/VM_POOL/VM/USER_TEMPLATE/SCHED_ACTION[TIME < " << time(0)
-            << " and not(DONE > 0)]/../..";
+        oss << "/VM_POOL/VM/USER_TEMPLATE/SCHED_ACTION[(TIME < " << time(0)
+            << " and not(DONE > 0)) or ( TIME[starts-with(text(),\"+\")] and not(DONE>0) ) ]/../..";
 
         return get_nodes(oss.str().c_str(), content);
     }

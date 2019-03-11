@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -224,7 +224,7 @@ function get_rbd_cmd
     echo "ssh '$(esc_sq "$DST_HOST")' \"$RBD export '$(esc_sq "$SOURCE")' -\""
 }
 
-TEMP=`getopt -o m:s:l:c:n -l md5:,sha1:,limit:,max-size:,nodecomp -- "$@"`
+TEMP=`getopt -o m:s:l:c:n -l md5:,sha1:,limit:,max-size:,convert:,nodecomp -- "$@"`
 
 if [ $? != 0 ] ; then
     echo "Arguments error" >&2
@@ -255,6 +255,10 @@ while true; do
             ;;
         -c|--max-size)
             export MAX_SIZE="$2"
+            shift 2
+            ;;
+        --convert)
+            export CONVERT="$2"
             shift 2
             ;;
         --)
@@ -324,6 +328,10 @@ rbd://*)
 vcenter://*)
     command="$VAR_LOCATION/remotes/datastore/vcenter_downloader.rb '$(esc_sq "$FROM")'"
     ;;
+lxd://*)
+    file_type="application/octet-stream"
+    command="$VAR_LOCATION/remotes/datastore/lxd_downloader.sh \"$FROM\""
+    ;;
 *)
     if [ ! -r $FROM ]; then
         echo "Cannot read from $FROM" >&2
@@ -333,7 +341,7 @@ vcenter://*)
     ;;
 esac
 
-file_type=$(get_type "$command")
+[ -z "$file_type" ] && file_type=$(get_type "$command")
 decompressor=$(get_decompressor "$file_type")
 
 if [ -z "${MAX_SIZE}" ]; then
@@ -389,7 +397,24 @@ if [ -n "$HASH_TYPE" ]; then
     fi
 fi
 
+function convert_image
+{
+    original_type=$(qemu-img info $TO | grep "^file format:" | awk '{print $3}' || :)
+    if [ "$CONVERT" != "$original_type" ]; then
+        tmpimage=$TO".tmp"
+        qemu-img convert -f $original_type -O $CONVERT $TO $tmpimage
+        mv $tmpimage $TO
+    fi
+}
+
 # Unarchive only if the destination is filesystem
 if [ "$TO" != "-" ]; then
     unarchive "$TO"
+
+    if [ -n "$CONVERT" ] && [ -f "$TO" ]; then
+        convert_image
+    fi
+
+elif [ -n "$CONVERT" ]; then
+    convert_image
 fi

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -208,8 +208,8 @@ define(function(require) {
   function _submitAdvanced(context) {
     if (this.action == "create") {
       var template = $("textarea#template", context).val();
-      var vm_group_json = {vm_group: {vm_group_raw: template}};
-      Sunstone.runAction("VMGroup.create",vm_group_json);
+      var vm_group_json = { vm_group: { vm_grp_raw: template } };
+      Sunstone.runAction("VMGroup.create", vm_group_json);
       return false;
     } else if (this.action == "update") {
       var template_raw = $("textarea#template", context).val();

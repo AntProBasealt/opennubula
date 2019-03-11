@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -61,7 +61,8 @@ const std::vector<ContextVariable> NETWORK_CONTEXT = {
     {"MTU", "GUEST_MTU", "", true},
     {"VLAN_ID", "VLAN_ID", "", true},
     {"VROUTER_IP", "VROUTER_IP", "", false},
-    {"VROUTER_MANAGEMENT", "VROUTER_MANAGEMENT", "", false}
+    {"VROUTER_MANAGEMENT", "VROUTER_MANAGEMENT", "", false},
+    {"EXTERNAL", "EXTERNAL", "", false},
 };
 
 const std::vector<ContextVariable> NETWORK6_CONTEXT = {
@@ -71,6 +72,7 @@ const std::vector<ContextVariable> NETWORK6_CONTEXT = {
     {"CONTEXT_FORCE_IPV4", "CONTEXT_FORCE_IPV4", "", true},
     {"IP6_PREFIX_LENGTH", "PREFIX_LENGTH", "", true},
     {"VROUTER_IP6", "VROUTER_IP6_GLOBAL", "VROUTER_IP6", false},
+    {"EXTERNAL", "EXTERNAL", "", false},
 };
 
 /* -------------------------------------------------------------------------- */
@@ -106,7 +108,14 @@ int VirtualMachine::generate_context(string &files, int &disk_id,
     }
 
     //Generate dynamic context attributes
-    if ( generate_network_context(context, error_str) != 0 )
+    int rc = generate_network_context(context, error_str, false); //no AUTO mode
+
+    if ( rc == 0 )
+    {
+        rc = generate_network_context(context, error_str, true); //AUTO mode
+    }
+
+    if ( rc != 0 )
     {
         ostringstream oss;
 
@@ -244,6 +253,9 @@ static void parse_context_network(const std::vector<ContextVariable>& cvars,
 {
     string nic_id = nic->vector_value("NIC_ID");
 
+    string alias_id  = nic->vector_value("ALIAS_ID");
+    string parent_id = nic->vector_value("PARENT_ID");
+
     std::vector<ContextVariable>::const_iterator it;
 
     for (it = cvars.begin(); it != cvars.end() ; ++it)
@@ -251,7 +263,15 @@ static void parse_context_network(const std::vector<ContextVariable>& cvars,
         ostringstream cvar;
         string cval;
 
-        cvar << "ETH" << nic_id << "_" << (*it).context_name;
+        if (nic->name() == "NIC")
+        {
+            cvar << "ETH" << nic_id << "_" << (*it).context_name;
+        }
+        else
+        {
+            cvar << "ETH" << parent_id << "_ALIAS" << alias_id << "_"
+                 << (*it).context_name;
+        }
 
         cval = nic->vector_value((*it).nic_name); //Check the NIC
 
@@ -274,11 +294,16 @@ static void parse_context_network(const std::vector<ContextVariable>& cvars,
     }
 }
 
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 
 int VirtualMachine::generate_network_context(VectorAttribute* context,
-        string& error_str)
+        string& error_str, bool only_auto)
 {
     bool net_context;
+    string net_mode = "";
+
+    bool parse_vnets = false; //VNETs needs parse, NIC context generated
 
     context->vector_value("NETWORK", net_context);
 
@@ -288,6 +313,7 @@ int VirtualMachine::generate_network_context(VectorAttribute* context,
     }
 
     vector<VectorAttribute *> vatts;
+    vector<VectorAttribute *> aatts;
     int rc;
 
     string  parsed;
@@ -296,16 +322,35 @@ int VirtualMachine::generate_network_context(VectorAttribute* context,
     VectorAttribute tmp_context("TMP_CONTEXT");
 
     int num_vatts = obj_template->get("NIC", vatts);
+    int num_aatts = obj_template->get("NIC_ALIAS", aatts);
+    int num_tatts = num_vatts + num_aatts;
 
-    if ( num_vatts == 0 )
+    if ( num_tatts == 0 )
     {
          return 0;
     }
 
-    for(int i=0; i<num_vatts; i++)
+    vatts.insert(vatts.end(), aatts.begin(), aatts.end());
+
+    for(int i=0; i<num_tatts; i++)
     {
+        std::string net_mode = vatts[i]->vector_value("NETWORK_MODE");
+        one_util::toupper(net_mode);
+
+        if ( net_mode == "AUTO" && !only_auto )
+        {
+            continue;
+        }
+
         parse_context_network(NETWORK_CONTEXT, &tmp_context, vatts[i]);
         parse_context_network(NETWORK6_CONTEXT, &tmp_context, vatts[i]);
+
+        parse_vnets = true;
+    }
+
+    if (!parse_vnets)
+    {
+        return 0;
     }
 
     str = tmp_context.marshall();
@@ -437,7 +482,7 @@ int VirtualMachine::generate_token_context(VectorAttribute * context, string& e)
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int VirtualMachine::parse_context(string& error_str)
+int VirtualMachine::parse_context(string& error_str, bool all_nics)
 {
     VectorAttribute * context = obj_template->get("CONTEXT");
 
@@ -453,8 +498,21 @@ int VirtualMachine::parse_context(string& error_str)
     // -------------------------------------------------------------------------
     // Add network context and parse variables
     // -------------------------------------------------------------------------
-    if (parse_context_variables(&context, error_str) == -1 ||
-            generate_network_context(context, error_str) == -1 )
+    if ( parse_context_variables(&context, error_str) == -1 )
+    {
+        return -1;
+    }
+
+    int rc;
+
+    rc = generate_network_context(context, error_str, false);
+
+    if ( rc != -1 && all_nics )
+    {
+        rc = generate_network_context(context, error_str, true);
+    }
+
+    if ( rc == -1 )
     {
         return -1;
     }
@@ -492,7 +550,7 @@ int VirtualMachine::parse_context(string& error_str)
 
             for ( it=img_ids.begin() ; it < img_ids.end(); it++ )
             {
-                img = ipool->get(*it);
+                img = ipool->get_ro(*it);
 
                 if ( img != 0 )
                 {
@@ -633,3 +691,37 @@ void VirtualMachine::clear_nic_context(int nicid)
 /* ------------------------------------------------------------------------ */
 /* ------------------------------------------------------------------------ */
 
+static void clear_context_alias_network(const std::vector<ContextVariable>& cvars,
+        VectorAttribute * context, int nic_id, int alias_id)
+{
+    ostringstream att_name;
+    std::vector<ContextVariable>::const_iterator it;
+
+    for (it = cvars.begin(); it != cvars.end() ; ++it)
+    {
+        att_name.str("");
+
+        att_name << "ETH" << nic_id << "_ALIAS" << alias_id << "_"
+                 << (*it).context_name;
+
+        context->remove(att_name.str());
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+
+void VirtualMachine::clear_nic_alias_context(int nicid, int aliasidx)
+{
+    VectorAttribute * context = obj_template->get("CONTEXT");
+
+    if (context == 0)
+    {
+        return;
+    }
+
+    clear_context_alias_network(NETWORK_CONTEXT, context, nicid, aliasidx);
+    clear_context_alias_network(NETWORK6_CONTEXT, context, nicid, aliasidx);
+}
+
+/* ------------------------------------------------------------------------ */
+/* ------------------------------------------------------------------------ */

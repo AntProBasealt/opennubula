@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -277,7 +277,7 @@ void  DispatchManager::done_action(int vid)
           (lcm_state == VirtualMachine::EPILOG ||
            lcm_state == VirtualMachine::CLEANUP_DELETE))
     {
-        free_vm_resources(vm);
+        free_vm_resources(vm, true);
     }
     else
     {
@@ -313,6 +313,8 @@ void  DispatchManager::resubmit_action(int vid)
         vm->set_state(VirtualMachine::LCM_INIT);
 
         vm->set_state(VirtualMachine::PENDING);
+
+        vm->set_deploy_id(""); //reset the deploy-id
 
         vmpool->update(vm);
 

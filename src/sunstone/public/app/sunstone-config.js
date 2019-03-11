@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -80,6 +80,14 @@ define(function(require) {
       }
     },
 
+    "isAdvancedEnabled": function(featureName) {
+      if (_config['view']['features'] && featureName in _config['view']['features']) {
+        return _config['view']['features'][featureName];
+      } else {
+        return true;
+      }
+    },
+
     "tabTableColumns": function(tabName) {
       if (!_config['view']['tabs'][tabName]) {
         return [];
@@ -122,10 +130,6 @@ define(function(require) {
       return _config['user_config']["table_order"];
     },
 
-    "autorefreshInfo": function(tabName) {
-      return _config['view']['tabs'][tabName]['autorefresh_info'] || 10000;
-    },
-
     "provision": {
       "dashboard": {
         "isEnabled": function(widget) {
@@ -161,7 +165,8 @@ define(function(require) {
     'onedConf': _config['oned_conf'],
     'confirmVMActions': _config['view']['confirm_vms'],
     'scaleFactor': _config['view']['features']['instantiate_cpu_factor'],
-    'filterView': _config['view']['filter_view'],
+    'filterView': _config['view']['filter-view'],
+    'doCountAnimation': _config['view']['do_count_animation'],
 
     "allTabs": function() {
       return Object.keys(_config['view']['tabs']);

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -44,9 +44,9 @@ public:
         VirtualMachineMonitorInfo new_info;
 
         char * error_c = 0;
-        
+
         remove_state();
-        
+
         if (new_info.parse(monitor_data, &error_c) != 0)
         {
             error = error_c;
@@ -76,6 +76,32 @@ public:
 
         return state_str[0];
     };
+
+    string& to_xml_short(string& xml) const
+    {
+        ostringstream oss;
+        string cpu, memory, state;
+
+        if (attributes.empty())
+        {
+            oss << "<MONITORING/>";
+        }
+        else
+        {
+            get("CPU", cpu);
+            get("MEMORY", memory);
+            get("STATE", state);
+
+            oss << "<MONITORING>"
+                << "<CPU>"    << one_util::escape_xml(cpu)    <<  "</CPU>"
+                << "<MEMORY>" << one_util::escape_xml(memory) <<  "</MEMORY>"
+                << "<STATE>"  << one_util::escape_xml(state)  <<  "</STATE>"
+                << "</MONITORING>";
+        }
+
+        xml = oss.str();
+        return xml;
+    }
 };
 
 #endif

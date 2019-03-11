@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -18,6 +18,12 @@
 #include "AddressRange.h"
 #include "AddressRangeInternal.h"
 #include "AddressRangeIPAM.h"
+
+#include "IPAMRequest.h"
+#include "IPAMManager.h"
+
+#include "Nebula.h"
+#include "NebulaUtil.h"
 
 using namespace std;
 
@@ -195,6 +201,27 @@ int AddressRangePool::rm_ar(unsigned int ar_id, string& error_msg)
     }
 
     AddressRange * ar_ptr = it->second;
+
+    if(ar_ptr->is_ipam())
+    {
+        IPAMManager * ipamm = Nebula::instance().get_ipamm();
+
+        std::ostringstream ar_xml;
+
+        ar_ptr->to_xml(ar_xml);
+
+        IPAMRequest ir(ar_xml.str());
+
+        ipamm->trigger(IPMAction::UNREGISTER_ADDRESS_RANGE, &ir);
+
+        ir.wait();
+
+        if (ir.result != true)
+        {
+            error_msg = ir.message;
+            return -1;
+        }
+    }
 
     ar_pool.erase(it);
 

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -27,6 +27,8 @@ define(function(require) {
   var RESOURCE = "Network";
   var XML_ROOT = "VNET";
   var TAB_ID = require('./tabId');
+
+  var INSTANTIATE_DIALOG_ID = require('./form-panels/instantiate/formPanelId');
   var CREATE_DIALOG_ID = require('./form-panels/create/formPanelId');
   var ADD_AR_DIALOG_ID = require('./dialogs/add-ar/dialogId');
   var UPDATE_AR_DIALOG_ID = require('./dialogs/update-ar/dialogId');
@@ -64,6 +66,13 @@ define(function(require) {
       type: "custom",
       call: function() {
         Sunstone.showFormPanel(TAB_ID, IMPORT_DIALOG_ID, "import");
+      }
+    },
+
+    "Network.instantiate_dialog" : {
+      type: "custom",
+      call: function() {
+        Sunstone.showFormPanel(TAB_ID, INSTANTIATE_DIALOG_ID, "instantiate");
       }
     },
 
@@ -142,7 +151,8 @@ define(function(require) {
       callback: function(request, response) {
         Sunstone.getDialog(CLUSTERS_DIALOG_ID).setParams({
           element: response[XML_ROOT],
-          resource:"vnet"
+          resource:"vnet",
+          resource_name: RESOURCE
         });
 
         Sunstone.getDialog(CLUSTERS_DIALOG_ID).reset();

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -128,13 +128,7 @@ int VirtualNetworkPool::allocate (
     vn = new VirtualNetwork(uid, gid, uname, gname, umask, pvid,
                             cluster_ids, vn_template);
 
-    // Check name
-    vn->PoolObjectSQL::get_template_attribute("NAME", name);
 
-    if ( !PoolObjectSQL::name_is_valid(name, error_str) )
-    {
-        goto error_name;
-    }
 
     // Check for duplicates
     db_oid = exist(name, uid);
@@ -169,8 +163,7 @@ int VirtualNetworkPool::allocate (
 error_duplicated:
     oss << "NAME is already taken by NET " << db_oid << ".";
     error_str = oss.str();
-
-error_name:
+    
     delete vn;
     *oid = -1;
 
@@ -181,7 +174,7 @@ error_name:
 /* -------------------------------------------------------------------------- */
 
 VirtualNetwork * VirtualNetworkPool::get_nic_by_name(VirtualMachineNic * nic,
-        const string& name, int _uid, string& error)
+        const string& name, int _uid, bool ro, string& error)
 {
     int uid = nic->get_uid(_uid, error);
 
@@ -190,7 +183,15 @@ VirtualNetwork * VirtualNetworkPool::get_nic_by_name(VirtualMachineNic * nic,
         return 0;
     }
 
-    VirtualNetwork * vnet = get(name, uid);
+    VirtualNetwork * vnet;
+
+    if (ro)
+    {
+        vnet = get_ro(name, uid);
+    }
+    else{
+        vnet = get(name, uid);
+    }
 
     if (vnet == 0)
     {
@@ -206,7 +207,7 @@ VirtualNetwork * VirtualNetworkPool::get_nic_by_name(VirtualMachineNic * nic,
 
 /* -------------------------------------------------------------------------- */
 
-VirtualNetwork * VirtualNetworkPool::get_nic_by_id(const string& id_s,
+VirtualNetwork * VirtualNetworkPool::get_nic_by_id(const string& id_s, bool ro,
     string& error)
 {
     istringstream  is;
@@ -219,7 +220,15 @@ VirtualNetwork * VirtualNetworkPool::get_nic_by_id(const string& id_s,
 
     if( !is.fail() )
     {
-        vnet = get(id);
+        if (ro)
+        {
+            vnet = get_ro(id);
+        }
+        else
+        {
+            vnet = get(id);
+        }
+
     }
 
     if (vnet == 0)
@@ -252,11 +261,11 @@ int VirtualNetworkPool::nic_attribute(
 
     if (!(network = nic->vector_value("NETWORK_ID")).empty())
     {
-        vnet = get_nic_by_id(network, error);
+        vnet = get_nic_by_id(network, false, error);
     }
     else if (!(network = nic->vector_value("NETWORK")).empty())
     {
-        vnet = get_nic_by_name (nic, network, uid, error);
+        vnet = get_nic_by_name (nic, network, uid, false, error);
     }
     else //Not using a pre-defined network
     {
@@ -314,11 +323,11 @@ void VirtualNetworkPool::authorize_nic(
 
     if (!(network = nic->vector_value("NETWORK_ID")).empty())
     {
-        vnet = get_nic_by_id(network, error);
+        vnet = get_nic_by_id(network, true, error);
     }
     else if (!(network = nic->vector_value("NETWORK")).empty())
     {
-        vnet = get_nic_by_name(nic, network, uid, error);
+        vnet = get_nic_by_name(nic, network, uid, true, error);
 
         if ( vnet != 0 )
         {

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -277,7 +277,7 @@ int DatastorePool::drop(PoolObjectSQL * objsql, string& error_msg)
 
 int DatastorePool::disk_attribute(int ds_id, VirtualMachineDisk * disk)
 {
-    Datastore * ds = get(ds_id);
+    Datastore * ds = get_ro(ds_id);
 
     if (ds == 0)
     {

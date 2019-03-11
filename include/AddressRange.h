@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -102,6 +102,11 @@ public:
     bool is_ipv6_static() const
     {
         return (type & 0x00000008) != 0;
+    }
+
+    bool is_ipam() const
+    {
+        return !attr->vector_value("IPAM_MAD").empty() && attr->vector_value("IPAM_MAD") != "internal";
     }
 
     // *************************************************************************

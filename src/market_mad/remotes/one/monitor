@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -23,7 +23,7 @@ require 'base64'
 require 'rexml/document'
 
 class OneMarket
-    ONE_MARKET_URL = 'http://marketplace.opennebula.systems/'
+    ONE_MARKET_URL = 'https://marketplace.opennebula.systems/'
     AGENT          = 'Market Driver'
     VERSION        = File.dirname(__FILE__) + '/../../VERSION'
 
@@ -51,7 +51,8 @@ class OneMarket
 
         req['User-Agent'] = @agent
 
-        response = Net::HTTP.start(uri.hostname, uri.port, p_host, p_port) {|http|
+        response = Net::HTTP.start(uri.hostname, uri.port, p_host, p_port,
+                                   :use_ssl => uri.scheme == 'https') { |http|
             http.request(req)
         }
 

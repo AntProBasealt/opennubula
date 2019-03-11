@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -36,10 +36,11 @@ class IPMAction : public ActionRequest
 public:
     enum Actions
     {
-        REGISTER_ADDRESS_RANGE, /**< Register/Request a new IP network    */
-        ALLOCATE_ADDRESS,       /**< Request a specific IP (or range)     */
-        GET_ADDRESS,            /**< Request any free  IP (or range)      */
-        FREE_ADDRESS            /**< Frees a previously requested IP      */
+        REGISTER_ADDRESS_RANGE,   /**< Register/Request a new IP network    */
+        UNREGISTER_ADDRESS_RANGE, /**< Unregister IP network                */
+        ALLOCATE_ADDRESS,         /**< Request a specific IP (or range)     */
+        GET_ADDRESS,              /**< Request any free  IP (or range)      */
+        FREE_ADDRESS              /**< Frees a previously requested IP      */
     };
 
     IPMAction(Actions a, IPAMRequest *r):ActionRequest(ActionRequest::USER),
@@ -186,6 +187,11 @@ private:
      *  Register (or requests) a new address range to the IPAM.
      */
     void register_address_range_action(IPAMRequest * ir);
+
+    /**
+     *  Unregisters an address range.
+     */
+    void unregister_address_range_action(IPAMRequest * ir);
 
     /**
      *  Requests the IPAM a free address (or range)

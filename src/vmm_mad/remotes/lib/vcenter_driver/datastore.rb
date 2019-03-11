@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -106,19 +106,15 @@ class Storage
         image = VIHelper.find_image_by("SOURCE", OpenNebula::ImagePool, image_path, ds_id, ipool)
 
         if image.nil?
-            # Generate a name with the reference
-            begin
-                image_name = "#{file_name} - #{ds_name} [#{type[:object]} #{type[:id]}]"
-            rescue
-                image_name = "#{file_name} - #{ds_name}"
-            end
+            key = "#{file_name}#{ds_name}#{image_path}"
+            image_name = VCenterDriver::VIHelper.one_name(OpenNebula::ImagePool, file_name, key, ipool)
 
             #Set template
             one_image[:template] << "NAME=\"#{image_name}\"\n"
             one_image[:template] << "PATH=\"vcenter://#{image_path}\"\n"
             one_image[:template] << "TYPE=\"#{image_type}\"\n"
             one_image[:template] << "PERSISTENT=\"#{opts[:persistent]}\"\n"
-            one_image[:template] << "VCENTER_IMPORTED=\"YES\"\n"
+            one_image[:template] << "VCENTER_IMPORTED=\"YES\"\n" unless CONFIG[:delete_images]
             one_image[:template] << "DEV_PREFIX=\"#{image_prefix}\"\n"
         else
             # Return the image XML if it already exists
@@ -183,6 +179,7 @@ class Storage
 
     def to_one(ds_hash, vcenter_uuid, dc_name, dc_ref)
         one = ""
+        one << "DRIVER=\"vcenter\"\n"
         one << "NAME=\"#{ds_hash[:name]}\"\n"
         one << "TM_MAD=vcenter\n"
         one << "VCENTER_INSTANCE_ID=\"#{vcenter_uuid}\"\n"
@@ -354,25 +351,53 @@ class Datastore < Storage
         end
 
         copy_params = {
-            :sourceName       => "[#{source_ds_name}] #{src_path}",
-            :sourceDatacenter => get_dc.item,
-            :destName         => "[#{target_ds_name}] #{target_path}"
+            :sourceName        => "[#{source_ds_name}] #{src_path}",
+            :sourceDatacenter  => get_dc.item
         }
 
-        get_vdm.CopyVirtualDisk_Task(copy_params).wait_for_completion
+        if File.extname(src_path) == '.vmdk'
+            copy_params[:destName] = "[#{target_ds_name}] #{target_path}"
+            get_vdm.CopyVirtualDisk_Task(copy_params).wait_for_completion
 
-        if new_size
-            resize_spec = {
-                :name => "[#{target_ds_name}] #{target_path}",
-                :datacenter => target_ds.get_dc.item,
-                :newCapacityKb => new_size,
-                :eagerZero => false
-            }
+            if new_size
+                resize_spec = {
+                    :name => "[#{target_ds_name}] #{target_path}",
+                    :datacenter => target_ds.get_dc.item,
+                    :newCapacityKb => new_size,
+                    :eagerZero => false
+                }
 
-            get_vdm.ExtendVirtualDisk_Task(resize_spec).wait_for_completion
+                get_vdm.ExtendVirtualDisk_Task(resize_spec).wait_for_completion
+            end
+        else
+            copy_params[:destinationName] = "[#{target_ds_name}] #{target_path}"
+            get_fm.CopyDatastoreFile_Task(copy_params)
         end
 
         target_path
+    end
+
+    def move_virtual_disk(disk, dest_path, dest_dsid, vi_client = nil)
+        vi_client = @vi_client unless vi_client
+
+        target_ds     = VCenterDriver::VIHelper.one_item(OpenNebula::Datastore, dest_dsid, false)
+        target_ds_ref = target_ds['TEMPLATE/VCENTER_DS_REF']
+        target_ds_vc  = VCenterDriver::Datastore.new_from_ref(target_ds_ref, vi_client)
+        dest_name     = target_ds_vc['name']
+
+        target_ds_vc.create_directory(File.dirname(dest_path))
+
+        dpath_ds  = "[#{dest_name}] #{dest_path}"
+        orig_path = "[#{self['name']}] #{disk.path}"
+
+        move_params = {
+            sourceName:       orig_path,
+            sourceDatacenter: get_dc.item,
+            destName:         dpath_ds,
+            force:            true
+        }
+
+        get_vdm.MoveVirtualDisk_Task(move_params).wait_for_completion
     end
 
     def rm_directory(directory)
@@ -631,7 +656,7 @@ class Datastore < Storage
                     one_image << "PATH=\"vcenter://#{image_path}\"\n"
                     one_image << "PERSISTENT=\"NO\"\n"
                     one_image << "TYPE=\"#{image_type}\"\n"
-                    one_image << "VCENTER_IMPORTED=\"YES\"\n"
+                    one_image << "VCENTER_IMPORTED=\"YES\"\n" unless CONFIG[:delete_images]
                     one_image << "DEV_PREFIX=\"#{disk_prefix}\"\n"
 
                     # Check image hasn't already been imported
@@ -667,6 +692,46 @@ class Datastore < Storage
     # This is never cached
     def self.new_from_ref(ref, vi_client)
         self.new(RbVmomi::VIM::Datastore.new(vi_client.vim, ref), vi_client)
+    end
+
+    # detach disk from vCenter vm if possible, destroy the disk on FS
+    def self.detach_and_destroy(disk, vm, disk_id, prev_ds_ref, vi_client)
+        # it's not a CDROM (CLONE=NO)
+        is_cd = !(disk["CLONE"].nil? || disk["CLONE"] == "YES")
+
+        begin
+            # Detach disk if possible (VM is reconfigured) and gather vCenter info
+            # Needed for poweroff machines too
+            ds_ref, img_path = vm.detach_disk(disk)
+
+            return if is_cd
+
+            # Disk could't be detached, use OpenNebula info
+            if !(ds_ref && img_path && !img_path.empty?)
+                img_path = vm.disk_real_path(disk, disk_id)
+                ds_ref = prev_ds_ref
+            end
+
+            # If disk was already detached we have no way to remove it
+            ds = VCenterDriver::Datastore.new_from_ref(ds_ref, vi_client)
+
+
+            search_params = ds.get_search_params(ds['name'],
+                                                File.dirname(img_path),
+                                                File.basename(img_path))
+
+            # Perform search task and return results
+            search_task = ds['browser'].SearchDatastoreSubFolders_Task(search_params)
+            search_task.wait_for_completion
+
+            ds.delete_virtual_disk(img_path)
+            img_dir = File.dirname(img_path)
+            ds.rm_directory(img_dir) if ds.dir_empty?(img_dir)
+        rescue Exception => e
+            if !e.message.start_with?('FileNotFound')
+                raise e.message # Ignore FileNotFound
+            end
+        end
     end
 end # class Datastore
 

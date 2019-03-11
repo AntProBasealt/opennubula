@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -905,7 +905,7 @@ define(function(require) {
             $('input.check_item', row).prop('checked', true);
           }
 
-          $('#selected_ids_row_' + that.dataTableId, section).append('<span row_id="' + row_id + '" class="radius label">' + row_name + ' <span class="fas fa-times blue"></span></span> ');
+          $('#selected_ids_row_' + that.dataTableId, section).append('<span row_id="' + row_id + '" class="radius label">' + row_name + '</span> ');
 
           that.selectOptions.select_callback(aData, that.selectOptions);
         }
@@ -1090,7 +1090,7 @@ define(function(require) {
 
         row_name = OpenNebula[that.resource].getName(row_id);
 
-        $('#selected_ids_row_' + that.dataTableId, section).append('<span row_id="' + row_id + '" class="radius label">' + row_name + ' <span class="fas fa-times blue"></span></span> ');
+        $('#selected_ids_row_' + that.dataTableId, section).append('<span row_id="' + row_id + '" class="radius label">' + row_name + '</span> ');
       });
 
       $('#selected_ids_row_' + that.dataTableId, section).data("ids", data_ids);

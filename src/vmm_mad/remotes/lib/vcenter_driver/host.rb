@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -243,9 +243,21 @@ class ClusterComputeResource
         return rp_info
     end
 
-    def monitor_host_systems
-        host_info = ""
+    def hostname_to_moref(hostname)
+        result = filter_hosts
 
+        moref = ""
+        result.each do |r|
+            if r.obj.name == hostname
+                moref = r.obj._ref
+                break
+            end
+        end
+        raise "Host #{hostname} was not found" if moref.empty?
+        return moref
+    end
+
+    def filter_hosts
         view = @vi_client.vim.serviceContent.viewManager.CreateContainerView({
             container: @item, #View for Hosts inside this cluster
             type:      ['HostSystem'],
@@ -284,7 +296,13 @@ class ClusterComputeResource
         )
 
         result = pc.RetrieveProperties(:specSet => [filterSpec])
+        view.DestroyView # Destroy the view
+        return result
+    end
 
+    def monitor_host_systems
+        host_info = ""
+        result = filter_hosts
         hosts = {}
         result.each do |r|
             hashed_properties = r.to_hash
@@ -318,8 +336,6 @@ class ClusterComputeResource
             host_info << "FREE_MEM="    << free_memory.to_s
             host_info << "]"
         end
-
-        view.DestroyView # Destroy the view
 
         return host_info
     end
@@ -457,6 +473,7 @@ class ClusterComputeResource
         }
 
         vms.each do |vm_ref,info|
+            vm_info = ""
             begin
                 esx_host = esx_hosts[info["runtime.host"]._ref]
                 info[:esx_host_name] = esx_host[:name]
@@ -492,7 +509,7 @@ class ClusterComputeResource
                 vm.monitor(stats)
 
                 vm_name = "#{info["name"]} - #{cluster_name}"
-                str_info << %Q{
+                vm_info << %Q{
                 VM = [
                     ID="#{id}",
                     VM_NAME="#{vm_name}",
@@ -502,21 +519,37 @@ class ClusterComputeResource
                 # if the machine does not exist in opennebula it means that is a wild:
                 unless vm.one_exist?
                     vm_template_64 = Base64.encode64(vm.vm_to_one(vm_name)).gsub("\n","")
-                    str_info << "VCENTER_TEMPLATE=\"YES\","
-                    str_info << "IMPORT_TEMPLATE=\"#{vm_template_64}\","
+                    vm_info << "VCENTER_TEMPLATE=\"YES\","
+                    vm_info << "IMPORT_TEMPLATE=\"#{vm_template_64}\","
                 end
 
-                str_info << "POLL=\"#{vm.info.gsub('"', "\\\"")}\"]"
-
+                vm_info << "POLL=\"#{vm.info.gsub('"', "\\\"")}\"]"
             rescue Exception => e
-                STDERR.puts e.inspect
-                STDERR.puts e.backtrace
+                vm_info = error_monitoring(e, vm_ref, info)
             end
+
+            str_info << vm_info
         end
 
         view.DestroyView # Destroy the view
 
         return str_info, last_mon_time
+    end
+
+    def error_monitoring(e, vm_ref, info = {})
+        error_info = ''
+        vm_name = info['name'] || nil
+        tmp_str = e.inspect
+        tmp_str << e.backtrace.join("\n")
+
+        error_info << %Q{
+        VM = [
+            VM_NAME="#{vm_name}",
+            DEPLOY_ID="#{vm_ref}",
+        }
+
+        error_info << "ERROR=\"#{Base64.encode64(tmp_str).gsub("\n","")}\"]"
+
     end
 
     def monitor_customizations

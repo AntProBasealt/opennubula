@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -107,7 +107,7 @@ Request::ErrorCode ImagePersistent::request_execute(
         return ec;
     }
 
-    image = ipool->get(id);
+    image = ipool->get_ro(id);
 
     if ( image == 0 )
     {
@@ -118,18 +118,9 @@ Request::ErrorCode ImagePersistent::request_execute(
 
     ds_id = image->get_ds_id();
 
-    if ( !image->is_managed() )
-    {
-        att.resp_msg = "Cannot change persistent state for non-managed images";
-
-        image->unlock();
-
-        return ACTION;
-    }
-
     image->unlock();
 
-    ds = dspool->get(ds_id);
+    ds = dspool->get_ro(ds_id);
 
     if ( ds == 0 )
     {
@@ -345,7 +336,7 @@ Request::ErrorCode ImageClone::request_execute(
 
     // ------------------------- Get source Image info -------------------------
 
-    img = ipool->get(clone_id);
+    img = ipool->get_ro(clone_id);
 
     if ( img == 0 )
     {
@@ -406,7 +397,7 @@ Request::ErrorCode ImageClone::request_execute(
 
     // ----------------------- Get target Datastore info -----------------------
 
-    ds = dspool->get(ds_id);
+    ds = dspool->get_ro(ds_id);
 
     if ( ds == 0 )
     {
@@ -442,7 +433,7 @@ Request::ErrorCode ImageClone::request_execute(
 
     if (ds_id != ds_id_orig) //check same DS_MAD
     {
-        ds = dspool->get(ds_id_orig);
+        ds = dspool->get_ro(ds_id_orig);
 
         if (ds == 0)
         {

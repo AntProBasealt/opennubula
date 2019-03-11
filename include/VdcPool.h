@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -95,10 +95,10 @@ public:
      *
      *  @return 0 on success
      */
-    int dump(ostringstream& oss, const string& where, const string& limit,
+    int dump(string& oss, const string& where, const string& limit,
             bool desc)
     {
-        return PoolSQL::dump(oss, "VDC_POOL", Vdc::table, where, limit, desc);
+        return PoolSQL::dump(oss, "VDC_POOL", "body", Vdc::table, where, limit, desc);
     };
 
     /**

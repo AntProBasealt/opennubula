@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -256,8 +256,6 @@ void RequestManagerAllocate::request_execute(xmlrpc_c::paramList const& params,
             return;
         }
 
-        clpool->update(cluster);
-
         cluster->unlock();
     }
 
@@ -422,7 +420,7 @@ void ImageAllocate::request_execute(xmlrpc_c::paramList const& params,
 
     // ------------------------- Check Datastore exists ------------------------
 
-    if ((ds = dspool->get(ds_id)) == 0 )
+    if ((ds = dspool->get_ro(ds_id)) == 0 )
     {
         att.resp_id  = ds_id;
         att.resp_obj = PoolObjectSQL::DATASTORE;
@@ -466,7 +464,7 @@ void ImageAllocate::request_execute(xmlrpc_c::paramList const& params,
     {
         // This image comes from a MarketPlaceApp. Get the Market info and
         // the size.
-        app = apppool->get(app_id);
+        app = apppool->get_ro(app_id);
 
         if ( app == 0 )
         {
@@ -484,7 +482,7 @@ void ImageAllocate::request_execute(xmlrpc_c::paramList const& params,
 
         app->unlock();
 
-        market = marketpool->get(market_id);
+        market = marketpool->get_ro(market_id);
 
         if ( market == 0 )
         {
@@ -704,6 +702,66 @@ bool TemplateAllocate::allocate_authorization(
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
+
+Request::ErrorCode VirtualNetworkTemplateAllocate::pool_allocate(
+        xmlrpc_c::paramList const&  paramList,
+        Template *                  tmpl,
+        int&                        id,
+        RequestAttributes&          att)
+{
+    VNTemplatePool * vnpool = static_cast<VNTemplatePool *>(pool);
+
+    VirtualNetworkTemplate * ttmpl=static_cast<VirtualNetworkTemplate *>(tmpl);
+
+    int rc = vnpool->allocate(att.uid, att.gid, att.uname, att.gname, att.umask,
+        ttmpl, &id, att.resp_msg);
+
+    if (rc < 0)
+    {
+        return Request::INTERNAL;
+    }
+
+    return Request::SUCCESS;
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+bool VirtualNetworkTemplateAllocate::allocate_authorization(
+		xmlrpc_c::paramList const&  paramList,
+        Template *          tmpl,
+        RequestAttributes&  att,
+        PoolObjectAuth *    cluster_perms)
+{
+    AuthRequest ar(att.uid, att.group_ids);
+    string      t64;
+    string      aname;
+
+    if (!RequestManagerAllocate::allocate_authorization(paramList, tmpl, att, cluster_perms))
+    {
+        return false;
+    }
+
+    VirtualNetworkTemplate * ttmpl = static_cast<VirtualNetworkTemplate *>(tmpl);
+
+    // ------------ Check template for restricted attributes -------------------
+    if (!att.is_admin())
+    {
+        if (ttmpl->check_restricted(aname))
+        {
+            att.resp_msg = "VM Template includes a restricted attribute "+aname;
+
+            failure_response(AUTHORIZATION, att);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
 Request::ErrorCode HostAllocate::pool_allocate(
         xmlrpc_c::paramList const&  paramList,
         Template *                  tmpl,
@@ -755,7 +813,7 @@ bool UserAllocate::allocate_authorization(
     {
         int tmp_gid = xmlrpc_c::value_int(*it);
 
-        Group* group = gpool->get(tmp_gid);
+        Group* group = gpool->get_ro(tmp_gid);
 
         if (group == 0)
         {
@@ -1167,7 +1225,7 @@ Request::ErrorCode MarketPlaceAppAllocate::pool_allocate(
     // ---------------------------------------------------------------------- //
     // Get Marketplace information for this app                               //
     // ---------------------------------------------------------------------- //
-    MarketPlace * mp = mppool->get(mp_id);
+    MarketPlace * mp = mppool->get_ro(mp_id);
 
     if ( mp == 0 )
     {

@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -72,10 +72,11 @@ end
 one_vnet.lock(1)
 esx_rollback = [] #Track hosts that require a rollback
 managed = one_vnet["TEMPLATE/OPENNEBULA_MANAGED"] != "NO"
+imported = one_vnet["TEMPLATE/VCENTER_IMPORTED"]
 
 begin
     # Step 0. Only execute for vcenter network driver && managed by one
-    if one_vnet["VN_MAD"] == "vcenter" && managed
+    if one_vnet["VN_MAD"] == "vcenter" && managed && imported.nil?
         wait_vlanid(one_vnet) if one_vnet["VLAN_ID_AUTOMATIC"] == '1'
         # Step 1. Extract vnet settings
         host_id =  one_vnet["TEMPLATE/VCENTER_ONE_HOST_ID"]

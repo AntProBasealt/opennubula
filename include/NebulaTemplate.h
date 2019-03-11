@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -171,6 +171,12 @@ private:
                        const std::string& change_password,
                        const std::string& driver_managed_groups,
                        const std::string& max_token_time);
+
+    /**
+     * Sets a the defaults for a Network drivers
+     */
+    void set_conf_vn(const std::string& name,
+                     const std::string& bridge_type);
 
     /**
      *  Sets auth permissions for vm operations

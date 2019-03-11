@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -21,6 +21,8 @@
 #include <sstream>
 #include <set>
 #include <vector>
+
+#include <string.h>
 
 using namespace std;
 
@@ -275,6 +277,46 @@ private:
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
+class string_cb : public Callbackable
+{
+public:
+    string_cb(int _total):total_values(_total){};
+
+    void set_callback(std::string * _str)
+    {
+        str = _str;
+
+        Callbackable::set_callback(
+                static_cast<Callbackable::Callback>(&string_cb::callback));
+    };
+
+    int callback(void * nil, int num, char **values, char **names)
+    {
+        if ( (!values[0]) || (num != total_values) )
+        {
+            return -1;
+        }
+
+        for (int i=0; i < total_values; i++)
+        {
+            if ( values[i] != NULL )
+            {
+                str->append(values[i]);
+            }
+        }
+
+        return 0;
+    };
+
+private:
+    int total_values;
+
+    std::string * str;
+};
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
 class stream_cb : public Callbackable
 {
 public:
@@ -327,5 +369,50 @@ public:
     };
 };
 
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+template< template<class...> class Container, class T>
+class multiple_cb : public Callbackable
+{
+public:
+    void set_callback(Container<T> * _columns)
+    {
+        columns = _columns;
+
+        Callbackable::set_callback(
+                static_cast<Callbackable::Callback>(&multiple_cb::callback));
+    };
+
+    int callback(void * nil, int num, char **values, char **names)
+    {
+        if ( num == 0 || values == 0 )
+        {
+            return -1;
+        }
+
+        for (int i=0; i < num ; ++i)
+        {
+            if (values[i] == 0)
+            {
+                continue;
+            }
+
+            std::istringstream iss(values[i]);
+
+            T value;
+
+            iss >> value;
+
+            columns->push_back(value);
+        }
+
+        return 0;
+    };
+
+private:
+
+    Container<T> *  columns;
+};
 
 #endif /*CALLBACKABLE_H_*/

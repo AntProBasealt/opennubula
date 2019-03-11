@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -581,18 +581,10 @@ void TransferManager::prolog_action(int vid)
         return;
     }
 
-    int uid = vm->get_created_by_uid();
+    int uid      = vm->get_created_by_uid();
     int owner_id = vm->get_uid();
-    vm->unlock();
 
     token_password = Nebula::instance().get_upool()->get_token_password(uid, owner_id);
-
-    vm = vmpool->get(vid);
-
-    if (vm == 0)
-    {
-        return;
-    }
 
     VirtualMachineDisks& disks = vm->get_disks();
 
@@ -676,6 +668,14 @@ void TransferManager::prolog_action(int vid)
 
         if ( update )
         {
+            vm->unlock();
+
+            vm = vmpool->get(vid);                                                                                                                                                                
+            if (vm == 0)
+            {
+                goto error_attributes;
+            }
+
             vmpool->update(vm);
         }
     }
@@ -875,18 +875,10 @@ void TransferManager::prolog_resume_action(int vid)
         return;
     }
 
-    int uid = vm->get_created_by_uid();
+    int uid      = vm->get_created_by_uid();
     int owner_id = vm->get_uid();
-    vm->unlock();
 
     token_password = Nebula::instance().get_upool()->get_token_password(uid, owner_id);
-
-    vm = vmpool->get(vid);
-
-    if (vm == 0)
-    {
-        return;
-    }
 
     VirtualMachineDisks& disks = vm->get_disks();
 

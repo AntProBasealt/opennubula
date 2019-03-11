@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # ---------------------------------------------------------------------------- #
-# Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                  #
+# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                  #
 #                                                                              #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may      #
 # not use this file except in compliance with the License. You may obtain      #
@@ -17,7 +17,7 @@
 # ---------------------------------------------------------------------------- #
 
 ###############################################################################
-# This script is used retrieve the file size of a disk
+# This script is used to export a VMDK from a vCenter DS to a Marketplace
 ###############################################################################
 
 ONE_LOCATION=ENV["ONE_LOCATION"] if !defined?(ONE_LOCATION)

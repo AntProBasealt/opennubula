@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------ */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems              */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems              */
 /*                                                                          */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may  */
 /* not use this file except in compliance with the License. You may obtain  */
@@ -326,6 +326,8 @@ int Datastore::set_tm_mad(string &tm_mad, string &error_str)
     ostringstream oss;
     std::stringstream ss;
 
+    string orph;
+
     if ( Nebula::instance().get_tm_conf_attribute(tm_mad, vatt) != 0 )
     {
         goto error_conf;
@@ -443,11 +445,9 @@ int Datastore::set_tm_mad(string &tm_mad, string &error_str)
         remove_template_attribute("SHARED");
     }
 
-    bool orph;
-
     if ( vatt->vector_value("ALLOW_ORPHANS", orph) == -1 )
     {
-        orph = false;
+        orph = "NO";
     }
 
     replace_template_attribute("ALLOW_ORPHANS", orph);
@@ -1094,3 +1094,38 @@ bool Datastore::is_persistent_only()
 
     return persistent_only;
 };
+
+/* ------------------------------------------------------------------------ */
+/* ------------------------------------------------------------------------ */
+
+int Datastore::get_tm_mad_targets(const string &tm_mad, string& ln_target, string& clone_target, string& disk_type)
+{
+    if (!tm_mad.empty())
+    {
+        string tm_mad_t = one_util::trim(tm_mad);
+        one_util::toupper(tm_mad_t);
+
+        get_template_attribute("CLONE_TARGET_" + tm_mad_t, clone_target);
+
+        if (clone_target.empty())
+        {
+            return -1;
+        }
+
+        get_template_attribute("LN_TARGET_" + tm_mad_t, ln_target);
+
+        if (ln_target.empty())
+        {
+            return -1;
+        }
+
+        get_template_attribute("DISK_TYPE_" + tm_mad_t, disk_type);
+
+        if (disk_type.empty())
+        {
+            return -1;
+        }
+    }
+
+    return 0;
+}

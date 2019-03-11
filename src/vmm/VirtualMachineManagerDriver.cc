@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -39,7 +39,7 @@ VirtualMachineManagerDriver::VirtualMachineManagerDriver(
     bool                        sudo,
     VirtualMachinePool *        pool):
         Mad(userid,attrs,sudo), driver_conf(true), keep_snapshots(false),
-        vmpool(pool)
+        ds_live_migration(false), vmpool(pool)
 {
     map<string,string>::const_iterator  it;
     char *          error_msg = 0;
@@ -98,6 +98,11 @@ VirtualMachineManagerDriver::VirtualMachineManagerDriver(
     // Parse KEEP_SNAPSHOTS
     // -------------------------------------------------------------------------
     driver_conf.get("KEEP_SNAPSHOTS", keep_snapshots);
+
+    // -------------------------------------------------------------------------
+    // Parse KEEP_SNAPSHOTS
+    // -------------------------------------------------------------------------
+    driver_conf.get("DS_LIVE_MIGRATION", ds_live_migration);
 
     // -------------------------------------------------------------------------
     // Parse IMPORTED_VMS_ACTIONS string and init the action set
@@ -792,7 +797,8 @@ void VirtualMachineManagerDriver::process_poll(VirtualMachine* vm,
 
         case 'e': //Failed
             if ( vm->get_state() == VirtualMachine::ACTIVE &&
-                 vm->get_lcm_state() == VirtualMachine::RUNNING )
+                ( vm->get_lcm_state() == VirtualMachine::RUNNING ||
+                  vm->get_lcm_state() == VirtualMachine::UNKNOWN ))
             {
                 vm->log("VMM",Log::INFO,"VM running but monitor state is ERROR.");
 
@@ -803,6 +809,7 @@ void VirtualMachineManagerDriver::process_poll(VirtualMachine* vm,
         case 'd': //The VM was powered-off
             if ( vm->get_state() == VirtualMachine::ACTIVE &&
                 ( vm->get_lcm_state() == VirtualMachine::RUNNING ||
+                  vm->get_lcm_state() == VirtualMachine::UNKNOWN ||
                   vm->get_lcm_state() == VirtualMachine::SHUTDOWN ||
                   vm->get_lcm_state() == VirtualMachine::SHUTDOWN_POWEROFF ||
                   vm->get_lcm_state() == VirtualMachine::SHUTDOWN_UNDEPLOY ))

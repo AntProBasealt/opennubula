@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -357,7 +357,7 @@ void Quotas::ds_del_recreate(int uid, int gid, vector<Template *>& ds_quotas)
 
         if ( img_owner )
         {
-            Image* img = ipool->get(image_id);
+            Image* img = ipool->get_ro(image_id);
 
             if(img != 0)
             {

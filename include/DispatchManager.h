@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -163,10 +163,11 @@ public:
      *  If the function fails the calling funtion is responsible for recovering
      *  from the error.
      *    @param vm pointer to a VirtualMachine with its mutex locked.
+     *    @param poff migration type: 0(save), 1(poff), 2(poff-hard)
      *    @param ra information about the API call request
      *    @return 0 on success
      */
-    int migrate(VirtualMachine * vm, const RequestAttributes& request);
+    int migrate(VirtualMachine * vm, int poff, const RequestAttributes& request);
 
     /**
      *  Migrates a VM. The following actions must be performed before calling
@@ -294,6 +295,15 @@ public:
      *    @return 0 on success
      */
     int delete_recreate(VirtualMachine * vm, const RequestAttributes& ra,
+            string& error_str);
+
+    /**
+     *  Ends a VM life cycle inside ONE but let the VM running at the Hipervisor.
+     *    @param vm VirtualMachine object
+     *    @param ra information about the API call request
+     *    @return 0 on success, the VM mutex is unlocked
+     */
+    int delete_vm_db(VirtualMachine * vm, const RequestAttributes& ra,
             string& error_str);
 
     /**
@@ -541,7 +551,7 @@ private:
     /**
      *  Frees the resources associated to a VM: disks, ip addresses and Quotas
      */
-    void free_vm_resources(VirtualMachine * vm);
+    void free_vm_resources(VirtualMachine * vm, bool check_images);
 
     //--------------------------------------------------------------------------
     // DM Actions associated with a VM state transition

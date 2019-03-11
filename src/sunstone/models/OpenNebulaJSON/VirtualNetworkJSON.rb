@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -26,16 +26,17 @@ module OpenNebulaJSON
                 return vnet_hash
             end
 
-            cluster_id = parse_json(template_json, 'cluster_id')
-
             if vnet_hash['vnet_raw']
                 template = vnet_hash['vnet_raw']
             else
                 template = template_to_str(vnet_hash)
             end
 
+            cluster_id = parse_json(template_json, 'cluster_id')
             if !OpenNebula.is_error?(cluster_id)
                 self.allocate(template, cluster_id.to_i)
+            else
+                self.allocate(template)
             end
         end
 

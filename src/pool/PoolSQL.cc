@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -123,8 +123,6 @@ int PoolSQL::allocate(PoolObjectSQL *objsql, string& error_str)
         lastOID = -1;
     }
 
-    objsql->lock();
-
     objsql->oid = ++lastOID;
 
     if ( _set_lastOID(lastOID, db, table) == -1 )
@@ -150,7 +148,14 @@ int PoolSQL::allocate(PoolObjectSQL *objsql, string& error_str)
 
     if( rc == -1 )
     {
-        _set_lastOID(--lastOID, db, table);
+        lastOID = lastOID - 1;
+
+        if ( lastOID < 0 )
+        {
+            lastOID = 0;
+        }
+
+        _set_lastOID(lastOID, db, table);
     }
 
     unlock();
@@ -168,30 +173,74 @@ PoolObjectSQL * PoolSQL::get(int oid)
         return 0;
     }
 
-    PoolObjectSQL * objectsql;
+    pthread_mutex_t * object_lock = cache.lock_line(oid);
 
-    cache.lock_line(oid);
-
-    objectsql = create();
+    PoolObjectSQL * objectsql = create();
 
     objectsql->oid = oid;
+
+    objectsql->ro  = false;
+
+    objectsql->mutex = object_lock;
 
     int rc = objectsql->select(db);
 
     if ( rc != 0 )
     {
-        delete objectsql;
-
-        cache.set_line(oid, 0);
+        objectsql->unlock(); //Free object and unlock cache line mutex
 
         return 0;
     }
 
-    objectsql->lock();
+    return objectsql;
+}
 
-    cache.set_line(oid, objectsql);
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+PoolObjectSQL * PoolSQL::get_ro(int oid)
+{
+    if ( oid < 0 )
+    {
+        return 0;
+    }
+
+    PoolObjectSQL * objectsql = create();
+
+    objectsql->oid = oid;
+
+    objectsql->ro = true;
+
+    int rc = objectsql->select(db);
+
+    if ( rc != 0 )
+    {
+        objectsql->unlock(); //Free object;
+
+        return 0;
+    }
 
     return objectsql;
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+void PoolSQL::exist(const string& id_str, std::set<int>& id_list)
+{
+    std::vector<int> existing_items;
+    std::set<int>::iterator iterator;
+
+    one_util::split_unique(id_str, ',', id_list);
+    search(existing_items, table.c_str(), "1 order by 1 ASC");
+
+    for (iterator = id_list.begin(); iterator != id_list.end(); ++iterator)
+    {
+        if (!std::binary_search(existing_items.begin(), existing_items.end(), *iterator))
+        {
+            id_list.erase(iterator);
+        }
+    }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -213,12 +262,27 @@ PoolObjectSQL * PoolSQL::get(const string& name, int ouid)
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int PoolSQL::dump(ostringstream& oss, const string& elem_name, const char* table,
+PoolObjectSQL * PoolSQL::get_ro(const string& name, int uid)
+{
+    int oid = PoolObjectSQL::select_oid(db, table.c_str(), name, uid);
+
+    if ( oid == -1 )
+    {
+        return 0;
+    }
+
+    return get_ro(oid);
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+int PoolSQL::dump(string& oss, const string& elem_name, const string& column, const char* table,
     const string& where, const string& limit, bool desc)
 {
     ostringstream   cmd;
 
-    cmd << "SELECT body FROM " << table;
+    cmd << "SELECT " << column << " FROM " << table;
 
     if ( !where.empty() )
     {
@@ -243,24 +307,30 @@ int PoolSQL::dump(ostringstream& oss, const string& elem_name, const char* table
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int PoolSQL::dump(ostringstream& oss, const string& root_elem_name,
+int PoolSQL::dump(string& oss, const string& root_elem_name,
     ostringstream& sql_query)
 {
     int rc;
 
-    stream_cb cb(1);
+    string_cb cb(1);
 
-    oss << "<" << root_elem_name << ">";
+    ostringstream oelem; 
+
+    oelem << "<" << root_elem_name << ">";
+
+    oss.append(oelem.str());
 
     cb.set_callback(&oss);
 
     rc = db->exec_rd(sql_query, &cb);
 
-    add_extra_xml(oss);
-
-    oss << "</" << root_elem_name << ">";
-
     cb.unset_callback();
+
+    oelem.str("");
+
+    oelem << "</" << root_elem_name << ">";
+
+    oss.append(oelem.str());
 
     return rc;
 }

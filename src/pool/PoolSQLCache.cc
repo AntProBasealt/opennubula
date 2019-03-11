@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -27,8 +27,10 @@ PoolSQLCache::PoolSQLCache()
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-void PoolSQLCache::lock_line(int oid)
+pthread_mutex_t * PoolSQLCache::lock_line(int oid)
 {
+    static unsigned int num_locks = 0;
+
     std::map<int, CacheLine *>::iterator it;
 
     CacheLine * cl;
@@ -39,7 +41,7 @@ void PoolSQLCache::lock_line(int oid)
 
     if ( it == cache.end() )
     {
-        cl = new CacheLine(0);
+        cl = new CacheLine();
 
         cache.insert(make_pair(oid, cl));
     }
@@ -54,51 +56,24 @@ void PoolSQLCache::lock_line(int oid)
 
     cl->lock();
 
-    if ( cl->object != 0 )
-    {
-        cl->object->lock();
-
-        delete cl->object;
-
-        cl->object = 0;
-    }
-
-    return;
-}
-
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-
-int PoolSQLCache::set_line(int oid, PoolObjectSQL * object)
-{
-    std::map<int, CacheLine *>::iterator it;
-
     lock();
 
-    it = cache.find(oid);
+    cl->active--;
 
-    if ( it == cache.end() )
+    if ( ++num_locks > MAX_ELEMENTS )
     {
-        unlock();
+        num_locks = 0;
 
-        return -1;
-    }
-
-    it->second->active--;
-
-    it->second->object = object;
-
-    it->second->unlock();
-
-    if ( cache.size() > MAX_ELEMENTS )
-    {
-        flush_cache_lines();
+        if ( cache.size() > MAX_ELEMENTS )
+        {
+            flush_cache_lines();
+        }
     }
 
     unlock();
 
-    return 0;
-};
+    return &(cl->mutex);
+}
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -125,20 +100,7 @@ void PoolSQLCache::flush_cache_lines()
             continue;
         }
 
-        if ( cl->object != 0 )
-        {
-            rc =  cl->object->trylock();
-
-            if ( rc == EBUSY ) //object int use
-            {
-                cl->unlock();
-
-                ++it;
-                continue;
-            }
-        }
-
-        delete it->second; // cache line & pool object locked & active == 0
+        delete it->second; // cache line locked & active == 0
 
         it = cache.erase(it);
     }

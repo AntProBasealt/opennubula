@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -81,7 +81,7 @@ int VirtualMachineDisk::get_uid(int _uid)
         Nebula&    nd    = Nebula::instance();
         UserPool * upool = nd.get_upool();
 
-        user = upool->get(uname);
+        user = upool->get_ro(uname);
 
         if ( user == 0 )
         {
@@ -122,7 +122,7 @@ int VirtualMachineDisk::get_image_id(int &id, int uid)
             return -1;
         }
 
-        Image * image = ipool->get(iname, uiid);
+        Image * image = ipool->get_ro(iname, uiid);
 
         if ( image != 0 )
         {
@@ -185,7 +185,7 @@ void VirtualMachineDisk::authorize(int uid, AuthRequest* ar, bool check_lock)
             return;
         }
 
-        img = ipool->get(source , uiid);
+        img = ipool->get_ro(source , uiid);
 
         if ( img != 0 )
         {
@@ -194,7 +194,7 @@ void VirtualMachineDisk::authorize(int uid, AuthRequest* ar, bool check_lock)
     }
     else if ( vector_value("IMAGE_ID", iid) == 0 )
     {
-        img = ipool->get(iid);
+        img = ipool->get_ro(iid);
     }
 
     if (img == 0)
@@ -277,14 +277,14 @@ int VirtualMachineDisk::create_snapshot(const string& name, string& error)
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int VirtualMachineDisk::revert_snapshot(int snap_id)
+int VirtualMachineDisk::revert_snapshot(int snap_id, bool revert)
 {
     if ( snapshots == 0 )
     {
         return -1;
     }
 
-    return snapshots->active_snapshot(snap_id);
+    return snapshots->active_snapshot(snap_id, revert);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -556,6 +556,28 @@ void VirtualMachineDisk::set_types(const string& ds_name)
     }
 
     replace("DISK_TYPE", ds_name);
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+#define XML_DISK_ATTR(Y,X) ( Y << "<" << X << ">" << \
+        one_util::escape_xml(vector_value(X)) << "</" << X << ">") 
+
+void VirtualMachineDisk::to_xml_short(std::ostringstream& oss) const
+{
+    oss << "<DISK>" ;
+    XML_DISK_ATTR(oss, "DISK_ID");
+    XML_DISK_ATTR(oss, "DATASTORE");
+    XML_DISK_ATTR(oss, "DATASTORE_ID");
+    XML_DISK_ATTR(oss, "IMAGE");
+    XML_DISK_ATTR(oss, "IMAGE_ID");
+    XML_DISK_ATTR(oss, "SIZE");
+    XML_DISK_ATTR(oss, "TYPE");
+    XML_DISK_ATTR(oss, "CLONE");
+    XML_DISK_ATTR(oss, "CLONE_TARGET");
+    XML_DISK_ATTR(oss, "LN_TARGET");
+    XML_DISK_ATTR(oss, "DISK_SNAPSHOT_TOTAL_SIZE");
+    oss << "</DISK>";
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1345,7 +1367,7 @@ const Snapshots * VirtualMachineDisks::get_snapshots(int id, string& error) cons
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int VirtualMachineDisks::revert_snapshot(int id, int snap_id)
+int VirtualMachineDisks::revert_snapshot(int id, int snap_id, bool revert)
 {
     VirtualMachineDisk * disk =
         static_cast<VirtualMachineDisk *>(get_attribute(id));
@@ -1355,7 +1377,7 @@ int VirtualMachineDisks::revert_snapshot(int id, int snap_id)
         return -1;
     }
 
-    return disk->revert_snapshot(snap_id);
+    return disk->revert_snapshot(snap_id, revert);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1376,6 +1398,23 @@ void VirtualMachineDisks::delete_snapshot(int disk_id, int snap_id,
     }
 
     disk->delete_snapshot(snap_id, ds_quota, vm_quota, img_owner, vm_owner);
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+int VirtualMachineDisks::rename_snapshot(int disk_id, int snap_id, const string& new_name,
+        string& error_str)
+{
+    VirtualMachineDisk * disk = get_disk(disk_id);
+
+    if (disk == 0)
+    {
+        error_str = "VM disk does not exist";
+        return -1;
+    }
+
+    return disk->rename_snapshot(snap_id, new_name, error_str);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1560,4 +1599,73 @@ int VirtualMachineDisks::get_saveas_info(int& disk_id, string& source,
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
+
+std::string& VirtualMachineDisks::to_xml_short(std::string& xml)
+{
+    std::ostringstream oss;
+
+    for ( disk_iterator disk = begin() ; disk != end() ; ++disk )
+    {
+        (*disk)->to_xml_short(oss);
+    }
+
+    xml = oss.str();
+
+    return xml;
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+int VirtualMachineDisks::check_tm_mad(const string& tm_mad, string& error)
+{
+    DatastorePool * dspool = Nebula::instance().get_dspool();
+
+    std::string _tm_mad = tm_mad;
+
+    one_util::toupper(_tm_mad);
+
+    for (disk_iterator it = begin(); it != end() ; ++it)
+    {
+        int ds_img_id;
+        VirtualMachineDisk * disk = *it;
+
+        std::string tm_mad_disk;
+
+        disk->vector_value("TM_MAD", tm_mad_disk);
+
+        one_util::toupper(tm_mad_disk);
+
+        if ( _tm_mad == tm_mad_disk)
+        {
+            continue;
+        }
+
+        if ( disk->vector_value("DATASTORE_ID", ds_img_id) == 0 )
+        {
+            std::string ln_target, clone_target, disk_type;
+
+            Datastore * ds_img = dspool->get_ro(ds_img_id);
+
+            if ( ds_img == 0 )
+            {
+                error = "Datastore does not exist";
+                return -1;
+            }
+
+            if ( ds_img->get_tm_mad_targets(tm_mad, ln_target, clone_target,
+                        disk_type) != 0 )
+            {
+                error = "Image Datastore does not support transfer mode: " + tm_mad;
+                return -1;
+            }
+
+            disk->replace("CLONE_TARGET", clone_target);
+            disk->replace("LN_TARGET", ln_target);
+            disk->replace("DISK_TYPE", disk_type);
+            disk->replace("TM_MAD_SYSTEM", tm_mad);
+        }
+    }
+    return 0;
+}
 

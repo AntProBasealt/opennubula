@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -89,6 +89,10 @@ void IPAMManager::user_action(const ActionRequest& ar)
             register_address_range_action(request);
         break;
 
+        case IPMAction::UNREGISTER_ADDRESS_RANGE:
+            unregister_address_range_action(request);
+        break;
+
         case IPMAction::ALLOCATE_ADDRESS:
             allocate_address_action(request);
         break;
@@ -138,6 +142,22 @@ void IPAMManager::register_address_range_action(IPAMRequest * ir)
     }
 
     ipammd->register_address_range(ir->id, ir->to_xml64(action_data));
+}
+
+
+/* -------------------------------------------------------------------------- */
+
+void IPAMManager::unregister_address_range_action(IPAMRequest * ir)
+{
+    std::string action_data;
+    const IPAMManagerDriver * ipammd = setup_request(ir);
+
+    if (ipammd == 0)
+    {
+        return;
+    }
+
+    ipammd->unregister_address_range(ir->id, ir->to_xml64(action_data));
 }
 
 /* -------------------------------------------------------------------------- */

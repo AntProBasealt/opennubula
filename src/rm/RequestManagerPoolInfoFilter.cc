@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -96,12 +96,28 @@ void VirtualMachinePoolInfo::request_execute(
     int end_id      = xmlrpc_c::value_int(paramList.getInt(3));
     int state       = xmlrpc_c::value_int(paramList.getInt(4));
 
-    ostringstream state_filter;
+    std::string fts_query;
+
+    if (paramList.size() > 5)
+    {
+        fts_query = xmlrpc_c::value_string(paramList.getString(5));
+
+        if (!fts_query.empty() && !pool->is_fts_available())
+        {
+            att.resp_msg = "Full text search is not supported by the SQL backend";
+
+            failure_response(INTERNAL, att);
+            return;
+        }
+    }
+
+    ostringstream and_filter;
 
     if (( state < VirtualMachinePoolInfo::ALL_VM ) ||
         ( state > VirtualMachine::CLONING_FAILURE ))
     {
         att.resp_msg = "Incorrect filter_flag, state";
+
         failure_response(XML_RPC_API, att);
         return;
     }
@@ -112,15 +128,39 @@ void VirtualMachinePoolInfo::request_execute(
             break;
 
         case VirtualMachinePoolInfo::NOT_DONE:
-            state_filter << "state <> " << VirtualMachine::DONE;
+            and_filter << "state <> " << VirtualMachine::DONE;
             break;
 
         default:
-            state_filter << "state = " << state;
+            and_filter << "state = " << state;
             break;
     }
 
-    dump(att, filter_flag, start_id, end_id, state_filter.str(), "");
+    if (!fts_query.empty())
+    {
+        char * _fts_query = pool->escape_str(fts_query);
+
+        if ( _fts_query == 0 )
+        {
+            att.resp_msg = "Error building search query";
+
+            failure_response(INTERNAL, att);
+            return;
+        }
+
+        if (!and_filter.str().empty())
+        {
+            and_filter << " AND ";
+        }
+
+        and_filter << "MATCH(search_token) AGAINST ('+\"";
+        one_util::escape_token(_fts_query, and_filter);
+        and_filter << "\"' in boolean mode)";
+
+        pool->free_str(_fts_query);
+    }
+
+    dump(att, filter_flag, start_id, end_id, and_filter.str(), "");
 }
 
 /* ------------------------------------------------------------------------- */
@@ -134,9 +174,9 @@ void VirtualMachinePoolAccounting::request_execute(
     int time_start  = xmlrpc_c::value_int(paramList.getInt(2));
     int time_end    = xmlrpc_c::value_int(paramList.getInt(3));
 
-    ostringstream oss;
-    string        where;
-    int           rc;
+    string oss;
+    string where;
+    int rc;
 
     if ( filter_flag < GROUP )
     {
@@ -158,7 +198,7 @@ void VirtualMachinePoolAccounting::request_execute(
         return;
     }
 
-    success_response(oss.str(), att);
+    success_response(oss, att);
 
     return;
 }
@@ -176,7 +216,7 @@ void VirtualMachinePoolShowback::request_execute(
     int end_month   = xmlrpc_c::value_int(paramList.getInt(4));
     int end_year    = xmlrpc_c::value_int(paramList.getInt(5));
 
-    ostringstream oss;
+    string oss;
     string        where;
     int           rc;
 
@@ -202,7 +242,7 @@ void VirtualMachinePoolShowback::request_execute(
         return;
     }
 
-    success_response(oss.str(), att);
+    success_response(oss, att);
 
     return;
 }
@@ -216,7 +256,7 @@ void VirtualMachinePoolMonitoring::request_execute(
 {
     int filter_flag = xmlrpc_c::value_int(paramList.getInt(1));
 
-    ostringstream oss;
+    string oss;
     string        where;
     int           rc;
 
@@ -238,7 +278,7 @@ void VirtualMachinePoolMonitoring::request_execute(
         return;
     }
 
-    success_response(oss.str(), att);
+    success_response(oss, att);
 
     return;
 }
@@ -260,9 +300,10 @@ void HostPoolMonitoring::request_execute(
         xmlrpc_c::paramList const& paramList,
         RequestAttributes& att)
 {
-    ostringstream oss;
-    string        where;
-    int           rc;
+    string oss;
+    string where;
+
+    int rc;
 
     where_filter(att, ALL, -1, -1, "", "", false, false, false, where);
 
@@ -275,7 +316,7 @@ void HostPoolMonitoring::request_execute(
         return;
     }
 
-    success_response(oss.str(), att);
+    success_response(oss, att);
 
     return;
 }
@@ -437,7 +478,9 @@ void RequestManagerPoolInfoFilter::dump(
         const string&      and_clause,
         const string&      or_clause)
 {
-    ostringstream oss;
+    std::string str;
+
+    std::ostringstream oss;
 
     std::string where_string, limit_clause;
     std::string desc;
@@ -466,13 +509,12 @@ void RequestManagerPoolInfoFilter::dump(
     {
         oss << start_id << "," << -end_id;
         limit_clause = oss.str();
-        oss.str("");
     }
 
-    Nebula::instance().get_configuration_attribute(att.uid, att.gid, 
+    Nebula::instance().get_configuration_attribute(att.uid, att.gid,
             "API_LIST_ORDER", desc);
 
-    rc = pool->dump(oss, where_string, limit_clause,
+    rc = pool->dump(str, where_string, limit_clause,
             one_util::toupper(desc) == "DESC");
 
     if ( rc != 0 )
@@ -482,7 +524,7 @@ void RequestManagerPoolInfoFilter::dump(
         return;
     }
 
-    success_response(oss.str(), att);
+    success_response(str, att);
 
     return;
 }
@@ -535,8 +577,8 @@ void VirtualNetworkPoolInfo::request_execute(
     /* ---------------------------------------------------------------------- */
     /*  Get the VNET pool                                                     */
     /* ---------------------------------------------------------------------- */
-    ostringstream pool_oss;
-    std::string   desc;
+    std::string pool_oss;
+    std::string desc;
 
     Nebula::instance().get_configuration_attribute(att.uid, att.gid, 
             "API_LIST_ORDER", desc);
@@ -551,7 +593,7 @@ void VirtualNetworkPoolInfo::request_execute(
         return;
     }
 
-    success_response(pool_oss.str(), att);
+    success_response(pool_oss, att);
 
     return;
 }

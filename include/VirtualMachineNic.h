@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -95,6 +95,64 @@ public:
      */
     int release_network_leases(int vmid);
 
+    /**
+     *  Marshall disk attributes in XML format with just essential information
+     *    @param stream to write the disk XML description
+     */
+    void to_xml_short(std::ostringstream& oss) const;
+
+    /**
+     * Check is a nic is alias or not
+     */
+    bool is_alias() const
+    {
+        return name() == "NIC_ALIAS";
+    }
+
+    /*
+     * Set nic NAME attribute if not empty, defaults to NAME = NIC${NIC_ID}
+     */
+    std::string set_nic_name()
+    {
+        std::string name = vector_value("NAME");
+
+        if (!name.empty())
+        {
+            return name;
+        }
+
+        std::ostringstream oss;
+
+        oss << "NIC" << get_id();
+
+        replace("NAME", oss.str());
+
+        return oss.str();
+    }
+
+    /*
+     * Set nic alias NAME attribute defaults to NAME = NIC${PARENT_ID}_ALIAS${ALIAS_ID}
+     *   @param parent_id for the alias
+     *   @return alias name
+     */
+    std::string set_nic_alias_name(int parent_id)
+    {
+        std::string name = vector_value("NAME");
+
+        if (!name.empty())
+        {
+            return name;
+        }
+
+        std::ostringstream oss;
+
+        oss << "NIC" << parent_id << "_" << "ALIAS" << get_id();
+
+        replace("NAME", oss.str());
+
+        return oss.str();
+    }
+
 private:
     /**
      *  Fills the authorization request for this NIC based on the VNET and SG
@@ -127,10 +185,13 @@ public:
         VirtualMachineAttributeSet(false)
     {
         std::vector<VectorAttribute *> vas;
+        std::vector<VectorAttribute *> alias;
         std::vector<VectorAttribute *> pcis;
         std::vector<VectorAttribute *>::iterator it;
 
         tmpl->get(NIC_NAME, vas);
+
+        tmpl->get(NIC_ALIAS_NAME, alias);
 
         tmpl->get("PCI", pcis);
 
@@ -140,6 +201,11 @@ public:
             {
                 vas.push_back(*it);
             }
+        }
+
+        for ( it=alias.begin(); it != alias.end(); ++it)
+        {
+            vas.push_back(*it);
         }
 
         init(vas, false);
@@ -218,11 +284,21 @@ public:
     /* NIC interface                                                          */
     /* ---------------------------------------------------------------------- */
     /**
-     * Returns the NIC attribute for a disk
+     * Returns the NIC attribute for a network interface
      *   @param nic_id of the NIC
      *   @return pointer to the attribute ir null if not found
      */
     VirtualMachineNic * get_nic(int nic_id) const
+    {
+        return static_cast<VirtualMachineNic *>(get_attribute(nic_id));
+    }
+
+    /**
+     * Deletes the NIC attribute from the VM NICs
+     *   @param nic_id of the NIC
+     *   @return pointer to the attribute or null if not found
+     */
+    VirtualMachineNic * delete_nic(int nic_id)
     {
         return static_cast<VirtualMachineNic *>(get_attribute(nic_id));
     }
@@ -249,6 +325,9 @@ public:
     int get_network_leases(int vm_id, int uid, std::vector<Attribute *> nics,
             VectorAttribute * nic_default, std::vector<VectorAttribute *>& sgs,
             std::string& estr);
+
+    int get_auto_network_leases(int vm_id, int uid, VectorAttribute * nic_default, 
+            vector<VectorAttribute*>& sgs, std::string& error_str);
 
     /**
      *  Release all the network leases and SG associated to the set
@@ -298,12 +377,11 @@ public:
     int set_up_attach_nic(int vmid, int uid, int cluster_id,
         VectorAttribute * vnic, VectorAttribute * nic_default,
         vector<VectorAttribute*>& sgs, std::string& error_str);
-
-
-
-
-
-
+    /**
+     *  Marshall NICs in XML format with just essential information
+     *    @param xml string to write the NIC XML description
+     */
+    std::string& to_xml_short(std::string& xml);
 
 protected:
 
@@ -315,6 +393,8 @@ protected:
 
 private:
     static const char * NIC_NAME; //"NIC"
+
+    static const char * NIC_ALIAS_NAME; //"NIC_ALIAS"
 
     static const char * NIC_ID_NAME; //"NIC_ID"
 };

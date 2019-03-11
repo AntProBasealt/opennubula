@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # ---------------------------------------------------------------------------- #
-# Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                  #
+# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                  #
 #                                                                              #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may      #
 # not use this file except in compliance with the License. You may obtain      #
@@ -46,16 +46,16 @@ begin
 
     # Setting one_item with info with the vm_xml including DISK to be added
     one_item = drv_action.retrieve_xmlelements('VM').first
+    disk = one_item.retrieve_xmlelements("TEMPLATE/DISK[ATTACH='YES']").first
 
     vm = VCenterDriver::VirtualMachine.new_one(vi_client, vm_ref, one_item)
-    vm.attach_disk
+    vm.attach_disk(disk)
 rescue StandardError => e
     message = "Attach image for VM #{vm_ref} on vCenter cluster" \
               "#{vc_cluster_name} failed due to \"#{e.message}\"\n"
     OpenNebula.log_error(message)
-    if vi_client.get_property_vcenter_conf(:debug_information)
-	    STDERR.puts "#{message} #{e.backtrace}"
-    end
+    STDERR.puts "#{message} #{e.backtrace}" if VCenterDriver::CONFIG[:debug_information]
+
     exit(-1)
 ensure
     vi_client.close_connection if vi_client

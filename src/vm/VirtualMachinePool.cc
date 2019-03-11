@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -373,10 +373,8 @@ int VirtualMachinePool::get_pending(
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int VirtualMachinePool::dump_acct(ostringstream& oss,
-                                  const string&  where,
-                                  int            time_start,
-                                  int            time_end)
+int VirtualMachinePool::dump_acct(string& oss, const string&  where,
+    int time_start, int time_end)
 {
     ostringstream cmd;
 
@@ -410,7 +408,7 @@ int VirtualMachinePool::dump_acct(ostringstream& oss,
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int VirtualMachinePool::dump_showback(ostringstream& oss,
+int VirtualMachinePool::dump_showback(string& oss,
                                       const string&  where,
                                       int            start_month,
                                       int            start_year,
@@ -493,7 +491,7 @@ int VirtualMachinePool::clean_all_monitoring()
 /* -------------------------------------------------------------------------- */
 
 int VirtualMachinePool::dump_monitoring(
-        ostringstream& oss,
+        string& oss,
         const string&  where)
 {
     ostringstream cmd;
@@ -710,10 +708,11 @@ int VirtualMachinePool::calculate_showback(
     // Get accounting history records
     //--------------------------------------------------------------------------
 
-    oss.str("");
-    rc = dump_acct(oss, "", start_time, end_time);
+    std::string acct_str;
 
-    ObjectXML xml(oss.str());
+    rc = dump_acct(acct_str, "", start_time, end_time);
+
+    ObjectXML xml(acct_str);
 
 #ifdef SBDEBUG
     time_t debug_t_1 = time(0);
@@ -890,7 +889,7 @@ int VirtualMachinePool::calculate_showback(
         {
             int vmid = vm_it->first;
 
-            vm = get(vmid);
+            vm = get_ro(vmid);
 
             int uid = 0;
             int gid = 0;
@@ -1145,11 +1144,24 @@ void VirtualMachinePool::delete_hotplug_nic(int vid, bool attach)
         }
     }
 
+    std::set<int> a_ids;
+
+    one_util::split_unique(nic->vector_value("ALIAS_IDS"), ',', a_ids);
+
+    for(std::set<int>::iterator it = a_ids.begin(); it != a_ids.end(); ++it)
+    {
+        tmpl.set(vm->get_nic(*it)->vector_attribute()->clone());
+
+        vm->get_nic(*it)->release_network_leases(oid);
+    }
+
+    nic->release_network_leases(oid);
+
+    vm->delete_attach_alias(nic);
+
     update(vm);
 
     vm->unlock();
-
-    nic->release_network_leases(oid);
 
     tmpl.set(nic->vector_attribute());
 

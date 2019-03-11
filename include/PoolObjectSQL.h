@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -67,7 +67,8 @@ public:
         VROUTER        = 0x0004000000000000LL,
         MARKETPLACE    = 0x0008000000000000LL,
         MARKETPLACEAPP = 0x0010000000000000LL,
-        VMGROUP        = 0x0020000000000000LL
+        VMGROUP        = 0x0020000000000000LL,
+        VNTEMPLATE     = 0x0040000000000000LL
     };
 
     /**
@@ -105,6 +106,7 @@ public:
             case MARKETPLACE:    return "MARKETPLACE" ; break;
             case MARKETPLACEAPP: return "MARKETPLACEAPP" ; break;
             case VMGROUP:        return "VMGROUP" ; break;
+            case VNTEMPLATE:     return "VNTEMPLATE"; break;
             default:             return "";
         }
     };
@@ -129,6 +131,7 @@ public:
         else if ( type == "MARKETPLACE" )    return MARKETPLACE ;
         else if ( type == "MARKETPLACEAPP" ) return MARKETPLACEAPP ;
         else if ( type == "VMGROUP" )        return VMGROUP ;
+        else if ( type == "VNTEMPLATE" )     return VNTEMPLATE ;
         else                                 return NONE;
     };
 
@@ -177,18 +180,14 @@ public:
              lock_owner(-1),
              lock_req_id(-1),
              lock_time(0),
+             mutex(0),
              table(_table)
     {
-        pthread_mutex_init(&mutex,0);
     };
 
     virtual ~PoolObjectSQL()
     {
         delete obj_template;
-
-        pthread_mutex_unlock(&mutex);
-
-        pthread_mutex_destroy(&mutex);
     };
 
     /* --------------------------------------------------------------------- */
@@ -317,30 +316,18 @@ public:
                                 string& error_str);
 
     /* --------------------------------------------------------------------- */
-
     /**
-     *  Function to lock the object
-     */
-    void lock()
-    {
-        pthread_mutex_lock(&mutex);
-    };
-
-    /**
-     *  Function to unlock the object
+     *  Function to unlock the object. It also frees associated resources. Object
+     *  cannot be access after unlocking it
      */
     void unlock()
     {
-        pthread_mutex_unlock(&mutex);
-    };
+        if (!ro && mutex != 0)
+        {
+            pthread_mutex_unlock(mutex);
+        }
 
-    /**
-     *  Try to lock the object
-     *    @return 0 on success or error_code
-     */
-    int trylock()
-    {
-        return pthread_mutex_trylock(&mutex);
+        delete this;
     };
 
     /**
@@ -814,6 +801,11 @@ protected:
      */
     time_t  lock_time;
 
+    /**
+     * Attribute for check if is a read only object
+     */
+    bool  ro;
+
 private:
     /**
      *  Characters that can not be in a name
@@ -834,7 +826,7 @@ private:
      * The mutex for the PoolObject. This implementation assumes that the mutex
      * IS LOCKED when the class destructor is called.
      */
-    pthread_mutex_t mutex;
+    pthread_mutex_t * mutex;
 
     /**
      *  Pointer to the SQL table for the PoolObjectSQL

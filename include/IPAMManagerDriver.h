@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -65,6 +65,14 @@ private:
     void register_address_range(int id, const std::string& arg) const
     {
         send_message("REGISTER_ADDRESS_RANGE", id, arg);
+    }
+
+    /**
+     *  Unregister an AddressRange from the IPAM
+     */
+    void unregister_address_range(int id, const std::string& arg) const
+    {
+        send_message("UNREGISTER_ADDRESS_RANGE", id, arg);
     }
 
     /**

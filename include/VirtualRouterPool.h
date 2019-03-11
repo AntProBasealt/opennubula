@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -73,9 +73,22 @@ public:
      *
      *   @return a pointer to the object, 0 in case of failure
      */
-    VirtualRouter * get(int oid)
+    VirtualRouter * get(int oid) 
     {
         return static_cast<VirtualRouter *>(PoolSQL::get(oid));
+    };
+
+    /**
+     *  Gets a read only object from the pool (if needed the object is loaded from the
+     *  database).
+     *   @param oid the object unique identifier
+     *   @param lock locks the object if true
+     *
+     *   @return a pointer to the object, 0 in case of failure
+     */
+    VirtualRouter * get_ro(int oid)
+    {
+        return static_cast<VirtualRouter *>(PoolSQL::get_ro(oid));
     };
 
     /**
@@ -88,10 +101,10 @@ public:
      *
      *  @return 0 on success
      */
-    int dump(ostringstream& oss, const string& where, const string& limit,
+    int dump(string& oss, const string& where, const string& limit,
             bool desc)
     {
-        return PoolSQL::dump(oss, "VROUTER_POOL", VirtualRouter::table, where,
+        return PoolSQL::dump(oss, "VROUTER_POOL", "body", VirtualRouter::table, where,
                              limit, desc);
     };
 

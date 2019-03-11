@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2018, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -72,6 +72,17 @@ public:
         return static_cast<SecurityGroup *>(PoolSQL::get(oid));
     };
 
+    /**
+     *  Function to get a read only SecurityGroup from the pool, if the object is not in memory
+     *  it is loaded from the DB
+     *    @param oid SecurityGroup unique id
+     *    @return a pointer to the SecurityGroup, 0 if the SecurityGroup could not be loaded
+     */
+    SecurityGroup * get_ro(int oid)
+    {
+        return static_cast<SecurityGroup *>(PoolSQL::get_ro(oid));
+    };
+
     /** Update a particular SecurityGroup
      *    @param securitygroup pointer to SecurityGroup
      *    @return 0 on success
@@ -100,10 +111,10 @@ public:
      *
      *  @return 0 on success
      */
-    int dump(ostringstream& oss, const string& where, const string& limit,
+    int dump(string& oss, const string& where, const string& limit,
             bool desc)
     {
-        return PoolSQL::dump(oss, "SECURITY_GROUP_POOL", SecurityGroup::table,
+        return PoolSQL::dump(oss, "SECURITY_GROUP_POOL", "body", SecurityGroup::table,
                 where, limit, desc);
     };
 

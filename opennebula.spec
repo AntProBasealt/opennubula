@@ -5,8 +5,8 @@
 
 Name: opennebula
 Summary: Cloud computing solution for Data Center Virtualization
-Version: 5.6.2
-Release: alt6
+Version: 5.8.0
+Release: alt1
 License: Apache
 Group: System/Servers
 Url: https://opennebula.org
@@ -32,6 +32,7 @@ BuildRequires: zlib-devel
 BuildRequires: node node-gyp npm node-devel
 BuildRequires: ronn
 BuildRequires: groff-base
+BuildRequires: libvncserver-devel
 
 %description
 OpenNebula.org is an open-source project aimed at building the industry
@@ -243,6 +244,17 @@ Configures an OpenNebula node providing kvm.
 # %description node-xen
 # Configures an OpenNebula node providing xen.
 
+%package provision
+Summary: OpenNebula provisioning tool
+Group: System/Servers
+BuildArch: noarch
+Requires: %name = %EVR
+Requires: %name-common = %EVR
+Requires: %name-server = %EVR
+Requires: ruby-%name = %EVR
+
+%description provision
+OpenNebula provisioning tool
 
 %prep
 %setup
@@ -539,13 +551,20 @@ fi
 %_unitdir/opennebula-gate.service
 %_initdir/opennebula-gate
 
-
 %files flow
 %config(noreplace) %attr(0640, root, oneadmin) %_sysconfdir/one/oneflow-server.conf
 %_libexecdir/one/oneflow
 %_bindir/oneflow-server
 %_unitdir/opennebula-flow.service
 %_initdir/opennebula-flow
+
+%files provision
+%_bindir/oneprovision
+%config(noreplace) %_sysconfdir/one/cli/oneprovision.yaml
+%_libexecdir/one/ruby/cli/one_helper/oneprovision_helper.rb
+%_libexecdir/one/oneprovision
+%_datadir/one/oneprovision
+%_man1dir/oneprovision.1*
 
 
 %files server
@@ -571,6 +590,7 @@ fi
 %_libexecdir/one/ruby/one_vnm.rb
 %_libexecdir/one/ruby/opennebula_driver.rb
 %_libexecdir/one/ruby/ssh_stream.rb
+%_libexecdir/one/ruby/packet_driver.rb
 %_libexecdir/one/sh
 #%rubygem_specdir/opennebula-server/Gemfile
 
@@ -594,6 +614,7 @@ fi
 %config(noreplace) %_sysconfdir/one/az_driver.conf
 %config %_sysconfdir/one/az_driver.default
 %config %_sysconfdir/one/vcenter_driver.default
+%config %_sysconfdir/one/packet_driver.default
 %config(noreplace) %_sysconfdir/one/vcenter_driver.conf
 %config(noreplace) %_sysconfdir/one/auth/server_x509_auth.conf
 %config(noreplace) %_sysconfdir/one/auth/ldap_auth.conf
@@ -602,6 +623,7 @@ fi
 %files tools
 %dir %_sysconfdir/one/cli
 %config(noreplace) %_sysconfdir/one/cli/*
+%exclude %_sysconfdir/one/cli/oneprovision.yaml
 
 %_bindir/oneacl
 %_bindir/onecluster
@@ -628,6 +650,7 @@ fi
 %_bindir/oneflow-template
 
 %_libexecdir/one/ruby/cli
+%exclude %_libexecdir/one/ruby/cli/one_helper/oneprovision_helper.rb
 %rubygem_specdir/opennebula-cli*
 %ruby_sitelibdir/cli_helper.rb
 %ruby_sitelibdir/one_helper.rb
@@ -640,6 +663,9 @@ fi
 %exclude %_man1dir/onedb.1.*
 
 %changelog
+* Mon Mar 11 2019 Alexey Shabalin <shaba@altlinux.org> 5.8.0-alt1
+- 5.8.0
+
 * Thu Mar 07 2019 Pavel Skrylev <majioa@altlinux.org> 5.6.2-alt6
 - Remove unnecessary dependency.
 

@@ -577,7 +577,6 @@ fi
 %_bindir/one
 %_bindir/oned
 %_bindir/onedb
-%_bindir/tty_expect
 
 %_datadir/one/examples
 %_datadir/one/esx-fw-vnc
@@ -615,7 +614,6 @@ fi
 %config %_sysconfdir/one/az_driver.default
 %config %_sysconfdir/one/vcenter_driver.default
 %config %_sysconfdir/one/packet_driver.default
-%config(noreplace) %_sysconfdir/one/vcenter_driver.conf
 %config(noreplace) %_sysconfdir/one/auth/server_x509_auth.conf
 %config(noreplace) %_sysconfdir/one/auth/ldap_auth.conf
 %config(noreplace) %_sysconfdir/one/auth/x509_auth.conf
@@ -625,6 +623,7 @@ fi
 %config(noreplace) %_sysconfdir/one/cli/*
 %exclude %_sysconfdir/one/cli/oneprovision.yaml
 
+%_bindir/oneacct
 %_bindir/oneacl
 %_bindir/onecluster
 %_bindir/onedatastore
@@ -635,16 +634,16 @@ fi
 %_bindir/onemarketapp
 %_bindir/onetemplate
 %_bindir/oneuser
+%_bindir/onevdc
 %_bindir/onevm
 %_bindir/onevmgroup
 %_bindir/onevnet
-%_bindir/oneacct
+%_bindir/onevntemplate
+%_bindir/onevrouter
 %_bindir/onezone
 %_bindir/onevcenter
 %_bindir/onesecgroup
 %_bindir/oneshowback
-%_bindir/onevdc
-%_bindir/onevrouter
 
 %_bindir/oneflow
 %_bindir/oneflow-template
@@ -661,6 +660,7 @@ fi
 
 %_man1dir/one*
 %exclude %_man1dir/onedb.1.*
+%exclude %_man1dir/oneprovision.1*
 
 %changelog
 * Mon Mar 11 2019 Alexey Shabalin <shaba@altlinux.org> 5.8.0-alt1

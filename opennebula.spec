@@ -33,6 +33,9 @@ BuildRequires: node node-gyp npm node-devel
 BuildRequires: ronn
 BuildRequires: groff-base
 BuildRequires: libvncserver-devel
+# TODO: python module
+# BuildRequires: python3-devel python3-module-setuptools python3-module-wheel 
+# BuildRequires: python3-module-generateDS
 
 %description
 OpenNebula.org is an open-source project aimed at building the industry
@@ -151,6 +154,14 @@ Requires: ruby-net-ldap
 
 %description -n ruby-%name
 Ruby interface for OpenNebula.
+
+%package -n python3-module-pyone
+Summary: Provides the OpenNebula Python libraries
+Group: Development/Python3
+BuildArch: noarch
+
+%description -n python3-module-pyone
+Python interface for OpenNebula.
 
 %package sunstone
 Summary: Browser based UI and public cloud interfaces
@@ -375,6 +386,11 @@ rm -f %buildroot%_datadir/one/Gemfile
 rm -f %buildroot%_datadir/one/install_gems
 rm -rf %buildroot%_libexecdir/one/ruby/vendors
 
+# Python
+#pushd src/oca/python
+#PYTHON=%__python3 make install ROOT=%buildroot
+#popd
+
 %pre common
 %_sbindir/groupadd -r -f oneadmin 2>/dev/null ||:
 %_sbindir/useradd -r -m -g oneadmin -G disk,wheel -c 'Opennebula Daemon User' \
@@ -483,6 +499,9 @@ fi
 
 %rubygem_specdir/opennebula*
 %exclude %rubygem_specdir/opennebula-cli*
+
+#%files -n python3-module-pyone
+#%%python3_sitelibdir/*
 
 %files sunstone
 %_libexecdir/one/sunstone

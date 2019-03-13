@@ -34,7 +34,7 @@ BuildRequires: ronn
 BuildRequires: groff-base
 BuildRequires: libvncserver-devel
 # TODO: python module
-# BuildRequires: python3-devel python3-module-setuptools python3-module-wheel 
+# BuildRequires: python3-devel python3-module-setuptools python3-module-wheel
 # BuildRequires: python3-module-generateDS
 
 %description
@@ -259,7 +259,6 @@ Configures an OpenNebula node providing kvm.
 Summary: OpenNebula provisioning tool
 Group: System/Servers
 BuildArch: noarch
-Requires: %name = %EVR
 Requires: %name-common = %EVR
 Requires: %name-server = %EVR
 Requires: ruby-%name = %EVR

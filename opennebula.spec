@@ -6,7 +6,7 @@
 Name: opennebula
 Summary: Cloud computing solution for Data Center Virtualization
 Version: 5.8.1
-Release: alt1
+Release: alt2
 License: Apache
 Group: System/Servers
 Url: https://opennebula.org
@@ -33,7 +33,6 @@ BuildRequires: zlib-devel
 BuildRequires: node node-gyp npm node-devel
 BuildRequires: ronn
 BuildRequires: groff-base
-BuildRequires: libvncserver-devel
 # TODO: python module
 # BuildRequires: python3-devel python3-module-setuptools python3-module-wheel
 # BuildRequires: python3-module-generateDS
@@ -106,25 +105,25 @@ BuildArch: noarch
 This package creates the oneadmin user and group.
 
 
-%package       -n gem-%name
-Summary:       Provides the OpenNebula Ruby libraries
-Group:         Development/Ruby
-BuildArch:     noarch
-Provides:      %name-ruby = %EVR ruby-%name
-Obsoletes:     %name-ruby < %EVR ruby-%name
+%package -n gem-%name
+Summary: Provides the OpenNebula Ruby libraries
+Group: Development/Ruby
+BuildArch: noarch
+Provides: %name-ruby = %EVR ruby-%name = %EVR
+Obsoletes: %name-ruby < %EVR ruby-%name < %EVR
 
-%description   -n gem-%name
+%description -n gem-%name
 Ruby interface for OpenNebula.
 
 
-%package       -n gem-%name-cli
-Summary:       Provides the CLI for OpenNebula
-Group:         Development/Ruby
-BuildArch:     noarch
-Provides:      %name-ruby = %EVR ruby-%name-cli
-Obsoletes:     %name-ruby < %EVR ruby-%name-cli
+%package -n gem-%name-cli
+Summary: Provides the CLI for OpenNebula
+Group: Development/Ruby
+BuildArch: noarch
+Provides: %name-ruby = %EVR ruby-%name-cli = %EVR %name-tools = %EVR
+Obsoletes: %name-ruby < %EVR ruby-%name-cli < %EVR %name-tools < %EVR
 
-%description   -n gem-%name-cli
+%description -n gem-%name-cli
 Ruby CLI for OpenNebula.
 
 # curb       => For EC2 and OCCI uploads (OPTIONAL: falls back to multipart)
@@ -263,7 +262,7 @@ popd
 # Compile OpenNebula
 scons -j2 mysql=yes new_xmlrpc=yes sunstone=no systemd=yes rubygems=yes
 
-%gem_build --use=install_gems --alias=opennebula-server --join=lib:bin --use=flow --alias=opennebula-common --join=lib:bin --use=opennebula-cli --join=lib:bin
+%gem_build --use=install_gems --alias=opennebula-common --join=lib:bin --use=flow --alias=opennebula-flow --join=lib:bin --use=opennebula-cli --join=lib:bin
 
 # build man pages
 pushd share/man
@@ -284,24 +283,23 @@ rm -f %buildroot%_libexecdir/one/sunstone/public/dist/main.js
 ln -r -s %buildroot%oneadmin_home/sunstone/main.js %buildroot%_libexecdir/one/sunstone/public/dist/main.js
 
 %gem_install
-
 # delete duplicated with gems files
 ## opennebula
-rm -f  %buildroot%_libexecdir/one/ruby/opennebula.rb
 rm -rf %buildroot%_libexecdir/one/ruby/opennebula
-rm -f  %buildroot%_libexecdir/one/ruby/vcenter_driver.rb
-rm -f  %buildroot%_libexecdir/one/ruby/VirtualMachineDriver.rb
-rm -f  %buildroot%_libexecdir/one/ruby/OpenNebulaDriver.rb
-rm -f  %buildroot%_libexecdir/one/ruby/CommandManager.rb
 rm -f  %buildroot%_libexecdir/one/ruby/ActionManager.rb
+rm -f  %buildroot%_libexecdir/one/ruby/CommandManager.rb
 rm -f  %buildroot%_libexecdir/one/ruby/DriverExecHelper.rb
+rm -f  %buildroot%_libexecdir/one/ruby/OpenNebulaDriver.rb
+rm -f  %buildroot%_libexecdir/one/ruby/VirtualMachineDriver.rb
+rm -f  %buildroot%_libexecdir/one/ruby/opennebula.rb
+rm -f  %buildroot%_libexecdir/one/ruby/vcenter_driver.rb
 rm -f  %buildroot%_libexecdir/one/ruby/cloud/CloudClient.rb
 
 ## oennebula-cli
-rm -f  %buildroot%_libexecdir/one/ruby/cli_helper.rb
-rm -f  %buildroot%_libexecdir/one/ruby/one_helper.rb
-rm -f  %buildroot%_libexecdir/one/ruby/command_parser.rb
-rm -rf %buildroot%_libexecdir/one/ruby/one_helper
+rm -rf  %buildroot%_libexecdir/one/ruby/cli
+
+# delete docs
+rm -rf %buildroot%_libexecdir/ruby/gems/*/doc
 
 # systemd units
 install -p -D -m 644 share/pkgs/ALT/opennebula.service %buildroot%_unitdir/opennebula.service
@@ -343,6 +341,8 @@ install -p -D -m 644 share/etc/sysctl.d/bridge-nf-call.conf %buildroot%_sysconfd
 rm -f %buildroot%_datadir/one/Gemfile
 rm -f %buildroot%_datadir/one/install_gems
 rm -rf %buildroot%_libexecdir/one/ruby/vendors
+rm -rf %buildroot%ruby_gemspecdir/packethost*.gemspec
+rm -rf %buildroot%ruby_gemslibdir/packethost*
 
 # Python
 #pushd src/oca/python
@@ -440,7 +440,7 @@ fi
 %files java
 %_javadir/org.opennebula.client.jar
 
-%files         -n gem-%name
+%files -n gem-%name
 %ruby_gemspecdir/%name-%version.gemspec
 %ruby_gemslibdir/%name-%version
 
@@ -454,9 +454,9 @@ fi
 #%ruby_sitelibdir/DriverExecHelper.rb
 #%ruby_sitelibdir/cloud/CloudClient.rb
 
-#%_libexecdir/one/ruby/OpenNebula.rb
-#%_libexecdir/one/ruby/scripts_common.rb
-#%_libexecdir/one/ruby/vcenter_driver
+%_libexecdir/one/ruby/OpenNebula.rb
+%_libexecdir/one/ruby/scripts_common.rb
+%_libexecdir/one/ruby/vcenter_driver
 
 #%rubygem_specdir/opennebula*
 #%exclude %rubygem_specdir/opennebula-cli*
@@ -541,7 +541,7 @@ fi
 %files provision
 %_bindir/oneprovision
 %config(noreplace) %_sysconfdir/one/cli/oneprovision.yaml
-%_libexecdir/one/ruby/cli/one_helper/oneprovision_helper.rb
+#%_libexecdir/one/ruby/cli/one_helper/oneprovision_helper.rb
 %_libexecdir/one/oneprovision
 %_datadir/one/oneprovision
 %_man1dir/oneprovision.1*
@@ -598,7 +598,7 @@ fi
 %config(noreplace) %_sysconfdir/one/auth/ldap_auth.conf
 %config(noreplace) %_sysconfdir/one/auth/x509_auth.conf
 
-%files         -n gem-%name-cli
+%files -n gem-%name-cli
 %dir %_sysconfdir/one/cli
 %ruby_gemspecdir/%name-cli-%version.gemspec
 %ruby_gemslibdir/%name-cli-%version
@@ -630,8 +630,8 @@ fi
 %_bindir/oneflow
 %_bindir/oneflow-template
 
-%_libexecdir/one/ruby/cli
-%exclude %_libexecdir/one/ruby/cli/one_helper/oneprovision_helper.rb
+#%_libexecdir/one/ruby/cli
+#%exclude %_libexecdir/one/ruby/cli/one_helper/oneprovision_helper.rb
 #%ruby_gemspecdir/opennebula-cli*
 #%ruby_sitelibdir/cli_helper.rb
 #%ruby_sitelibdir/one_helper.rb
@@ -645,6 +645,10 @@ fi
 %exclude %_man1dir/oneprovision.1*
 
 %changelog
+* Tue Apr 09 2019 Alexey Shabalin <shaba@altlinux.org> 5.8.1-alt2
+- 5.8.1 release
+- fix provides and obsoletes
+
 * Fri Mar 22 2019 Pavel Skrylev <majioa@altlinux.org> 5.8.1-alt1
 - Use Ruby Policy 2.0
 

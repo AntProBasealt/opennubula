@@ -1,3 +1,19 @@
+/* -------------------------------------------------------------------------- */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/*                                                                            */
+/* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
+/* not use this file except in compliance with the License. You may obtain    */
+/* a copy of the License at                                                   */
+/*                                                                            */
+/* http://www.apache.org/licenses/LICENSE-2.0                                 */
+/*                                                                            */
+/* Unless required by applicable law or agreed to in writing, software        */
+/* distributed under the License is distributed on an "AS IS" BASIS,          */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   */
+/* See the License for the specific language governing permissions and        */
+/* limitations under the License.                                             */
+/*--------------------------------------------------------------------------- */
+
 package goca
 
 import (
@@ -32,10 +48,9 @@ type oneClient struct {
 }
 
 type response struct {
-	status   bool
-	body     string
-	bodyInt  int
-	bodyBool bool
+	status  bool
+	body    string
+	bodyInt int
 }
 
 // Initializes the client variable, used as a singleton
@@ -124,8 +139,7 @@ func (c *oneClient) endpointCall(url string, method string, args ...interface{})
 		status  bool
 		body    string
 		bodyInt int64
-		bodyBool bool
-		errCode  int64
+		errCode int64
 	)
 
 	xmlArgs := make([]interface{}, len(args)+1)
@@ -163,7 +177,7 @@ func (c *oneClient) endpointCall(url string, method string, args ...interface{})
 	resp.Body.Close()
 	if err != nil {
 		return nil,
-			&ClientError{Code: ClientRespHTTP, msg: "read http response body", err: err}
+			&ClientError{ClientRespHTTP, "read http response body", resp, err}
 	}
 
 	// Server side XML-RPC library: xmlrpc-c
@@ -188,25 +202,22 @@ func (c *oneClient) endpointCall(url string, method string, args ...interface{})
 	status, ok = result[0].(bool)
 	if ok == false {
 		return nil,
-			&ClientError{ClientRespONeParse, "index 0: boolean expected", resp, err}
+			&ClientError{ClientRespONeParse, "index 0: boolean expected", resp, nil}
 	}
 
 	body, ok = result[1].(string)
 	if ok == false {
 		bodyInt, ok = result[1].(int64)
 		if ok == false {
-			bodyBool, ok = result[1].(bool)
-			if ok == false {
-				return nil,
-					&ClientError{ClientRespONeParse, "index 1: boolean expected", resp, err}
-			}
+            return nil,
+                &ClientError{ClientRespONeParse, "index 1: int or string expected", resp, nil}
 		}
 	}
 
 	errCode, ok = result[2].(int64)
 	if ok == false {
 		return nil,
-			&ClientError{ClientRespONeParse, "index 2: boolean expected", resp, err}
+			&ClientError{ClientRespONeParse, "index 2: boolean expected", resp, nil}
 	}
 
 	if status == false {
@@ -216,7 +227,7 @@ func (c *oneClient) endpointCall(url string, method string, args ...interface{})
 		}
 	}
 
-	r := &response{status, body, int(bodyInt), bodyBool}
+	r := &response{status, body, int(bodyInt)}
 
 	return r, nil
 }

@@ -35,7 +35,6 @@ class Container
     # Class Constants API and Containers Paths
     #---------------------------------------------------------------------------
     CONTAINERS = 'containers'.freeze
-    LXC_COMMAND = 'lxc'
 
     #---------------------------------------------------------------------------
     # Methods to access container attributes
@@ -69,6 +68,8 @@ class Container
 
         @lxc = lxc
         @one = one
+        @lxc_command = 'lxc'
+        @lxc_command.prepend 'sudo ' if client.snap
 
         @containers = "#{@client.lxd_path}/storage-pools/default/containers"
         @rootfs_dir = "#{@containers}/#{name}/rootfs"
@@ -87,8 +88,6 @@ class Container
             one  = OpenNebulaVM.new(one_xml) if one_xml
 
             Container.new(info, one, client)
-        rescue LXDError => exception
-            raise exception
         end
 
         # Creates container from a OpenNebula VM xml description
@@ -111,12 +110,12 @@ class Container
             containers
         end
 
-        # Returns boolean indicating if the container exists(true) or not (false)
+        # Returns boolean indicating the container exists(true) or not (false)
         def exist?(name, client)
             client.get("#{CONTAINERS}/#{name}")
             true
-        rescue LXDError => exception
-            raise exception if exception.body['error_code'] != 404
+        rescue LXDError => e
+            raise e if e.code != 404
 
             false
         end
@@ -163,17 +162,19 @@ class Container
     # Runs command inside container
     # @param command [String] to execute through lxc exec
     def exec(command)
-        cmd = "#{LXC_COMMAND} exec #{@one.vm_name} -- #{command}"
-        rc, o, e = Command.execute(cmd, true)
+        cmd = "#{@lxc_command} exec #{@one.vm_name} -- #{command}"
+        Command.execute(cmd, true)
+    end
 
-        # TODO: this should be removed when Snap bug is fixed
-        err = 'cannot create user data directory:'
-        rc, o, e = Command.execute("sudo #{cmd}", true) if e.include?(err)
+    def show_log
+        cmd = "#{@lxc_command} info --show-log #{@lxc['name']}"
+        rc, o, e = Command.execute(cmd, false)
 
-        log = "Failed to run command #{cmd}: #{e}"
-        OpenNebula.log_error("#{__method__}: #{log}") unless rc.zero?
-
-        [rc, o, e]
+        if rc.zero?
+            OpenNebula.log o
+        else
+            OpenNebula.log_error e
+        end
     end
 
     #---------------------------------------------------------------------------
@@ -185,6 +186,21 @@ class Container
 
     def stop(options = { :timeout => 120 })
         change_state(__method__, options)
+
+        # Remove nic from ovs-switch if needed
+        @one.get_nics.each do |nic|
+            del_bridge_port(nic) # network driver matching implemented here
+        end
+    end
+
+    def check_stop
+        return if status != 'Running'
+
+        if ARGV[-1] == '-f'
+            stop(:force => true)
+        else
+            stop
+        end
     end
 
     def restart(options = {})
@@ -221,7 +237,8 @@ class Container
             device.include?('eth') && config['hwaddr'] == mac
         end
 
-        update
+        # Removes nic from ovs-switch if needed
+        update if del_bridge_port(@one.get_nic_by_mac(mac))
     end
 
     #---------------------------------------------------------------------------
@@ -242,7 +259,7 @@ class Container
             return nil unless status
         end
 
-        return 'no context' unless @one.has_context?
+        return true unless @one.has_context?
 
         csrc = @lxc['devices']['context']['source'].clone
 
@@ -279,7 +296,7 @@ class Container
     # Removes the context section from the LXD configuration and unmap the
     # context device
     def detach_context
-        return 'no context' unless @one.has_context?
+        return true unless @one.has_context?
 
         csrc = @lxc['devices']['context']['source'].clone
 
@@ -361,7 +378,7 @@ class Container
 
     # Start the svncterm server if it is down.
     def vnc(signal)
-        command = @one.vnc_command(signal)
+        command = @one.vnc_command(signal, @lxc_command)
         return if command.nil?
 
         w = @one.lxdrc[:vnc][:width]
@@ -392,9 +409,27 @@ class Container
 
     private
 
+    # Deletes the switch port. Unlike libvirt, LXD doesn't handle this.
+    def del_bridge_port(nic)
+        return true unless /ovswitch/ =~ nic['VN_MAD']
+
+        cmd = 'sudo ovs-vsctl --if-exists del-port '\
+        "#{nic['BRIDGE']} #{nic['TARGET']}"
+
+        rc, _o, e = Command.execute(cmd, false)
+
+        return true if rc.zero?
+
+        OpenNebula.log_error "#{__method__}: #{e}"
+        false
+    end
+
     # Waits or no for response depending on wait value
     def wait?(response, wait, timeout)
         @client.wait(response, timeout) unless wait == false
+    rescue LXDError => e
+        show_log
+        raise e
     end
 
     # Performs an action on the container that changes the execution status.

@@ -1,3 +1,19 @@
+/* -------------------------------------------------------------------------- */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/*                                                                            */
+/* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
+/* not use this file except in compliance with the License. You may obtain    */
+/* a copy of the License at                                                   */
+/*                                                                            */
+/* http://www.apache.org/licenses/LICENSE-2.0                                 */
+/*                                                                            */
+/* Unless required by applicable law or agreed to in writing, software        */
+/* distributed under the License is distributed on an "AS IS" BASIS,          */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   */
+/* See the License for the specific language governing permissions and        */
+/* limitations under the License.                                             */
+/*--------------------------------------------------------------------------- */
+
 package goca
 
 import (
@@ -38,7 +54,7 @@ type templateTemplate struct {
 }
 
 type templateContext struct {
-	Dynamic unmatchedTagsSlice `xml:",any"`
+	Dynamic unmatchedTagsMap `xml:",any"`
 }
 
 type templateDisk struct {
@@ -182,8 +198,8 @@ func (template *Template) Delete() error {
 }
 
 // Instantiate will instantiate the template
-func (template *Template) Instantiate(name string, pending bool, extra string) (uint, error) {
-	response, err := client.Call("one.template.instantiate", template.ID, name, pending, extra)
+func (template *Template) Instantiate(name string, pending bool, extra string, clone bool) (uint, error) {
+	response, err := client.Call("one.template.instantiate", template.ID, name, pending, extra, clone)
 
 	if err != nil {
 		return 0, err

@@ -63,7 +63,8 @@ module OneProvision
         # Deletes the PROVISION
         #
         # @param cleanup [Boolean] True to delete running VMs and images
-        def delete(cleanup = false)
+        # @param timeout [Integer] Timeout for deleting running VMs
+        def delete(cleanup, timeout)
             Utils.fail('Provision not found.') unless exists
 
             if running_vms? && !cleanup
@@ -74,9 +75,9 @@ module OneProvision
                 Utils.fail('Provision with images can\'t be deleted')
             end
 
-            delete_vms if cleanup
+            delete_vms(timeout) if cleanup
 
-            delete_images if cleanup
+            delete_images(timeout) if cleanup
 
             OneProvisionLogger.info("Deleting provision #{@id}")
 
@@ -124,6 +125,11 @@ module OneProvision
                     msg = "#{section.chomp('s')} #{obj['ID']}"
 
                     Driver.retry_loop "Failed to delete #{msg}" do
+                        if section == 'vnets'
+                            vnet = Vnet.new(obj.id)
+                            vnet.delete_ars
+                        end
+
                         OneProvisionLogger.debug("Deleting OpenNebula #{msg}")
 
                         Utils.exception(obj.delete)
@@ -181,9 +187,7 @@ module OneProvision
 
                 Mode.new_cleanup(true)
 
-                Driver.retry_loop 'Failed to create some resources' do
-                    create_resources(cfg, cid)
-                end
+                create_resources(cfg, cid)
 
                 if cfg['hosts'].nil?
                     puts "ID: #{@id}"
@@ -191,9 +195,7 @@ module OneProvision
                     return 0
                 end
 
-                Driver.retry_loop 'Failed to create hosts' do
-                    create_hosts(cfg, cid)
-                end
+                create_hosts(cfg, cid)
 
                 # ask user to be patient, mandatory for now
                 STDERR.puts 'WARNING: This operation can ' \
@@ -269,32 +271,34 @@ module OneProvision
                 next if cfg[r].nil?
 
                 cfg[r].each do |x|
-                    if cfg['defaults'] && cfg['defaults']['driver']
-                        driver = cfg['defaults']['provision']['driver']
+                    Driver.retry_loop 'Failed to create some resources' do
+                        if cfg['defaults'] && cfg['defaults']['driver']
+                            driver = cfg['defaults']['provision']['driver']
+                        end
+
+                        erb = Utils.evaluate_erb(self, x)
+
+                        msg = "Creating OpenNebula #{r}: #{erb['name']}"
+
+                        OneProvisionLogger.debug(msg)
+
+                        if r == 'datastores'
+                            datastore = Datastore.new
+                            datastore.create(cid.to_i, erb, driver, @id, @name)
+                            @datastores << datastore.one
+                        else
+                            vnet = Vnet.new
+                            vnet.create(cid.to_i, erb, driver, @id, @name)
+                            @vnets << vnet.one
+                        end
+
+                        r     = 'vnets' if r == 'networks'
+                        rid   = instance_variable_get("@#{r}").last['ID']
+                        rname = r.chomp('s').capitalize
+                        msg   = "#{rname} created with ID: #{rid}"
+
+                        OneProvisionLogger.debug(msg)
                     end
-
-                    msg = "Creating OpenNebula #{r}: #{x['name']}"
-
-                    OneProvisionLogger.debug(msg)
-
-                    erb = Utils.evaluate_erb(self, x)
-
-                    if r == 'datastores'
-                        datastore = Datastore.new
-                        datastore.create(cid.to_i, erb, driver, @id, @name)
-                        @datastores << datastore.one
-                    else
-                        vnet = Vnet.new
-                        vnet.create(cid.to_i, erb, driver, @id, @name)
-                        @vnets << vnet.one
-                    end
-
-                    r     = 'vnets' if r == 'networks'
-                    rid   = instance_variable_get("@#{r}").last['ID']
-                    rname = r.chomp('s').capitalize
-                    msg   = "#{rname} created with ID: #{rid}"
-
-                    OneProvisionLogger.debug(msg)
                 end
             end
         end
@@ -305,16 +309,18 @@ module OneProvision
         # @param cid [String]           Cluster ID
         def create_hosts(cfg, cid)
             cfg['hosts'].each do |h|
-                erb      = Utils.evaluate_erb(self, h)
-                dfile    = Utils .create_deployment_file(erb, @id, @name)
-                playbook = cfg['playbook']
+                Driver.retry_loop 'Failed to create some host' do
+                    erb      = Utils.evaluate_erb(self, h)
+                    dfile    = Utils.create_deployment_file(erb, @id, @name)
+                    playbook = cfg['playbook']
 
-                host = Host.new
-                host = host.create(dfile.to_xml, cid.to_i, playbook)
+                    host = Host.new
+                    host = host.create(dfile.to_xml, cid.to_i, playbook)
 
-                @hosts << host
+                    @hosts << host
 
-                host.offline
+                    host.offline
+                end
             end
         end
 
@@ -412,7 +418,9 @@ module OneProvision
         end
 
         # Deletes VMs from the PROVISION
-        def delete_vms
+        #
+        # @param timeout [Integer] Timeout for deleting running VMs
+        def delete_vms(timeout)
             Driver.retry_loop 'Failed to delete running_vms' do
                 hosts = []
 
@@ -426,7 +434,7 @@ module OneProvision
                     vm_ids = host.retrieve_elements('VMS/ID')
 
                     vm_ids.each do |id|
-                        delete_object('vm', id)
+                        delete_object('vm', id, timeout)
                     end
                 end
 
@@ -437,7 +445,9 @@ module OneProvision
         end
 
         # Deletes images from the PROVISION
-        def delete_images
+        #
+        # @param timeout [Integer] Timeout for deleting running VMs
+        def delete_images(timeout)
             Driver.retry_loop 'Failed to delete images' do
                 datastores = []
 
@@ -453,7 +463,7 @@ module OneProvision
                     image_ids = datastore.retrieve_elements('IMAGES/ID')
 
                     image_ids.each do |id|
-                        delete_object('image', id)
+                        delete_object('image', id, timeout)
                     end
                 end
 
@@ -465,9 +475,10 @@ module OneProvision
 
         # Deletes an object
         #
-        # @param type [String] Type of the object (vm, image)
-        # @param id   [String] ID of the object
-        def delete_object(type, id)
+        # @param type    [String] Type of the object (vm, image)
+        # @param id      [String] ID of the object
+        # @param timeout [Integer] Timeout for deleting running VMs
+        def delete_object(type, id, timeout)
             msg = "Deleting OpenNebula #{type} #{id}"
 
             OneProvision::OneProvisionLogger.debug(msg)
@@ -485,7 +496,28 @@ module OneProvision
 
             Utils.exception(object.delete)
 
-            Utils.exception(object.wait_state('DONE')) if type == 'vm'
+            if type == 'vm'
+                Utils.exception(object.wait_state('DONE', timeout))
+            else
+                Utils.exception(wait_image_delete(object, timeout))
+            end
+        end
+
+        # Waits until the image is deleted
+        #
+        # @param image   [OpenNebula::Image] Image to wait
+        # @param timeout [Integer ]          Timeout for delete
+        def wait_image_delete(image, timeout)
+            timeout.times do
+                rc = image.info
+
+                return true if OpenNebula.is_error?(rc)
+
+                sleep 1
+            end
+
+            raise OneProvisionLoopExeception, 'Timeout expired for deleting' /
+                                              " image #{image['ID']}"
         end
 
     end

@@ -31,15 +31,16 @@ class LXDClient
     API    = '/1.0'.freeze
     HEADER = { 'Host' => 'localhost' }.freeze
 
-    attr_reader :lxd_path
+    attr_reader :lxd_path, :snap
 
     def initialize
-        paths = ['/var/lib/lxd', '/var/snap/lxd/common/lxd']
+        snap_path = '/var/snap/lxd/common/lxd'
+        apt_path = '/var/lib/lxd'
 
         @socket = nil
         @lxd_path = nil
 
-        paths.each do |path|
+        [apt_path, snap_path].each do |path|
             begin
                 @socket = socket(path)
                 @lxd_path = path
@@ -50,6 +51,8 @@ class LXDClient
         end
 
         raise 'Failed to open LXD socket' unless @socket
+
+        @snap = @lxd_path == snap_path
     end
 
     # Performs HTTP::Get
@@ -91,7 +94,7 @@ class LXDClient
     def wait(response, timeout)
         operation_id = response['operation'].split('/').last
 
-        timeout = "?timeout=#{timeout}" if timeout
+        timeout = "?timeout=#{timeout}" unless [nil, ''].include?(timeout)
 
         response = get("operations/#{operation_id}/wait#{timeout}")
 
@@ -133,18 +136,29 @@ class LXDClient
 
         response
     end
+
 end
 
 # Error used for raising LXDClient exception when response is error return value
 class LXDError < StandardError
 
-    attr_reader :body, :error, :error_code, :type
+    attr_reader :body, :error, :code, :type
 
-    def initialize(msg = 'LXD API error')
-        @body = msg
+    INTERNAL_ERROR = {
+        'error_code' => 500,
+        'type'       => 'driver',
+        'error'      => 'driver unknown error'
+    }
+
+    def initialize(response = INTERNAL_ERROR)
+        raise "Got wrong argument class: #{response.class}, expecting Hash" \
+        unless response.class == Hash
+
+        @body  = response
+        @code  = @body['error_code']
+        @type  = @body['type']
         @error = @body['error']
-        @error_code = @body['error_code']
-        @type = @body['type']
+
         super
     end
 

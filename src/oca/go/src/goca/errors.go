@@ -1,3 +1,19 @@
+/* -------------------------------------------------------------------------- */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/*                                                                            */
+/* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
+/* not use this file except in compliance with the License. You may obtain    */
+/* a copy of the License at                                                   */
+/*                                                                            */
+/* http://www.apache.org/licenses/LICENSE-2.0                                 */
+/*                                                                            */
+/* Unless required by applicable law or agreed to in writing, software        */
+/* distributed under the License is distributed on an "AS IS" BASIS,          */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   */
+/* See the License for the specific language governing permissions and        */
+/* limitations under the License.                                             */
+/*--------------------------------------------------------------------------- */
+
 package goca
 
 import (
@@ -119,6 +135,12 @@ const (
 
 	// OneInternalError code if there is an internal error, e.g. the resource could not be loaded from the DB
 	OneInternalError = 0x2000
+
+	// OneAllocateError code if a resource cannot be allocated
+	OneAllocateError = 0x4000
+
+	// OneLockedError code if the resource is locked
+	OneLockedError   = 0x8000
 )
 
 func (s OneErrCode) String() string {
@@ -137,6 +159,10 @@ func (s OneErrCode) String() string {
 		return "XML_RPC_API"
 	case OneInternalError:
 		return "INTERNAL"
+	case OneAllocateError:
+		return "ALLOCATE"
+	case OneLockedError:
+		return "LOCKED"
 	default:
 		return ""
 	}

@@ -391,6 +391,12 @@ EOT
         :description => 'Overwrite the file'
     }
 
+    EXTENDED={
+        :name => 'extended',
+        :large => '--extended',
+        :description => 'Show info extended (it only works with xml output)'
+    }
+
     TEMPLATE_OPTIONS_VM   = [TEMPLATE_NAME_VM] + TEMPLATE_OPTIONS + [DRY]
 
     CAPACITY_OPTIONS_VM   = [TEMPLATE_OPTIONS[0], TEMPLATE_OPTIONS[1],
@@ -399,7 +405,7 @@ EOT
     UPDATECONF_OPTIONS_VM = TEMPLATE_OPTIONS[6..15] + [TEMPLATE_OPTIONS[2],
       TEMPLATE_OPTIONS[17], TEMPLATE_OPTIONS[18]]
 
-    OPTIONS = XML, NUMERIC, KILOBYTES
+    OPTIONS = XML, EXTENDED, NUMERIC, KILOBYTES
 
     class OneHelper
         attr_accessor :client
@@ -593,7 +599,7 @@ EOT
                 size = $stdout.winsize[0] - 1
 
                 # ----------- First page, check if pager is needed -------------
-                rc = pool.get_page(size, 0)
+                rc = pool.get_page(size, 0, false)
                 ps = ""
 
                 return -1, rc.message if OpenNebula.is_error?(rc)
@@ -621,7 +627,7 @@ EOT
                 options[:noheader] = true
 
                 loop do
-                    rc = pool.get_page(size, current)
+                    rc = pool.get_page(size, current, false)
 
                     return -1, rc.message if OpenNebula.is_error?(rc)
 
@@ -666,11 +672,13 @@ EOT
         # List pool in XML format, pagination is used in interactive output
         #-----------------------------------------------------------------------
         def list_pool_xml(pool, options, filter_flag)
+            extended = options.include?(:extended) && options[:extended]
+
             if $stdout.isatty
                 size = $stdout.winsize[0] - 1
 
                 # ----------- First page, check if pager is needed -------------
-                rc = pool.get_page(size, 0)
+                rc = pool.get_page(size, 0, extended)
                 ps = ""
 
                 return -1, rc.message if OpenNebula.is_error?(rc)
@@ -698,7 +706,7 @@ EOT
                 current = size
 
                 loop do
-                    rc = pool.get_page(size, current)
+                    rc = pool.get_page(size, current, extended)
 
                     return -1, rc.message if OpenNebula.is_error?(rc)
 
@@ -717,7 +725,11 @@ EOT
 
                 stop_pager(ppid)
             else
-                rc = pool.info
+                if pool.pool_name == "VM_POOL" && extended
+                    rc = pool.info_all_extended
+                else
+                    rc = pool.info
+                end
 
                 return -1, rc.message if OpenNebula.is_error?(rc)
 

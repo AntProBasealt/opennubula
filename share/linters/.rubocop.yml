@@ -321,7 +321,6 @@ AllCops:
     - src/sunstone/public/config.rb
     - src/sunstone/routes/oneflow.rb
     - src/sunstone/routes/vcenter.rb
-    - src/sunstone/routes/support.rb
     - src/onegate/onegate-server.rb
     - src/datastore_mad/remotes/vcenter_downloader.rb
     - src/datastore_mad/remotes/vcenter_uploader.rb
@@ -634,6 +633,9 @@ Layout/EmptyLinesAroundModuleBody:
 Layout/EmptyLineAfterGuardClause:
     Enabled: true
 
+Layout/AlignHash:
+    Enabled: false
+
 ###
 
 #######
@@ -712,6 +714,10 @@ Style/MutableConstant:
     Enabled: false
 
 Style/SymbolProc:
+    Enabled: false
+
+# TODO: Remove this whenever there is strenght to do so
+Style/StderrPuts:
     Enabled: false
 
 ######
@@ -794,6 +800,9 @@ Naming/ConstantName:
     Enabled: true
 
 Naming/HeredocDelimiterNaming:
+    Enabled: false
+
+Naming/RescuedExceptionsVariableName:
     Enabled: false
 
 ###

@@ -1,3 +1,19 @@
+/* -------------------------------------------------------------------------- */
+/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/*                                                                            */
+/* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
+/* not use this file except in compliance with the License. You may obtain    */
+/* a copy of the License at                                                   */
+/*                                                                            */
+/* http://www.apache.org/licenses/LICENSE-2.0                                 */
+/*                                                                            */
+/* Unless required by applicable law or agreed to in writing, software        */
+/* distributed under the License is distributed on an "AS IS" BASIS,          */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   */
+/* See the License for the specific language governing permissions and        */
+/* limitations under the License.                                             */
+/*--------------------------------------------------------------------------- */
+
 package goca
 
 import (
@@ -82,17 +98,17 @@ type vmUserTemplate struct {
 }
 
 type vmTemplate struct {
-	CPU               float64               `xml:"CPU"`
-	Memory            int                   `xml:"MEMORY"`
-	NIC               []vmNic               `xml:"NIC"`
-	NICAlias          []vmNicAlias          `xml:"NIC_ALIAS"`
-	Context           *vmContext            `xml:"CONTEXT"`
-	Disk              []vmDisk              `xml:"DISK"`
-	Graphics          *vmGraphics           `xml:"GRAPHICS"`
-	OS                *vmOS                 `xml:"OS"`
-	Snapshot          []VMSnapshot          `xml:"SNAPSHOT"`
-	SecurityGroupRule []vmSecurityGroupRule `xml:"SECURITY_GROUP_RULE"`
-	Dynamic           unmatchedTagsSlice    `xml:",any"`
+	CPU                float64               `xml:"CPU"`
+	Memory             int                   `xml:"MEMORY"`
+	NICs               []vmNic               `xml:"NIC"`
+	NICAliases         []vmNicAlias          `xml:"NIC_ALIAS"`
+	Context            *vmContext            `xml:"CONTEXT"`
+	Disks              []vmDisk              `xml:"DISK"`
+	Graphics           *vmGraphics           `xml:"GRAPHICS"`
+	OS                 *vmOS                 `xml:"OS"`
+	Snapshots          []VMSnapshot          `xml:"SNAPSHOT"`
+	SecurityGroupRules []vmSecurityGroupRule `xml:"SECURITY_GROUP_RULE"`
+	Dynamic            unmatchedTagsSlice    `xml:",any"`
 }
 
 type vmContext struct {
@@ -111,7 +127,7 @@ type vmNic struct {
 type vmNicAlias struct {
 	ID       int    `xml:"NIC_ID"`    // minOccurs=1
 	Parent   string `xml:"PARENT"`    // minOccurs=1
-	ParentId string `xml:"PARENT_ID"` // minOccurs=1
+	ParentID string `xml:"PARENT_ID"` // minOccurs=1
 }
 
 type vmGraphics struct {
@@ -601,6 +617,17 @@ func NewVMPool(args ...int) (*VMPool, error) {
 	return vmPool, nil
 }
 
+// InfoExtended connects to OpenNebula and fetches the whole VM_POOL information
+func (vmpool *VMPool) InfoExtended(filter_flag, start_id, end_id, state int) error {
+	response, err := client.Call("one.vmpool.infoextended", filter_flag,
+	                             start_id, end_id,state)
+	if err != nil {
+		return err
+	}
+	*vmpool = VMPool{}
+	return xml.Unmarshal([]byte(response.Body()), vmpool)
+}
+
 // Monitoring returns all the virtual machine monitoring records
 // filter flag:
 // -4: Resources belonging to the user's primary group
@@ -608,9 +635,14 @@ func NewVMPool(args ...int) (*VMPool, error) {
 // -2: All resources
 // -1: Resources belonging to the user and any of his groups
 // >= 0: UID User's Resources
-func (vmpool *VMPool) Monitoring(filter int) error {
-	_, err := client.Call("one.vmpool.monitoring", filter)
-	return err
+func (vmpool *VMPool) Monitoring(filter int) (string, error) {
+	monitor_data, err := client.Call("one.vmpool.monitoring", filter)
+
+	if err != nil{
+		return "", err
+	}else {
+		return monitor_data.Body(), err
+	}
 }
 
 // Accounting returns the virtual machine history records
@@ -762,9 +794,14 @@ func (vm *VM) UpdateConf(tpl string) error {
 }
 
 // Monitoring Returns the virtual machine monitoring records
-func (vm *VM) Monitoring() error {
-	_, err := client.Call("one.vm.monitoring", vm.ID)
-	return err
+func (vm *VM) Monitoring() (string, error) {
+	monitor_data, err := client.Call("one.vm.monitoring", vm.ID)
+
+	if err != nil{
+		return "", err
+	}else {
+		return monitor_data.Body(), err
+	}
 }
 
 // Chown changes the owner/group of a VM. If uid or gid is -1 it will not

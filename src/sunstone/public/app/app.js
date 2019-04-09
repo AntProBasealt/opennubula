@@ -51,7 +51,7 @@ define(function(require) {
   //$(window).load(function() {
   //   $('#loading').hide();
   //});
-
+  
   $(document).ready(function() {
     Sunstone.addDialogs(_commonDialogs);
     Sunstone.addMainTabs();
@@ -152,7 +152,6 @@ define(function(require) {
             groups = groups.toString();
             groups = [groups];
           }
-
           that = this;
           OpenNebula.Group.list({
             timeout: true,
@@ -243,7 +242,7 @@ define(function(require) {
          url: 'config',
          type: "GET",
          headers: {
-           "ZONE_NAME" : this.id
+           "ZONENAME" : this.id
          },
          dataType: "json",
          success: function() {

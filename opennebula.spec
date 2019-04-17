@@ -229,7 +229,6 @@ Configures an OpenNebula node providing kvm.
 %package node-lxd
 Summary: Configures an OpenNebula node providing lxd
 Group: System/Servers
-BuildArch: noarch
 
 #Requires: ruby ruby-stdlibs
 Requires: %name-common = %EVR
@@ -449,8 +448,8 @@ fi
 #EOF
 
 %files common
-%config %_sysconfdir/sudoers.d/opennebula
-%config %_sysconfdir/logrotate.d/opennebula
+%config(noreplace) %_sysconfdir/sudoers.d/opennebula
+%config(noreplace) %_sysconfdir/logrotate.d/opennebula
 
 %_datadir/docs/one/*
 %_tmpfilesdir/opennebula.conf
@@ -462,17 +461,17 @@ fi
 %dir %attr(0750, oneadmin, oneadmin) %oneadmin_home
 
 %files node-kvm
-%config %_sysconfdir/polkit-1/rules.d/50-opennebula.rules
-%config %_sysconfdir/sysctl.d/bridge-nf-call.conf
+%config(noreplace) %_sysconfdir/polkit-1/rules.d/50-opennebula.rules
+%config(noreplace) %_sysconfdir/sysctl.d/bridge-nf-call.conf
 %_tmpfilesdir/opennebula-node.conf
 
 %files node-lxd
 %doc README.opennebula-lxd
 %_bindir/svncterm_server
 %_bindir/catfstab
-%config %_sysconfdir/sudoers.d/opennebula-lxd
-%config %_sysconfdir/modprobe.d/opennebula-lxd.conf
-%config %_sysconfdir/modules-load.d/opennebula-lxd.conf
+%config(noreplace) %_sysconfdir/sudoers.d/opennebula-lxd
+%config(noreplace) %_sysconfdir/modprobe.d/opennebula-lxd.conf
+%config(noreplace) %_sysconfdir/modules-load.d/opennebula-lxd.conf
 
 # %files node-xen
 

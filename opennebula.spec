@@ -194,6 +194,7 @@ BuildArch: noarch
 
 Conflicts: %name-node-xen
 #Requires: ruby ruby-stdlibs
+Requires: %name-common = %EVR
 Requires: openssh-server
 Requires: openssh-clients
 Requires: libvirt-kvm
@@ -204,7 +205,6 @@ Requires: bridge-utils
 Requires: ipset
 Requires: pciutils
 Requires: rsync
-Requires: %name-common = %EVR
 
 %description node-kvm
 Configures an OpenNebula node providing kvm.
@@ -225,6 +225,27 @@ Configures an OpenNebula node providing kvm.
 #
 # %description node-xen
 # Configures an OpenNebula node providing xen.
+
+%package node-lxd
+Summary: Configures an OpenNebula node providing lxd
+Group: System/Servers
+BuildArch: noarch
+
+#Requires: ruby ruby-stdlibs
+Requires: %name-common = %EVR
+Requires: openssh-server
+Requires: openssh-clients
+Requires: kpartx
+Requires: lxd >= 3.0
+Requires: qemu-img
+Requires: nfs-utils
+Requires: bridge-utils
+Requires: ipset
+Requires: rsync
+Requires: rbd-nbd
+
+%description node-lxd
+Configures an OpenNebula node providing lxd.
 
 %package provision
 Summary: OpenNebula provisioning tool
@@ -337,6 +358,13 @@ install -p -D -m 644 src/oca/java/jar/org.opennebula.client.jar %buildroot%_java
 # sysctl
 install -p -D -m 644 share/etc/sysctl.d/bridge-nf-call.conf %buildroot%_sysconfdir/sysctl.d/bridge-nf-call.conf
 
+# node-lxd
+install -p -D -m 755 src/vmm_mad/remotes/lib/lxd/svncterm_server/svncterm_server %buildroot%_bindir/svncterm_server
+install -p -D -m 440 src/vmm_mad/remotes/lib/lxd/opennebula-lxd %buildroot%_sysconfdir/sudoers.d/opennebula-lxd
+install -p -D -m 755 src/vmm_mad/remotes/lib/lxd/catfstab %buildroot%_bindir/catfstab
+install -p -D -m 644 share/pkgs/ALT/opennebula-lxd.modprobe %buildroot%_sysconfdir/modprobe.d/opennebula-lxd.conf
+install -p -D -m 644 share/pkgs/ALT/opennebula-lxd.modules %buildroot%_sysconfdir/modules-load.d/opennebula-lxd.conf
+
 # cleanup
 rm -f %buildroot%_datadir/one/Gemfile
 rm -f %buildroot%_datadir/one/install_gems
@@ -411,6 +439,9 @@ elif [ $1 = 2 ]; then
     [ -n "$PID" ] && kill $PID 2> /dev/null || :
 fi
 
+%pre node-lxd
+%_sbindir/usermod -a -G lxd oneadmin  2>/dev/null ||:
+
 #%post ruby
 #cat <<EOF
 #Please remember to execute %_datadir/one/install_gems to install all the
@@ -434,6 +465,14 @@ fi
 %config %_sysconfdir/polkit-1/rules.d/50-opennebula.rules
 %config %_sysconfdir/sysctl.d/bridge-nf-call.conf
 %_tmpfilesdir/opennebula-node.conf
+
+%files node-lxd
+%doc README.opennebula-lxd
+%_bindir/svncterm_server
+%_bindir/catfstab
+%config %_sysconfdir/sudoers.d/opennebula-lxd
+%config %_sysconfdir/modprobe.d/opennebula-lxd.conf
+%config %_sysconfdir/modules-load.d/opennebula-lxd.conf
 
 # %files node-xen
 
@@ -648,6 +687,7 @@ fi
 * Tue Apr 09 2019 Alexey Shabalin <shaba@altlinux.org> 5.8.1-alt2
 - 5.8.1 release
 - fix provides and obsoletes
+- add opennebula-node-lxd package
 
 * Fri Mar 22 2019 Pavel Skrylev <majioa@altlinux.org> 5.8.1-alt1
 - Use Ruby Policy 2.0

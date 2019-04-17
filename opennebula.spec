@@ -351,7 +351,7 @@ rm -rf %buildroot%ruby_gemslibdir/packethost*
 
 %pre common
 %_sbindir/groupadd -r -f oneadmin 2>/dev/null ||:
-%_sbindir/useradd -r -m -g oneadmin -G disk,wheel -c 'Opennebula Daemon User' \
+%_sbindir/useradd -r -M -g oneadmin -G disk,wheel -c 'Opennebula Daemon User' \
         -s /bin/bash -d %oneadmin_home oneadmin 2>/dev/null ||:
 
 %post server

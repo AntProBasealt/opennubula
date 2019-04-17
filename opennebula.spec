@@ -241,7 +241,9 @@ Requires: nfs-utils
 Requires: bridge-utils
 Requires: ipset
 Requires: rsync
+%ifarch aarch64 ppc64 ppc64le x86_64
 Requires: rbd-nbd
+%endif
 
 %description node-lxd
 Configures an OpenNebula node providing lxd.

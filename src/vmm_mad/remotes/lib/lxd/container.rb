@@ -139,7 +139,6 @@ class Container
         cmd = "#{Mapper::COMMANDS[:lsblk]} -J"
         _rc, o, _e = Command.execute(cmd, false)
 
-        # TODO: Add extra mounts to raise
         raise "Container rootfs still mounted \n#{o}" if o.include?(@rootfs_dir)
 
         wait?(@client.delete("#{CONTAINERS}/#{name}"), wait, timeout)
@@ -186,10 +185,12 @@ class Container
     # Contianer Status Control
     #---------------------------------------------------------------------------
     def start(options = {})
+        OpenNebula.log '--- Starting container ---'
         change_state(__method__, options)
     end
-
+    
     def stop(options = { :timeout => 120 })
+        OpenNebula.log '--- Stopping container ---'
         change_state(__method__, options)
 
         # Remove nic from ovs-switch if needed
@@ -221,7 +222,7 @@ class Container
                 break if %w[Running Stopped].include? real_status
             end
 
-            container.stop(:force => true) if real_status == 'Running'
+            stop(:force => true) if real_status == 'Running'
         end
     end
 

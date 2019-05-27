@@ -2236,6 +2236,7 @@ class VirtualMachine < VCenterDriver::Template
     end
 
     def has_snapshots?
+        self.clear('rootSnapshot')
         self['rootSnapshot'] && !self['rootSnapshot'].empty?
     end
 
@@ -2526,17 +2527,19 @@ class VirtualMachine < VCenterDriver::Template
     ############################################################################
 
     def shutdown
-        begin
-            if vm_tools?
-                @item.ShutdownGuest
-            else
-                poweroff_hard
+        if !is_powered_off?
+            begin
+                if vm_tools?
+                    @item.ShutdownGuest
+                else
+                    poweroff_hard
+                end
+            rescue RbVmomi::Fault => e
+                error = e.message.split(':').first
+                raise e.message if error != 'InvalidPowerState'
             end
-        rescue RbVmomi::Fault => e
-            error = e.message.split(':').first
-            raise e.message if error != 'InvalidPowerState'
+            wait_timeout(:is_powered_off?)
         end
-        wait_timeout(:is_powered_off?)
     end
 
     def destroy
@@ -3166,7 +3169,8 @@ class VmmImporter < VCenterDriver::VcImporter
                                                             npool,
                                                             hpool,
                                                             vc_name,
-                                                            vm_ref)
+                                                            vm_ref,
+                                                            vc_vm)
         opts = {uuid: vc_uuid, npool: npool, error: error }
         Raction.delete_ars(ar_ids, opts) if !error.empty?
 

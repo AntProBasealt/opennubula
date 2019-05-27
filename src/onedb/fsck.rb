@@ -99,7 +99,7 @@ EOT
         "marketplaceapp_pool"].freeze
 
     FEDERATED_TABLES = ["group_pool", "user_pool", "acl", "zone_pool",
-        "vdc_pool", "marketplace_pool", "marketplaceapp_pool"].freeze
+        "vdc_pool", "marketplace_pool", "marketplaceapp_pool", "db_versioning"].freeze
 
     def tables
         TABLES
@@ -462,17 +462,20 @@ EOT
         # USER QUOTAS
         ########################################################################
 
-        check_fix_user_quotas
+        check_fix_quotas('user')
+
+        check_fix_quotas('user', 'running')
 
         log_time
-
         ########################################################################
         # Groups
         #
         # GROUP QUOTAS
         ########################################################################
 
-        check_fix_group_quotas
+        check_fix_quotas('group')
+
+        check_fix_quotas('group', 'running')
 
         log_time
 
@@ -483,9 +486,8 @@ EOT
         ########################################################################
 
         check_template
-        fix_template
 
-        log_time
+        fix_template
 
         log_total_errors
 
@@ -527,7 +529,7 @@ EOT
     end
 
     def mac_s_to_i(mac)
-        return nil if mac.empty?
+        return nil if mac.nil? || mac.empty?
         return mac.split(":").map {|e|
             e.to_i(16).to_s(16).rjust(2,"0")}.join("").to_i(16)
     end

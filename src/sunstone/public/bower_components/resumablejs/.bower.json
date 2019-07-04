@@ -16,7 +16,7 @@
     "type": "commit",
     "commit": "420cd351c5"
   },
-  "_source": "git://github.com/23/resumable.js.git",
+  "_source": "https://github.com/23/resumable.js.git",
   "_target": "420cd351c5",
-  "_originalSource": "git://github.com/23/resumable.js.git"
+  "_originalSource": "https://github.com/23/resumable.js.git"
 }

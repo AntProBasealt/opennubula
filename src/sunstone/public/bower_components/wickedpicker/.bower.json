@@ -30,7 +30,7 @@
     "type": "commit",
     "commit": "dd2cce3"
   },
-  "_source": "git://github.com/ericjgagnon/wickedpicker.git",
+  "_source": "https://github.com/ericjgagnon/wickedpicker.git",
   "_target": "dd2cce3",
-  "_originalSource": "git://github.com/ericjgagnon/wickedpicker"
+  "_originalSource": "https://github.com/ericjgagnon/wickedpicker.git"
 }

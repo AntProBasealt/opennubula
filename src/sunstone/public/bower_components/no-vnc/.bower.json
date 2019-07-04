@@ -1,14 +1,14 @@
 {
   "name": "no-vnc",
   "homepage": "https://github.com/kanaka/noVNC",
-  "version": "0.5.1",
-  "_release": "0.5.1",
+  "version": "1.1.0",
+  "_release": "1.1.0",
   "_resolution": {
     "type": "version",
-    "tag": "v0.5.1",
-    "commit": "fc00821eba469641c6c94706726c3d78e46460a2"
+    "tag": "v1.1.0",
+    "commit": "0e9bdff609201e8a859d430b387d6e51fbd2db6f"
   },
   "_source": "https://github.com/kanaka/noVNC.git",
-  "_target": "0.5.1",
+  "_target": "1.1.0",
   "_originalSource": "no-vnc"
 }

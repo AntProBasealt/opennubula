@@ -310,6 +310,8 @@ int LogDB::insert(int index, int term, const std::string& sql, time_t tstamp,
         return -1;
     }
 
+    bool applied = tstamp != 0;
+
     if (replace)
     {
         oss << "REPLACE";
@@ -319,11 +321,13 @@ int LogDB::insert(int index, int term, const std::string& sql, time_t tstamp,
         oss << "INSERT";
     }
 
-    bool applied = tstamp != 0;
-
     oss << " INTO " << table << " ("<< db_names <<") VALUES ("
-        << index << "," << term << "," << "'" << sql_db << "'," << tstamp
-        << "," << fed_index << "," << applied << ")";
+            <<        index     << ","
+            <<        term      << ","
+            << "'" << sql_db    << "',"
+            <<        tstamp    << ","
+            <<        fed_index << ","
+            <<        applied   << ")";
 
     int rc = db->exec_wr(oss);
 

@@ -44,7 +44,9 @@ class VCenterConf < Hash
     DEFAULT_CONFIGURATION = {
         :delete_images => false,
         :vm_poweron_wait_default => 300,
-        :debug_information => false
+        :debug_information => false,
+        :retries => 3,
+        :retry_interval => 1
     }
 
     def initialize
@@ -83,6 +85,13 @@ require 'vm_template'
 require 'virtual_machine'
 require 'network'
 require 'file_helper'
+require 'vm_folder'
+require 'vmm_importer'
+require 'vm_device'
+require 'vm_disk'
+require 'vm_nic'
+require 'vm_helper'
+require 'vm_monitor'
 
 CHECK_REFS = true
 

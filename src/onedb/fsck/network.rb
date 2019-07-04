@@ -162,7 +162,7 @@ module OneDBFsck
                 addrs = { :mac => first_mac, :ip => first_ip, :ipv6 => ipv6 }
 
                 # Parent vnet has a lease for each address of this reservation
-                calculate_leases(ar, row[:oid], addrs. parent_vnet, parent_ar)
+                calculate_leases(ar, row[:oid], addrs, parent_vnet, parent_ar)
             end
         end
     end
@@ -238,7 +238,7 @@ module OneDBFsck
         address_range.at_xpath('SIZE').text.to_i.times do |index|
             lease = get_lease(oid, addrs[:mac], addrs[:ip], addrs[:ipv6], index)
 
-            counters[:vnet][p_vnet][:ar_leases][p_ar][mac] = lease
+            counters[:vnet][p_vnet][:ar_leases][p_ar][lease[:mac_index]] = lease
         end
     end
 

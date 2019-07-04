@@ -48,7 +48,7 @@ int Group::select(SqlDB * db)
         return rc;
     }
 
-    return quota.select(oid, db);
+    return quota.select(oid, db->get_local_db());
 }
 
 /* -------------------------------------------------------------------------- */
@@ -64,7 +64,7 @@ int Group::select(SqlDB * db, const string& name, int uid)
         return rc;
     }
 
-    return quota.select(oid, db);
+    return quota.select(oid, db->get_local_db());
 }
 
 /* -------------------------------------------------------------------------- */
@@ -78,7 +78,7 @@ int Group::drop(SqlDB * db)
 
     if ( rc == 0 )
     {
-        rc += quota.drop(db);
+        rc += quota.drop(db->get_local_db());
     }
 
     return rc;
@@ -93,7 +93,7 @@ int Group::insert(SqlDB *db, string& error_str)
 
     if (rc == 0)
     {
-        rc = quota.insert(oid, db, error_str);
+        rc = quota.insert(oid, db->get_local_db(), error_str);
     }
 
     return rc;
@@ -141,16 +141,19 @@ int Group::insert_replace(SqlDB *db, bool replace, string& error_str)
 
     if ( replace )
     {
-        oss << "REPLACE";
+        oss << "UPDATE " << table << " SET "
+            << "name = '"    << sql_name << "', "
+            << "body = '"    << sql_xml  << "', "
+            << "uid = "      << uid      << ", "
+            << "gid = "      << gid      << ", "
+            << "owner_u = "  << owner_u  << ", "
+            << "group_u = "  << group_u  << ", "
+            << "other_u = "  << other_u
+            << " WHERE oid = " << oid;
     }
     else
     {
-        oss << "INSERT";
-    }
-
-    // Construct the SQL statement to Insert or Replace
-
-    oss <<" INTO "<<table <<" ("<< db_names <<") VALUES ("
+        oss << "INSERT INTO " << table << " (" << db_names << ") VALUES ("
         <<          oid                 << ","
         << "'" <<   sql_name            << "',"
         << "'" <<   sql_xml             << "',"
@@ -159,7 +162,7 @@ int Group::insert_replace(SqlDB *db, bool replace, string& error_str)
         <<          owner_u             << ","
         <<          group_u             << ","
         <<          other_u             << ")";
-
+    }
 
     rc = db->exec_wr(oss);
 

@@ -144,6 +144,13 @@ class Container
         wait?(@client.delete("#{CONTAINERS}/#{name}"), wait, timeout)
     end
 
+    # Unmap container storage and delete the container if success
+    def clean
+        return delete if setup_storage('unmap')
+
+        OpenNebula.log_error 'failed to dismantle container storage'
+    end
+
     # Updates the container in LXD server with the new configuration
     def update(wait: true, timeout: '')
         wait?(@client.put("#{CONTAINERS}/#{name}", @lxc), wait, timeout)
@@ -163,11 +170,22 @@ class Container
         @lxc = @client.get("#{CONTAINERS}/#{name}")['metadata']
     end
 
-    # Runs command inside container
+    # Runs command inside container using the LXD CLI
     # @param command [String] to execute through lxc exec
     def exec(command)
         cmd = "#{@lxc_command} exec #{@one.vm_name} -- #{command}"
         Command.execute(cmd, true)
+    end
+
+    # Runs command inside container using REST. Execution isn't managed.
+    # @param full command [String] to execute
+    def exec_rest(command)
+        body = { 'command'              => command.split(' '),
+                 'wait-for-websocket'   => false,
+                 'record-output'        => false,
+                 'interactive'          => false }
+
+        @client.post("#{CONTAINERS}/#{name}/exec", body)
     end
 
     def show_log
@@ -188,7 +206,7 @@ class Container
         OpenNebula.log '--- Starting container ---'
         change_state(__method__, options)
     end
-    
+
     def stop(options = { :timeout => 120 })
         OpenNebula.log '--- Stopping container ---'
         change_state(__method__, options)
@@ -272,14 +290,7 @@ class Container
         return unless @one
 
         @one.get_disks.each do |disk|
-            if @one.volatile?(disk)
-                e = "disk #{disk['DISK_ID']} type #{disk['TYPE']} not supported"
-                OpenNebula.log_error e
-                next
-            end
-
-            status = setup_disk(disk, operation)
-            return nil unless status
+            return nil unless setup_disk(disk, operation)
         end
 
         return true unless @one.has_context?
@@ -289,13 +300,15 @@ class Container
         context = @one.get_context_disk
         mapper  = FSRawMapper.new
 
-        create_context_dir = "#{Mapper::COMMANDS[:su_mkdir]} #{@context_path}"
+        if operation == 'map'
+            mk_context_dir = "#{Mapper::COMMANDS[:su_mkdir]} #{@context_path}"
 
-        rc, _o, e = Command.execute(create_context_dir, false)
+            rc, _o, e = Command.execute(mk_context_dir, false)
 
-        if rc != 0
-            OpenNebula.log_error("#{__method__}: #{e}")
-            return
+            if rc != 0
+                OpenNebula.log_error("#{__method__}: #{e}")
+                return
+            end
         end
 
         mapper.public_send(operation, @one, context, csrc)
@@ -323,7 +336,7 @@ class Container
 
         csrc = @lxc['devices']['context']['source'].clone
 
-        @lxc['devices'].delete('context')['source']
+        @lxc['devices'].delete('context')
 
         update
 
@@ -339,8 +352,7 @@ class Container
 
         raise 'Missing hotplug info' unless disk_element
 
-        status = setup_disk(disk_element, 'map')
-        return unless status
+        return unless setup_disk(disk_element, 'map')
 
         disk_hash = @one.disk(disk_element, nil, nil)
 
@@ -373,14 +385,11 @@ class Container
             container devices\n#{@lxc['devices']}"
         end
 
-        csrc = @lxc['devices'][disk_name]['source'].clone
-
-        @lxc['devices'].delete(disk_name)['source']
+        @lxc['devices'].delete(disk_name)
 
         update
 
-        mapper = new_disk_mapper(disk_element)
-        mapper.unmap(@one, disk_element, csrc)
+        setup_disk(disk_element, 'unmap')
     end
 
     # Setup the disk by mapping/unmapping the disk device
@@ -389,13 +398,17 @@ class Container
 
         disk_id = disk['DISK_ID']
 
+        OpenNebula.log "Processing disk #{disk_id}"
+
+        mapper = new_disk_mapper(disk)
+        return true if mapper.nil? # Skip unsupported disks
+
         if disk_id == @one.rootfs_id
             target = @rootfs_dir
         else
             target = @one.disk_mountpoint(disk_id)
         end
 
-        mapper = new_disk_mapper(disk)
         mapper.public_send(operation, @one, disk, target)
     end
 
@@ -504,6 +517,10 @@ class Container
         when 'RBD'
             OpenNebula.log "Using rbd disk mapper for #{ds}"
             RBDMapper.new(disk)
+        else
+            OpenNebula.log_error("disk #{disk['DISK_ID']} type #{disk['TYPE']}"\
+                ' not supported')
+            nil
         end
     end
 

@@ -303,6 +303,7 @@ VAR_DIRS="$VAR_LOCATION/remotes \
           $VAR_LOCATION/remotes/tm/ssh \
           $VAR_LOCATION/remotes/tm/ceph \
           $VAR_LOCATION/remotes/tm/lizardfs \
+          $VAR_LOCATION/remotes/tm/moosefs \
           $VAR_LOCATION/remotes/tm/dev \
           $VAR_LOCATION/remotes/tm/vcenter \
           $VAR_LOCATION/remotes/tm/iscsi_libvirt \
@@ -315,7 +316,8 @@ VAR_DIRS="$VAR_LOCATION/remotes \
           $VAR_LOCATION/remotes/datastore/fs \
           $VAR_LOCATION/remotes/datastore/ceph \
           $VAR_LOCATION/remotes/datastore/lizardfs \
-	  $VAR_LOCATION/remotes/datastore/dev \
+          $VAR_LOCATION/remotes/datastore/moosefs \
+          $VAR_LOCATION/remotes/datastore/dev \
           $VAR_LOCATION/remotes/datastore/vcenter \
           $VAR_LOCATION/remotes/market \
           $VAR_LOCATION/remotes/market/http \
@@ -454,6 +456,7 @@ INSTALL_FILES=(
     TM_SSH_FILES:$VAR_LOCATION/remotes/tm/ssh
     TM_CEPH_FILES:$VAR_LOCATION/remotes/tm/ceph
     TM_LIZARDFS_FILES:$VAR_LOCATION/remotes/tm/lizardfs
+    TM_MOOSEFS_FILES:$VAR_LOCATION/remotes/tm/moosefs
     TM_DEV_FILES:$VAR_LOCATION/remotes/tm/dev
     TM_ISCSI_FILES:$VAR_LOCATION/remotes/tm/iscsi_libvirt
     TM_DUMMY_FILES:$VAR_LOCATION/remotes/tm/dummy
@@ -462,6 +465,7 @@ INSTALL_FILES=(
     DATASTORE_DRIVER_DUMMY_SCRIPTS:$VAR_LOCATION/remotes/datastore/dummy
     DATASTORE_DRIVER_FS_SCRIPTS:$VAR_LOCATION/remotes/datastore/fs
     DATASTORE_DRIVER_LIZARDFS_SCRIPTS:$VAR_LOCATION/remotes/datastore/lizardfs
+    DATASTORE_DRIVER_MOOSEFS_SCRIPTS:$VAR_LOCATION/remotes/datastore/moosefs
     DATASTORE_DRIVER_CEPH_SCRIPTS:$VAR_LOCATION/remotes/datastore/ceph
     DATASTORE_DRIVER_ETC_CEPH_SCRIPTS:$VAR_LOCATION/remotes/etc/datastore/ceph
     DATASTORE_DRIVER_DEV_SCRIPTS:$VAR_LOCATION/remotes/datastore/dev
@@ -1285,6 +1289,26 @@ TM_LIZARDFS_FILES="src/tm_mad/lizardfs/clone \
 		src/tm_mad/lizardfs/snap_create_live \
 		src/tm_mad/lizardfs/snap_delete \
 		src/tm_mad/lizardfs/snap_revert"
+		
+TM_MOOSEFS_FILES="src/tm_mad/moosefs/clone \
+		src/tm_mad/moosefs/context \
+		src/tm_mad/moosefs/cpds \
+		src/tm_mad/moosefs/delete \
+		src/tm_mad/moosefs/failmigrate \
+		src/tm_mad/moosefs/ln \
+		src/tm_mad/moosefs/mkimage \
+		src/tm_mad/moosefs/mkswap \
+		src/tm_mad/moosefs/monitor \
+		src/tm_mad/moosefs/mv \
+		src/tm_mad/moosefs/mvds \
+		src/tm_mad/moosefs/postmigrate \
+		src/tm_mad/moosefs/premigrate \
+		src/tm_mad/moosefs/resize \
+		src/tm_mad/moosefs/resize-one \
+		src/tm_mad/moosefs/snap_create \
+		src/tm_mad/moosefs/snap_create_live \
+		src/tm_mad/moosefs/snap_delete \
+		src/tm_mad/moosefs/snap_revert"
 
 TM_DEV_FILES="src/tm_mad/dev/clone \
                  src/tm_mad/dev/ln \
@@ -1381,6 +1405,18 @@ DATASTORE_DRIVER_LIZARDFS_SCRIPTS="src/datastore_mad/remotes/lizardfs/clone \
                          src/datastore_mad/remotes/lizardfs/snap_flatten \
                          src/datastore_mad/remotes/lizardfs/snap_revert \
                          src/datastore_mad/remotes/lizardfs/stat"
+                         
+DATASTORE_DRIVER_MOOSEFS_SCRIPTS="src/datastore_mad/remotes/moosefs/clone \
+                         src/datastore_mad/remotes/moosefs/cp \
+                         src/datastore_mad/remotes/moosefs/export \
+                         src/datastore_mad/remotes/moosefs/mkfs \
+                         src/datastore_mad/remotes/moosefs/monitor \
+                         src/datastore_mad/remotes/moosefs/rm \
+                         src/datastore_mad/remotes/moosefs/snap_delete \
+                         src/datastore_mad/remotes/moosefs/snap_flatten \
+                         src/datastore_mad/remotes/moosefs/snap_revert \
+                         src/datastore_mad/remotes/moosefs/stat"
+
 
 DATASTORE_DRIVER_CEPH_SCRIPTS="src/datastore_mad/remotes/ceph/cp \
                          src/datastore_mad/remotes/ceph/mkfs \

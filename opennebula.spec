@@ -6,7 +6,7 @@
 Name: opennebula
 Summary: Cloud computing solution for Data Center Virtualization
 Version: 5.8.3
-Release: alt2
+Release: alt3
 License: Apache
 Group: System/Servers
 Url: https://opennebula.org
@@ -685,6 +685,9 @@ fi
 %exclude %_man1dir/oneprovision.1*
 
 %changelog
+* Mon Jul 15 2019 Andrew A. Vasilyev <andy@altlinux.org> 5.8.3-alt3
+- add moosefs support
+
 * Tue Jul 09 2019 Andrew A. Vasilyev <andy@altlinux.org> 5.8.3-alt2
 - add lizardfs support
 

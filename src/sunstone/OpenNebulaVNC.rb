@@ -151,7 +151,7 @@ class OpenNebulaVNC
             proxy_options << " -6"
         end
 
-        cmd ="python #{@proxy_path} #{proxy_options} #{@proxy_port}"
+        cmd ="python3 #{@proxy_path} #{proxy_options} #{@proxy_port}"
 
         begin
             @logger.info { "Starting VNC proxy: #{cmd}" }

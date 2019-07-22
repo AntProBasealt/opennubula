@@ -6,7 +6,7 @@
 Name: opennebula
 Summary: Cloud computing solution for Data Center Virtualization
 Version: 5.8.3
-Release: alt4
+Release: alt5
 License: Apache
 Group: System/Servers
 Url: https://opennebula.org
@@ -33,9 +33,6 @@ BuildRequires: zlib-devel
 BuildRequires: node node-gyp npm node-devel
 BuildRequires: ronn
 BuildRequires: groff-base
-# TODO: python module
-# BuildRequires: python3-devel python3-module-setuptools python3-module-wheel
-# BuildRequires: python3-module-generateDS
 
 %description
 OpenNebula.org is an open-source project aimed at building the industry
@@ -49,34 +46,6 @@ to support each other.
 
 OpenNebula is free software released under the Apache License.
 
-
-%package tools
-Summary: Cloud computing solution for Data Center Virtualization
-Group: Emulators
-BuildArch: noarch
-
-Requires: openssl
-Requires: openssh
-Requires: sqlite3
-Requires: openssh-clients
-
-Requires: %name-common = %EVR
-Requires: gem-%name-cli = %EVR
-
-%description tools
-OpenNebula.org is an open-source project aimed at building the industry
-standard open source cloud computing tool to manage the complexity and
-heterogeneity of distributed data center infrastructures.
-
-The OpenNebula.org Project is maintained and driven by the community. The
-OpenNebula.org community has thousands of users, contributors, and supporters,
-who interact through various online email lists, blogs and innovative projects
-to support each other.
-
-OpenNebula is free software released under the Apache License.
-
-This package provides the CLI interface.
-
 %package server
 Summary: Provides the OpenNebula servers
 Group: System/Servers
@@ -89,6 +58,8 @@ Requires: wget
 Requires: curl
 Requires: rsync
 Requires: iputils
+Requires: %name-common = %EVR
+Requires: gem-%name-cli = %EVR
 Obsoletes: %name-ozones
 #TODO: Requires http://rubygems.org/gems/net-ldap
 
@@ -120,6 +91,11 @@ Ruby interface for OpenNebula.
 Summary: Provides the CLI for OpenNebula
 Group: Development/Ruby
 BuildArch: noarch
+Requires: gem-%name = %EVR
+Requires: ruby
+Requires: openssl
+Requires: openssh-clients
+
 Provides: %name-ruby = %EVR ruby-%name-cli = %EVR %name-tools = %EVR
 Obsoletes: %name-ruby < %EVR ruby-%name-cli < %EVR %name-tools < %EVR
 
@@ -151,6 +127,7 @@ Group: System/Servers
 BuildArch: noarch
 
 Requires: %name-common = %EVR
+Requires: gem-%name = %EVR
 
 %description sunstone
 Browser based UI for administrating a OpenNebula cloud. Also includes
@@ -162,6 +139,7 @@ Group: System/Servers
 BuildArch: noarch
 
 Requires: %name-common = %EVR
+Requires: gem-%name = %EVR
 
 %description gate
 Transfer information from Virtual Machines to OpenNebula
@@ -172,6 +150,8 @@ Group: System/Servers
 BuildArch: noarch
 
 Requires: %name-common = %EVR
+Requires: gem-%name = %EVR
+Requires: %name-sunstone = %EVR
 
 %description flow
 Manage OpenNebula Services
@@ -685,6 +665,9 @@ fi
 %exclude %_man1dir/oneprovision.1*
 
 %changelog
+* Mon Jul 22 2019 Alexey Shabalin <shaba@altlinux.org> 5.8.3-alt5
+- update requires
+
 * Fri Jul 19 2019 Andrew A. Vasilyev <andy@altlinux.org> 5.8.3-alt4
 - run python3 for novnc websockify script
 - fix datastore scripts file mode

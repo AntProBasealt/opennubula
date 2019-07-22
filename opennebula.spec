@@ -247,6 +247,8 @@ mkdir -p src/sunstone/public/node_modules/.node-gyp/$node_ver/include
 ln -s %_includedir/node src/sunstone/public/node_modules/.node-gyp/$node_ver/include/node
 echo "9" > src/sunstone/public/node_modules/.node-gyp/$node_ver/installVersion
 
+find . -type f -exec subst 's,^#!/usr/bin/env ruby,#!%__ruby,' {} \;
+
 %build
 export PATH="$PATH:$PWD/src/sunstone/public/node_modules/.bin"
 export npm_config_devdir="$PWD/src/sunstone/public/node_modules/.node-gyp"

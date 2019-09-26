@@ -1,4 +1,7 @@
 
+%global commit 8bd6804c4cebf455dc1a383574a4bf35a86fdbc8
+%global shortcommit %(c=%{commit}; echo ${c:0:7})
+
 %define oneadmin_home /var/lib/one
 
 %add_findreq_skiplist /var/lib/one/*
@@ -267,7 +270,7 @@ mv -f dist/main.js dist/main-dist.js
 popd
 
 # Compile OpenNebula
-scons -j2 mysql=yes new_xmlrpc=yes sunstone=no systemd=yes rubygems=yes
+scons -j2 mysql=yes new_xmlrpc=yes sunstone=no systemd=yes rubygems=yes gitversion=%shortcommit
 
 %ruby_build --ignore=packethost \
             --use=install_gems --alias=opennebula-common --join=lib:bin \

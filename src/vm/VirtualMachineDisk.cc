@@ -1174,6 +1174,7 @@ VirtualMachineDisk * VirtualMachineDisks::set_up_attach(int vmid, int uid,
     // -------------------------------------------------------------------------
 
     disk->set_attach();
+
     if ( !tsys.empty() )
     {
         disk->replace("TM_MAD_SYSTEM", tsys);
@@ -1265,6 +1266,11 @@ int VirtualMachineDisks::set_active_snapshot(int id, int snap_id)
     VirtualMachineDisk * disk = get_disk(id);
 
     if ( disk == 0 )
+    {
+        return -1;
+    }
+
+    if (!disk->has_snapshot(snap_id))
     {
         return -1;
     }

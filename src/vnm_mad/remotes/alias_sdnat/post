@@ -1,5 +1,7 @@
+#!/usr/bin/env ruby
+
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2019, OpenNebula Project (OpenNebula.org), C12G Labs        #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -14,15 +16,20 @@
 # limitations under the License.                                             #
 #--------------------------------------------------------------------------- #
 
-dist: xenial
-language: generic
-before_install:
-  - sudo apt-get install -y libsystemd-dev bash-completion bison debhelper default-jdk flex javahelper libmysql++-dev libsqlite3-dev libssl-dev libws-commons-util-java libxml2-dev libxmlrpc3-client-java libxmlrpc3-common-java libxslt1-dev libcurl4-openssl-dev ruby scons libxmlrpc-c++8-dev npm libvncserver-dev qemu-utils
-  - gem install rubocop
-  - sudo npm install -g bower
-  - sudo npm install -g grunt
-  - sudo npm install -g grunt-cli
-  - (cd src/sunstone/public && npm install && bower install)
-  - eval "$(curl -sL https://raw.githubusercontent.com/travis-ci/gimme/master/gimme | GIMME_GO_VERSION=1.12 bash)"
-script:
-  - set -o errexit; source .travis/smoke_tests.sh
+$LOAD_PATH << File.dirname(__FILE__)
+$LOAD_PATH << File.join(File.dirname(__FILE__), '..')
+
+require 'AliasSDNAT'
+
+template64   = ARGV[0]
+deploy_id    = ARGV[1]
+xpath_filter = AliasSDNATDriver::XPATH_FILTER
+
+begin
+    drv = AliasSDNATDriver.from_base64(template64, xpath_filter, deploy_id)
+    drv.activate
+rescue StandardError => e
+    OpenNebula.log_error(e.message)
+    OpenNebula.log_error(e.backtrace)
+    exit 1
+end

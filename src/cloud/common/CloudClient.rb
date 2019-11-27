@@ -16,6 +16,7 @@
 
 require 'rubygems'
 require 'uri'
+require 'ipaddress'
 
 require 'digest/sha1'
 require 'net/https'
@@ -50,7 +51,7 @@ end
 module CloudClient
 
     # OpenNebula version
-    VERSION = '5.8.5'
+    VERSION = '5.10.0'
 
     # #########################################################################
     # Default location for the authentication file
@@ -94,8 +95,29 @@ module CloudClient
 
         if ENV['http_proxy']
             uri_proxy  = URI.parse(ENV['http_proxy'])
-            host = uri_proxy.host
-            port = uri_proxy.port
+            flag = false
+
+            # Check if we need to bypass the proxy
+            if ENV['no_proxy']
+                ENV['no_proxy'].split(',').each do |item|
+                    item = item.rstrip.lstrip
+
+                    unless (IPAddress(url.host) rescue nil).nil?
+                        unless (IPAddress(item) rescue nil).nil?
+                            flag |= IPAddress(item).include? IPAddress(url.host)
+                        end
+                    else
+                        if (IPAddress(item) rescue nil).nil?
+                            flag |= (item == url.host)
+                        end
+                    end
+                end
+            end
+
+            unless flag
+                host = uri_proxy.host
+                port = uri_proxy.port
+            end
         end
 
         http = Net::HTTP::Proxy(host, port).new(url.host, url.port)

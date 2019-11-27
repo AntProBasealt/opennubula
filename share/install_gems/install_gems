@@ -6,7 +6,7 @@ ENV['PATH'] += ENV['PATH'] + ':/usr/local/bin'
 
 require 'pp'
 
-DEFAULT_PRE=%w{sunstone quota cloud auth_ldap vmware oneflow ec2_hybrid oca onedb market}
+DEFAULT_PRE=%w{sunstone quota cloud auth_ldap vmware oneflow ec2_hybrid oca onedb market hooks}
 
 if defined?(RUBY_VERSION) && RUBY_VERSION>="1.8.7"
     SQLITE='sqlite3'
@@ -46,7 +46,8 @@ GROUPS={
     :ec2_hybrid => 'aws-sdk --version "~> 2.5"',
     :oca        => 'ox',
     :market     => 'aws-sdk',
-    :onedb      => "mysql2"
+    :onedb      => "mysql2",
+    :hooks      => "zeromq"
 }
 
 PACKAGES=GROUPS.keys
@@ -62,12 +63,13 @@ DISTRIBUTIONS={
         :dependencies_common => ['ruby-dev', 'make'],
         :dependencies => {
             SQLITE      => ['gcc', 'libsqlite3-dev'],
-            'mysql2'     => ['gcc', ['default-libmysqlclient-dev', 'libmysqlclient-dev']],
+            'mysql2'     => ['gcc', 'libssl-dev', ['default-libmysqlclient-dev', 'libmysqlclient-dev']],
             'curb'      => ['gcc', 'libcurl4-openssl-dev'],
             $nokogiri   => %w{gcc rake libxml2-dev libxslt1-dev patch},
             'xmlparser' => ['gcc', 'libexpat1-dev'],
             'thin'      => ['g++'],
-            'json'      => ['gcc']
+            'json'      => ['gcc'],
+            'zeromq'    => ['gcc', 'libzmq5', 'libzmq3-dev']
         },
         :install_command_interactive => 'apt-get install',
         :install_command => 'apt-get -y install',
@@ -78,7 +80,7 @@ DISTRIBUTIONS={
     },
     :redhat => {
         :id => ['CentOS', /^RedHat/, /^Scientific/],
-        :dependencies_common => ['ruby-devel', 'make'],
+        :dependencies_common => ['ruby-devel', 'make', 'redhat-rpm-config'],
         :dependencies => {
             SQLITE      => ['gcc', 'sqlite-devel'],
             'mysql2'     => ['gcc', 'mysql-devel', 'openssl-devel'],
@@ -86,7 +88,8 @@ DISTRIBUTIONS={
             $nokogiri   => %w{gcc rubygem-rake libxml2-devel libxslt-devel patch},
             'xmlparser' => ['gcc', 'expat-devel'],
             'thin'      => ['gcc-c++'],
-            'json'      => ['gcc']
+            'json'      => ['gcc'],
+            'zeromq'    => ['gcc', 'zeromq', 'zeromq-devel']
         },
         :install_command_interactive => 'yum install',
         :install_command => 'yum -y install',
@@ -306,9 +309,9 @@ def get_dependencies(gems, dependencies, check_command)
                 alt_pkg = nil
 
                 pkg.each do |p|
-                    `#{check_command} #{p} 2>/dev/null`
+                    out = `#{check_command} #{p} 2>/dev/null`
 
-                    if $?.exitstatus==0
+                    if $?.exitstatus==0 && !out.empty?
                         alt_pkg = p
                         break
                     end
@@ -371,7 +374,12 @@ def install_dependencies(gems, distro)
 
         command=install_command+" " << deps.join(' ')
         puts command
-        system command
+        rc = system command
+
+        if !rc
+            STDERR.puts 'Error installing dependencies'
+            exit(-1)
+        end
     end
 end
 
@@ -430,6 +438,24 @@ def install_bundler_gem
 end
 
 def install_gems(packages, bundler = false)
+    gems_location = '/usr/share/one/gems'
+    if File.directory?(gems_location)
+        STDERR.puts(<<-EOT.unindent(12))
+            WARNING: Running install_gems is not necessary anymore, as all the
+            required dependencies are already installed by your packaging
+            system into symlinked location #{gems_location}. Ruby gems
+            installed by this script won't be used until this symlink exists.
+            Remove the symlink before starting the OpenNebula services
+            to use Ruby gems installed by this script. E.g. execute
+
+                # unlink #{gems_location}
+
+            Execution continues in 15 seconds ...
+EOT
+
+        sleep(15)
+    end
+
     if bundler
         gems_list=which_gems(packages)
     else

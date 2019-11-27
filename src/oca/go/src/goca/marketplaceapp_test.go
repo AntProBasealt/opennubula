@@ -17,66 +17,83 @@
 package goca
 
 import (
-	"testing"
 	"strconv"
+	"testing"
+
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/image"
+	imgkeys "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/image/keys"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/marketplace"
+	mktkeys "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/marketplace/keys"
+	mktapp "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/marketplaceapp"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/marketplaceapp/keys"
 )
 
-func TestMarketplaceApp(t *testing.T){
+func TestMarketplaceApp(t *testing.T) {
 	var mkt_app_name string = "new_mkt_app"
-	var mkt_app *MarketPlaceApp
-	var mkt_app_tmpl string
-	var mkt_img_id uint
-	var market_id  uint
+	var mkt_app *mktapp.MarketPlaceApp
+	var mkt_img_id int
+	var market_id int
 	var err error
 
-	mkt_app_tmpl = "NAME= \"" + mkt_app_name + "\"\n" +
-					"TYPE=image\n"
+	mkt_app_tmpl := mktapp.NewTemplate()
+	mkt_app_tmpl.Add(keys.Name, mkt_app_name)
+	mkt_app_tmpl.Add(keys.Size, "1")
+	mkt_app_tmpl.SetType(mktapp.Image)
 
 	//Create an image
-	img_tmpl := "NAME = \"test_img_go" + "\"\n" +
-	"TYPE = DATABLOCK\n" +
-	"SIZE = 1\n"
 
-	mkt_img_id, err = CreateImage(img_tmpl, 1)
+	img_tmpl := image.NewTemplate()
 
-	WaitResource(func() bool{
-		img, _ := NewImageFromName("test_img_go")
-		img.Info()
+	img_tmpl.Add(imgkeys.Name, "test_img_go")
+	img_tmpl.Add(imgkeys.Size, "1")
+	img_tmpl.SetType(image.Datablock)
+
+	mkt_img_id, err = testCtrl.Images().Create(img_tmpl.String(), 1)
+	if err != nil {
+		t.Fatalf("Test failed:\n" + err.Error())
+	}
+
+	WaitResource(func() bool {
+		id, _ := testCtrl.Images().ByName("test_img_go")
+		img, _ := testCtrl.Image(id).Info(false)
 
 		state, _ := img.State()
 
-		return state == ImageReady
+		return state == image.Ready
 	})
 
 	if err != nil {
-	    t.Errorf("Test failed:\n" + err.Error())
+		t.Errorf("Test failed:\n" + err.Error())
 	}
 
-	mkt_app_tmpl += "ORIGIN_ID=" + strconv.Itoa(int(mkt_img_id)) + "\n"
+	mkt_app_tmpl.Add(keys.OriginID, strconv.Itoa(int(mkt_img_id)))
 
 	//Create a marketplace
-	mkt_tmpl := "NAME = \"mkt-app-test\"\n" +
-	"MARKET_MAD = \"http\"\n" +
-	"BASE_URL = \"http://url/\"\n" +
-	"PUBLIC_DIR = \"/var/loca/market-http\"\n"
 
-	market_id, err = CreateMarketPlace(mkt_tmpl)
+	mkt_tmpl := marketplace.NewTemplate()
+	mkt_tmpl.Add(mktkeys.Name, "mkt-app-test")
+	mkt_tmpl.Add(mktkeys.MarketMAD, "http")
+	mkt_tmpl.Add(mktkeys.BaseUrl, "http://url/")
+	mkt_tmpl.Add(mktkeys.PublicDir, "/var/loca/market-http")
+
+	market_id, err = testCtrl.MarketPlaces().Create(mkt_tmpl.String())
 
 	if err != nil {
-	    t.Errorf("Test failed:\n" + err.Error())
+		t.Errorf("Test failed:\n" + err.Error())
 	}
 
-	mkt_app_tmpl += "MARKETPLACE_ID=\"" + strconv.Itoa(int(market_id)) + "\"\n"
-
+	mkt_app_tmpl.Add(keys.MarketPlaceID, strconv.Itoa(int(market_id)))
 	//Create MarketplaceApp
-	app_id, err := CreateMarketPlaceApp(mkt_app_tmpl, int(market_id))
+	app_id, err := testCtrl.MarketPlaceApps().Create(mkt_app_tmpl.String(), int(market_id))
 
 	if err != nil {
-	    t.Errorf("Test failed:\n" + err.Error())
+		t.Errorf("Test failed:\n" + err.Error())
 	}
 
-	mkt_app = NewMarketPlaceApp(app_id)
-	mkt_app.Info()
+	mkt_app, err = testCtrl.MarketPlaceApp(app_id).Info(false)
+	if err != nil {
+		t.Errorf("Test failed:\n" + err.Error())
+	}
 
 	actual := mkt_app.Name
 
@@ -85,23 +102,21 @@ func TestMarketplaceApp(t *testing.T){
 	}
 
 	//Delete MarketplaceApp
-	err = mkt_app.Delete()
+	err = testCtrl.MarketPlaceApp(app_id).Delete()
 
 	if err != nil {
 		t.Errorf("Test failed:\n" + err.Error())
 	}
 
 	//delete image
-	img := NewImage(mkt_img_id)
-	err = img.Delete()
+	err = testCtrl.Image(mkt_img_id).Delete()
 
 	if err != nil {
 		t.Errorf("Test failed:\n" + err.Error())
 	}
 
 	//delete marketplace
-	market := NewMarketPlace(market_id)
-	err = market.Delete()
+	err = testCtrl.MarketPlace(market_id).Delete()
 
 	if err != nil {
 		t.Errorf("Test failed:\n" + err.Error())

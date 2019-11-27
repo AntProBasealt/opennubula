@@ -38,8 +38,6 @@ fi
 
 . $TMCOMMON
 
-DRIVER_PATH=$(dirname $0)
-
 #-------------------------------------------------------------------------------
 # Set dst path and dir
 #-------------------------------------------------------------------------------
@@ -55,38 +53,9 @@ SRC_DS_PATH="$(dirname $(dirname $SRC_ARG_PATH))"
 SRC_PATH="${DST_DS_PATH}${SRC_ARG_PATH##$SRC_DS_PATH}"
 
 #-------------------------------------------------------------------------------
-# Get Image information
-#-------------------------------------------------------------------------------
-
-DISK_ID=$(basename ${DST_PATH} | cut -d. -f2)
-
-XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
-
-unset i j XPATH_ELEMENTS
-
-while IFS= read -r -d '' element; do
-    XPATH_ELEMENTS[i++]="$element"
-done < <(onevm show -x $VMID| $XPATH \
-                    /VM/HISTORY_RECORDS/HISTORY[last\(\)]/TM_MAD)
-
-TM_MAD="${XPATH_ELEMENTS[j++]}"
-
-if [ "$TM_MAD" = "ssh" ]; then
-    MONITOR="ssh"
-else
-    MONITOR=""
-fi
-
-#-------------------------------------------------------------------------------
-# Create DST path
-#-------------------------------------------------------------------------------
-
-ssh_make_path $DST_HOST $DST_DIR $MONITOR
-
-#-------------------------------------------------------------------------------
 # Link (ln) SRC into DST
 #-------------------------------------------------------------------------------
-log "Linking $SRC_PATH in $DST (in ${TM_MAD} mode)"
+log "Linking $SRC_PATH in $DST"
 
 LN_CMD=$(cat <<EOF
     set -ex -o pipefail
@@ -94,11 +63,7 @@ LN_CMD=$(cat <<EOF
     cd ${DST_DIR}
     rm -f ${DST_PATH}
 
-    if [ "${TM_MAD}" = 'ssh' ]; then
-        cp "${SRC_PATH}" "${DST_PATH}"
-    else
-        ln -s "${SRC_PATH}" "${DST_PATH}"
-    fi
+    ln -s "${SRC_PATH}" "${DST_PATH}"
 EOF
 )
 

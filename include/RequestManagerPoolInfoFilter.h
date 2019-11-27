@@ -73,12 +73,10 @@ protected:
         extended    = false;
     };
 
-    ~RequestManagerPoolInfoFilter(){};
-
     /* -------------------------------------------------------------------- */
 
-    virtual void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+    void request_execute(
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 
     /* -------------------------------------------------------------------- */
 
@@ -137,12 +135,10 @@ public:
         auth_object = PoolObjectSQL::VM;
     };
 
-    ~VirtualMachinePoolInfo(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -160,7 +156,6 @@ public:
         extended    = true;
     };
 
-    ~VirtualMachinePoolInfoExtended(){};
 };
 
 /* ------------------------------------------------------------------------- */
@@ -180,12 +175,10 @@ public:
         auth_object = PoolObjectSQL::VM;
     };
 
-    ~VirtualMachinePoolAccounting(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -205,12 +198,10 @@ public:
         auth_object = PoolObjectSQL::VM;
     };
 
-    ~VirtualMachinePoolShowback(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -230,12 +221,10 @@ public:
         auth_object = PoolObjectSQL::VM;
     };
 
-    ~VirtualMachinePoolMonitoring(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -253,8 +242,6 @@ public:
         pool        = nd.get_tpool();
         auth_object = PoolObjectSQL::TEMPLATE;
     };
-
-    ~TemplatePoolInfo(){};
 };
 
 /* ------------------------------------------------------------------------- */
@@ -273,10 +260,8 @@ public:
         auth_object = PoolObjectSQL::NET;
     };
 
-    ~VirtualNetworkPoolInfo(){};
-
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -294,9 +279,6 @@ public:
         pool        = nd.get_vntpool();
         auth_object = PoolObjectSQL::VNTEMPLATE;
     };
-
-    ~VirtualNetworkTemplatePoolInfo(){};
-
 };
 
 /* ------------------------------------------------------------------------- */
@@ -314,8 +296,6 @@ public:
         pool        = nd.get_ipool();
         auth_object = PoolObjectSQL::IMAGE;
     };
-
-    ~ImagePoolInfo(){};
 };
 
 /* ------------------------------------------------------------------------- */
@@ -334,12 +314,10 @@ public:
         auth_object = PoolObjectSQL::HOST;
     };
 
-    ~HostPoolInfo(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -359,12 +337,10 @@ public:
         auth_object = PoolObjectSQL::HOST;
     };
 
-    ~HostPoolMonitoring(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -383,12 +359,10 @@ public:
         auth_object = PoolObjectSQL::GROUP;
     };
 
-    ~GroupPoolInfo(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -407,12 +381,10 @@ public:
         auth_object = PoolObjectSQL::USER;
     };
 
-    ~UserPoolInfo(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -431,12 +403,10 @@ public:
         auth_object = PoolObjectSQL::DATASTORE;
     };
 
-    ~DatastorePoolInfo(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -455,12 +425,10 @@ public:
         auth_object = PoolObjectSQL::CLUSTER;
     };
 
-    ~ClusterPoolInfo(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -479,12 +447,10 @@ public:
         auth_object = PoolObjectSQL::DOCUMENT;
     };
 
-    ~DocumentPoolInfo(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -503,12 +469,10 @@ public:
         auth_object = PoolObjectSQL::ZONE;
     };
 
-    ~ZonePoolInfo(){};
-
     /* -------------------------------------------------------------------- */
 
     void request_execute(
-            xmlrpc_c::paramList const& paramList, RequestAttributes& att);
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -526,8 +490,6 @@ public:
         pool        = nd.get_secgrouppool();
         auth_object = PoolObjectSQL::SECGROUP;
     };
-
-    ~SecurityGroupPoolInfo(){};
 };
 
 /* ------------------------------------------------------------------------- */
@@ -546,9 +508,7 @@ public:
         auth_object = PoolObjectSQL::VDC;
     };
 
-    ~VdcPoolInfo(){};
-
-    void request_execute(xmlrpc_c::paramList const& pl, RequestAttributes& att);
+    void request_execute(xmlrpc_c::paramList const& pl, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -566,8 +526,6 @@ public:
         pool        = nd.get_vrouterpool();
         auth_object = PoolObjectSQL::VROUTER;
     };
-
-    ~VirtualRouterPoolInfo(){};
 };
 
 /* -------------------------------------------------------------------------- */
@@ -586,9 +544,7 @@ public:
         auth_object = PoolObjectSQL::MARKETPLACE;
     };
 
-    ~MarketPlacePoolInfo(){};
-
-    void request_execute(xmlrpc_c::paramList const& pl, RequestAttributes& att);
+    void request_execute(xmlrpc_c::paramList const& pl, RequestAttributes& att) override;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -606,8 +562,6 @@ public:
         pool        = nd.get_apppool();
         auth_object = PoolObjectSQL::MARKETPLACEAPP;
     };
-
-    ~MarketPlaceAppPoolInfo(){};
 };
 
 /* ------------------------------------------------------------------------- */
@@ -625,8 +579,47 @@ public:
         pool        = nd.get_vmgrouppool();
         auth_object = PoolObjectSQL::VMGROUP;
     };
+};
 
-    ~VMGroupPoolInfo(){};
+/* ------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------- */
+
+class HookPoolInfo : public RequestManagerPoolInfoFilter
+{
+public:
+    HookPoolInfo():
+        RequestManagerPoolInfoFilter("one.hookpool.info",
+                                     "Returns the hook pool",
+                                     "A:siii")
+    {
+        Nebula& nd  = Nebula::instance();
+        pool        = nd.get_hkpool();
+        auth_object = PoolObjectSQL::HOOK;
+    };
+
+    ~HookPoolInfo(){};
+};
+
+/* ------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------- */
+
+class HookLogInfo : public RequestManagerPoolInfoFilter
+{
+public:
+    HookLogInfo():
+        RequestManagerPoolInfoFilter("one.hooklog.info",
+                                     "Returns the hook pool log info",
+                                     "A:siiii")
+    {
+        Nebula& nd  = Nebula::instance();
+        pool        = nd.get_hkpool();
+        auth_object = PoolObjectSQL::HOOK;
+    };
+
+    ~HookLogInfo(){};
+
+    void request_execute(
+            xmlrpc_c::paramList const& paramList, RequestAttributes& att) override;
 };
 
 #endif

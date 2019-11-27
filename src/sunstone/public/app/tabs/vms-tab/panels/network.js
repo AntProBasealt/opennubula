@@ -212,15 +212,19 @@ define(function(require) {
 
   function _ipTr(nic, attr){
     var v = "--";
-
-    if (nic[attr] != undefined){
-      v = nic[attr];
-
-      if (nic["VROUTER_"+attr] != undefined){
-        v += ("<br/>" + nic["VROUTER_"+attr] + Locale.tr(" (VRouter)"));
+    if(nic && attr){
+      if(!Array.isArray(attr)){
+        attr = [attr];
       }
+      attr.map(function(attr){
+        if(nic[attr]){
+          v = nic[attr];
+          if (nic["VROUTER_"+attr] != undefined){
+            v += ("<br/>" + nic["VROUTER_"+attr] + Locale.tr(" (VRouter)"));
+          }
+        }
+      });
     }
-
     return v;
   }
 
@@ -266,21 +270,34 @@ define(function(require) {
     if (nics.length) {
       for (var i = 0; i < nics.length; i++) {
         var nic = nics[i];
-
-        nics_names.push({ NAME: nic.NAME, IP: nic.IP, NET: nic.NETWORK, ID: nic.NIC_ID });
+        nics_names.push(
+          { 
+            NAME: nic.NAME, 
+            IP: nic.IP, 
+            NET: nic.NETWORK, 
+            ID: nic.NIC_ID 
+          }
+        );
 
         var is_pci = (nic.PCI_ID != undefined);
 
         var actions = "";
         // Attach / Detach
         if (!is_pci){
-          if ( (that.element.STATE == OpenNebulaVM.STATES.ACTIVE) &&
-               (that.element.LCM_STATE == OpenNebulaVM.LCM_STATES.HOTPLUG_NIC)) {
+          if ( 
+            that.element.STATE == OpenNebulaVM.STATES.ACTIVE &&
+            that.element.LCM_STATE == OpenNebulaVM.LCM_STATES.HOTPLUG_NIC
+          ) {
             actions = Locale.tr("attach/detach in progress");
           } else {
-            if ( (Config.isTabActionEnabled("vms-tab", "VM.detachnic")) &&
-                 (StateActions.enabledStateAction("VM.detachnic", that.element.STATE, that.element.LCM_STATE))) {
-              actions += "<a href=\"VM.detachnic\" class=\"detachnic\" ><i class=\"fas fa-times\"/></a>";
+            if ( 
+              Config.isTabActionEnabled("vms-tab", "VM.detachnic") &&
+              StateActions.enabledStateAction("VM.detachnic", that.element.STATE, that.element.LCM_STATE)
+            ) {
+              var icon = $("<i/>",{class:"fas fa-times"});
+              var anchorAttributes = {class: "detachnic"}
+              var anchor = $("<a/>",anchorAttributes).append(icon);
+              actions += anchor.get(0).outerHTML; //"<a href=\"VM.detachnic\" class=\"detachnic PEPE\" ><i class=\"fas fa-times\"/></a>";
             }
           }
         }
@@ -329,11 +346,10 @@ define(function(require) {
                 nic_alias.push(alias[j]);
             }
         }
-
         nic_dt_data.push({
           NIC_ID : nic.NIC_ID,
           NETWORK : Navigation.link(nic.NETWORK, "vnets-tab", nic.NETWORK_ID),
-          IP : _ipTr(nic, ipStr),
+          IP : _ipTr(nic, [ipStr, "IP6_LINK"]),
           NIC_ALIAS : nic_alias,
           MAC : nic.MAC,
           PCI_ADDRESS: pci_address,
@@ -497,6 +513,9 @@ define(function(require) {
 
   function detach_alias(event) {
     var nic_id = $(this).parent().attr("nic_id");
+    if(!nic_id){
+      var nic_id = $(this).parents("tr").attr("nic_id");
+    }
     var element_id = event.data.element_id;
 
     Sunstone.getDialog(CONFIRM_DIALOG_ID).setParams({

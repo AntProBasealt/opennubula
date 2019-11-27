@@ -19,6 +19,10 @@ package goca
 import (
 	"testing"
 
+	ds "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/datastore"
+	dskeys "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/datastore/keys"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 	. "gopkg.in/check.v1"
 )
 
@@ -26,69 +30,66 @@ import (
 func Test(t *testing.T) { TestingT(t) }
 
 type VMSuite struct {
-	templateID uint
-	vmID       uint
-	hostID     uint
+	templateID int
+	vmID       int
+	hostID     int
 }
 
 var _ = Suite(&VMSuite{})
 
 func (s *VMSuite) SetUpSuite(c *C) {
 	// Create template
-	tpl := NewTemplateBuilder()
+	vmName := GenName("VMSuite-template")
+	tpl := vm.NewTemplate()
+	tpl.Add(keys.Name, vmName)
+	tpl.CPU(1).Memory(64)
 
-	tpl.AddValue("NAME", GenName("VMSuite-template"))
-	tpl.AddValue("CPU", 1)
-	tpl.AddValue("MEMORY", "64")
-
-	templateID, err := CreateTemplate(tpl.String())
+	templateID, err := testCtrl.Templates().Create(tpl.String())
 	c.Assert(err, IsNil)
 
 	s.templateID = templateID
 
-	s.hostID, _ = CreateHost("dummy-test", "dummy", "dummy", 0)
+	s.hostID, _ = testCtrl.Hosts().Create("dummy-test", "dummy", "dummy", 0)
 
-	tmpl := "TM_MAD=dummy\nDS_MAD=dummy"
+	tmpl := ds.NewTemplate()
+	tmpl.Add(dskeys.TMMAD, "dummy")
+	tmpl.Add(dskeys.DSMAD, "dummy")
 
-	ds_img := NewDatastore(1)
-	ds_img.Update(tmpl, 1)
+	testCtrl.Datastore(1).Update(tmpl.String(), 1)
 
-	ds_sys := NewDatastore(0)
-	ds_sys.Update(tmpl, 1)
+	testCtrl.Datastore(0).Update(tmpl.String(), 1)
 
 }
 
 func (s *VMSuite) SetUpTest(c *C) {
-	template := NewTemplate(s.templateID)
-
-	vmID, err := template.Instantiate("", true, "", false)
+	vmID, err := testCtrl.Template(s.templateID).Instantiate("", true, "", false)
 	c.Assert(err, IsNil)
 	s.vmID = vmID
 }
 
 func (s *VMSuite) TearDownTest(c *C) {
-	vm := NewVM(s.vmID)
-
-	err := vm.TerminateHard()
+	vmC := testCtrl.VM(s.vmID)
+	err := vmC.TerminateHard()
 	if err != nil {
-		err = vm.RecoverDelete()
+		err = vmC.RecoverDelete()
 	}
 	c.Assert(err, IsNil)
 }
 
 func (s *VMSuite) TearDownSuite(c *C) {
-	template := NewTemplate(s.templateID)
-	template.Delete()
+	testCtrl.Template(s.templateID).Delete()
 
-	host := NewHost(s.hostID)
-	host.Delete()
+	testCtrl.Host(s.hostID).Delete()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func VMExpectState(c *C, vm *VM, state, lcmState string) func() bool {
+func VMExpectState(c *C, vmID int, state, lcmState string) func() bool {
 	return func() bool {
-		vm.Info()
+		vm, err := testCtrl.VM(vmID).Info(false)
+		if err != nil {
+			return false
+		}
 
 		s, l, err := vm.StateString()
 		if err != nil {
@@ -99,7 +100,7 @@ func VMExpectState(c *C, vm *VM, state, lcmState string) func() bool {
 			return true
 		}
 
-		if state != "" && s == state && lcmState == ""{
+		if state != "" && s == state && lcmState == "" {
 			return true
 		}
 
@@ -112,30 +113,30 @@ func VMExpectState(c *C, vm *VM, state, lcmState string) func() bool {
 ////////////////////////////////////////////////////////////////////////////////
 
 func (s *VMSuite) TestVMDeploy(c *C) {
-	vm := NewVM(s.vmID)
-	err := vm.Deploy(s.hostID, false, -1)
+	vmC := testCtrl.VM(s.vmID)
+	err := vmC.Deploy(s.hostID, false, -1)
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "ACTIVE", "RUNNING")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "ACTIVE", "RUNNING")), Equals, true)
 }
 
 func (s *VMSuite) TestVMHoldRelease(c *C) {
-	vm := NewVM(s.vmID)
-	c.Assert(WaitResource(VMExpectState(c, vm, "HOLD", "")), Equals, true)
+	vmC := testCtrl.VM(s.vmID)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "HOLD", "")), Equals, true)
 
-	err := vm.Release()
+	err := vmC.Release()
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "PENDING", "")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "PENDING", "")), Equals, true)
 }
 
 func (s *VMSuite) TestVMUpdate(c *C) {
-	vm := NewVM(s.vmID)
-	err := vm.Update("A=B", 1)
+	vmC := testCtrl.VM(s.vmID)
+	err := vmC.Update("A=B", 1)
 	c.Assert(err, IsNil)
 
-	err = vm.Info()
+	vm, err := vmC.Info(false)
 	c.Assert(err, IsNil)
 
-	val := vm.UserTemplate.Dynamic.GetContentByName("A")
+	val, _ := vm.UserTemplate.GetStr("A")
 	c.Assert(val, Equals, "B")
 }
 
@@ -146,96 +147,102 @@ func (s *VMSuite) TestVMUpdate(c *C) {
 // }
 
 func (s *VMSuite) TestVMTerminate(c *C) {
-	vm := NewVM(s.vmID)
-	err := vm.Deploy(s.hostID, false, -1)
+	vmC := testCtrl.VM(s.vmID)
+	err := vmC.Deploy(s.hostID, false, -1)
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "ACTIVE", "RUNNING")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "ACTIVE", "RUNNING")), Equals, true)
 
-	err = vm.Terminate()
+	err = vmC.Terminate()
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "DONE", "")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "DONE", "")), Equals, true)
 }
 
 func (s *VMSuite) TestVMTerminateHard(c *C) {
-	vm := NewVM(s.vmID)
-	err :=vm.Deploy(s.hostID, false, -1)
+	vmC := testCtrl.VM(s.vmID)
+	err := vmC.Deploy(s.hostID, false, -1)
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "ACTIVE", "RUNNING")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "ACTIVE", "RUNNING")), Equals, true)
 
-	vm.TerminateHard()
-	c.Assert(WaitResource(VMExpectState(c, vm, "DONE", "")), Equals, true)
+	err = vmC.TerminateHard()
+	c.Assert(err, IsNil)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "DONE", "")), Equals, true)
 }
 
 func (s *VMSuite) TestVMStop(c *C) {
-	vm := NewVM(s.vmID)
-	err := vm.Deploy(s.hostID, false, -1)
+	vmC := testCtrl.VM(s.vmID)
+	err := vmC.Deploy(s.hostID, false, -1)
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "ACTIVE", "RUNNING")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "ACTIVE", "RUNNING")), Equals, true)
 
-	err = vm.Stop()
+	err = vmC.Stop()
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "STOPPED", "")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "STOPPED", "")), Equals, true)
 }
 
 func (s *VMSuite) TestVMSuspend(c *C) {
-	vm := NewVM(s.vmID)
-	err := vm.Deploy(s.hostID, false, -1)
+	vmC := testCtrl.VM(s.vmID)
+	err := vmC.Deploy(s.hostID, false, -1)
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "ACTIVE", "RUNNING")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "ACTIVE", "RUNNING")), Equals, true)
 
-	err = vm.Suspend()
+	err = vmC.Suspend()
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "SUSPENDED", "")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "SUSPENDED", "")), Equals, true)
 }
 
 func (s *VMSuite) TestVMResume(c *C) {
-	vm := NewVM(s.vmID)
-	err := vm.Deploy(s.hostID, false, -1)
+	vmC := testCtrl.VM(s.vmID)
+	err := vmC.Deploy(s.hostID, false, -1)
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "ACTIVE", "RUNNING")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "ACTIVE", "RUNNING")), Equals, true)
 
-	err = vm.Suspend()
+	err = vmC.Suspend()
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "SUSPENDED", "")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "SUSPENDED", "")), Equals, true)
 
-	err = vm.Resume()
+	err = vmC.Resume()
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "ACTIVE", "RUNNING")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "ACTIVE", "RUNNING")), Equals, true)
 }
 
 func (s *VMSuite) TestVMResize(c *C) {
-	expectHostState := func(host *Host) func() bool {
+	expectHostState := func(hostID int) func() bool {
 		return func() bool {
-			host.Info()
-			state, _ := host.StateString()
+			hostC := testCtrl.Host(hostID)
+			host, err := hostC.Info(false)
+			c.Assert(err, IsNil)
+			state, err := host.StateString()
+			c.Assert(err, IsNil)
 
 			return state == "MONITORED"
 		}
 	}
 
-	vm := NewVM(s.vmID)
-	err := vm.Deploy(s.hostID, false, -1)
+	vmC := testCtrl.VM(s.vmID)
+	err := vmC.Deploy(s.hostID, false, -1)
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "ACTIVE", "RUNNING")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "ACTIVE", "RUNNING")), Equals, true)
 
-	err = vm.Poweroff()
+	err = vmC.Poweroff()
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "POWEROFF", "")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "POWEROFF", "")), Equals, true)
 
-	c.Assert(WaitResource(expectHostState(NewHost(s.hostID))), Equals, true)
+	c.Assert(WaitResource(expectHostState(s.hostID)), Equals, true)
 
-	err = vm.Resize("CPU=2.5\nMEMORY=512", false)
+	err = vmC.Resize("CPU=2.5\nMEMORY=512", false)
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "POWEROFF", "")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "POWEROFF", "")), Equals, true)
 
-	err = vm.Resume()
+	err = vmC.Resume()
 	c.Assert(err, IsNil)
-	c.Assert(WaitResource(VMExpectState(c, vm, "ACTIVE", "RUNNING")), Equals, true)
+	c.Assert(WaitResource(VMExpectState(c, s.vmID, "ACTIVE", "RUNNING")), Equals, true)
 
-	err = vm.Info()
+	vm, err := vmC.Info(false)
 	c.Assert(err, IsNil)
 
-	c.Assert(vm.Template.CPU, Equals, 2.5)
+	cpu, _ := vm.Template.GetCPU()
+	mem, _ := vm.Template.GetMemory()
 
-	c.Assert(vm.Template.Memory, Equals, 512)
+	c.Assert(cpu, Equals, 2.5)
+	c.Assert(mem, Equals, 512)
 }

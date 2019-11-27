@@ -192,6 +192,29 @@ class OneVNetHelper < OpenNebulaHelper::OneHelper
         puts template
     end
 
+    def check_orphans
+        orphans = []
+        xpath = '/VMTEMPLATE_POOL/VMTEMPLATE/TEMPLATE/NIC'
+
+        pool = factory_pool
+        tmpl_pool = OpenNebula::TemplatePool.new(@client, -2)
+
+        pool.info
+        tmpl_pool.info
+
+        pool.each do |img|
+            attrs = { :id    => img['ID'],
+                      :name  => img['NAME'],
+                      :uname => img['UNAME'] }
+
+            orphans << img['ID'] if check_orphan(tmpl_pool,
+                                                 xpath,
+                                                 'NETWORK', attrs)
+        end
+
+        orphans
+    end
+
     private
 
     def factory(id=nil)
@@ -296,7 +319,6 @@ class OneVNetHelper < OpenNebulaHelper::OneHelper
 
         puts
         CLIHelper.print_header(str_h1 % ["LEASES"], false)
-
         ar_list = []
 
         if !vn_hash['VNET']['AR_POOL']['AR'].nil?
@@ -342,7 +364,7 @@ class OneVNetHelper < OpenNebulaHelper::OneHelper
                     d["IP"]||"-"
             end
 
-            column :IP6, "", :donottruncate, :size=>26 do |d|
+            column :IP6, "", :adjust, :size=>26 do |d|
                     d["IP6"]||d["IP6_GLOBAL"]||"-"
             end
         end.show(leases, {})

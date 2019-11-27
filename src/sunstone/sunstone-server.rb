@@ -17,37 +17,43 @@
 # limitations under the License.                                             #
 #--------------------------------------------------------------------------- #
 
-ONE_LOCATION = ENV["ONE_LOCATION"]
+ONE_LOCATION = ENV['ONE_LOCATION']
 
 if !ONE_LOCATION
-    LOG_LOCATION = "/var/log/one"
-    VAR_LOCATION = "/var/lib/one"
-    ETC_LOCATION = "/etc/one"
-    SHARE_LOCATION = "/usr/share/one"
-    RUBY_LIB_LOCATION = "/usr/lib/one/ruby"
-    SUNSTONE_LOCATION = "/usr/lib/one/sunstone"
+    LOG_LOCATION      = '/var/log/one'
+    VAR_LOCATION      = '/var/lib/one'
+    ETC_LOCATION      = '/etc/one'
+    SHARE_LOCATION    = '/usr/share/one'
+    RUBY_LIB_LOCATION = '/usr/lib/one/ruby'
+    GEMS_LOCATION     = '/usr/share/one/gems'
+    SUNSTONE_LOCATION = '/usr/lib/one/sunstone'
 else
-    VAR_LOCATION = ONE_LOCATION + "/var"
-    LOG_LOCATION = ONE_LOCATION + "/var"
-    ETC_LOCATION = ONE_LOCATION + "/etc"
-    SHARE_LOCATION = ONE_LOCATION + "/share"
-    RUBY_LIB_LOCATION = ONE_LOCATION + "/lib/ruby"
-    SUNSTONE_LOCATION = ONE_LOCATION + "/lib/sunstone"
+    VAR_LOCATION      = ONE_LOCATION + '/var'
+    LOG_LOCATION      = ONE_LOCATION + '/var'
+    ETC_LOCATION      = ONE_LOCATION + '/etc'
+    SHARE_LOCATION    = ONE_LOCATION + '/share'
+    RUBY_LIB_LOCATION = ONE_LOCATION + '/lib/ruby'
+    GEMS_LOCATION     = ONE_LOCATION + '/share/gems'
+    SUNSTONE_LOCATION = ONE_LOCATION + '/lib/sunstone'
 end
 
-SUNSTONE_AUTH             = VAR_LOCATION + "/.one/sunstone_auth"
-SUNSTONE_LOG              = LOG_LOCATION + "/sunstone.log"
-CONFIGURATION_FILE        = ETC_LOCATION + "/sunstone-server.conf"
-
-PLUGIN_CONFIGURATION_FILE = ETC_LOCATION + "/sunstone-plugins.yaml"
-LOGOS_CONFIGURATION_FILE = ETC_LOCATION + "/sunstone-logos.yaml"
+SUNSTONE_AUTH             = VAR_LOCATION + '/.one/sunstone_auth'
+SUNSTONE_LOG              = LOG_LOCATION + '/sunstone.log'
+CONFIGURATION_FILE        = ETC_LOCATION + '/sunstone-server.conf'
+PLUGIN_CONFIGURATION_FILE = ETC_LOCATION + '/sunstone-plugins.yaml'
+LOGOS_CONFIGURATION_FILE  = ETC_LOCATION + '/sunstone-logos.yaml'
 
 SUNSTONE_ROOT_DIR = File.dirname(__FILE__)
+
+if File.directory?(GEMS_LOCATION)
+    Gem.use_paths(GEMS_LOCATION)
+end
 
 $LOAD_PATH << RUBY_LIB_LOCATION
 $LOAD_PATH << RUBY_LIB_LOCATION + '/cloud'
 $LOAD_PATH << SUNSTONE_ROOT_DIR
 $LOAD_PATH << SUNSTONE_ROOT_DIR + '/models'
+$LOAD_PATH << SUNSTONE_ROOT_DIR + '/models/OpenNebula2FA'
 
 DISPLAY_NAME_XPATH = 'TEMPLATE/SUNSTONE/DISPLAY_NAME'
 TABLE_ORDER_XPATH = 'TEMPLATE/SUNSTONE/TABLE_ORDER'
@@ -55,6 +61,7 @@ DEFAULT_VIEW_XPATH = 'TEMPLATE/SUNSTONE/DEFAULT_VIEW'
 GROUP_ADMIN_DEFAULT_VIEW_XPATH = 'TEMPLATE/SUNSTONE/GROUP_ADMIN_DEFAULT_VIEW'
 TABLE_DEFAULT_PAGE_LENGTH_XPATH = 'TEMPLATE/SUNSTONE/TABLE_DEFAULT_PAGE_LENGTH'
 LANG_XPATH = 'TEMPLATE/SUNSTONE/LANG'
+TWO_FACTOR_AUTH_SECRET_XPATH = 'TEMPLATE/SUNSTONE/TWO_FACTOR_AUTH_SECRET'
 DEFAULT_ZONE_ENDPOINT_XPATH = 'TEMPLATE/SUNSTONE/DEFAULT_ZONE_ENDPOINT'
 
 ONED_CONF_OPTS = {
@@ -97,6 +104,9 @@ require 'rexml/document'
 require 'uri'
 require 'open3'
 
+require "sunstone_qr_code"
+require "sunstone_optp"
+require "sunstone_2f_auth"
 require 'CloudAuth'
 require 'SunstoneServer'
 require 'SunstoneViews'
@@ -135,6 +145,11 @@ set :port, $conf[:port]
 if (proxy = $conf[:proxy])
     ENV['http_proxy'] = proxy
     ENV['HTTP_PROXY'] = proxy
+end
+
+if (no_proxy = $conf[:no_proxy])
+    ENV['no_proxy'] = no_proxy
+    ENV['NO_PROXY'] = no_proxy
 end
 
 case $conf[:sessions]
@@ -205,6 +220,7 @@ $addons = OpenNebulaAddons.new(logger)
 
 DEFAULT_TABLE_ORDER = "desc"
 DEFAULT_PAGE_LENGTH = 10
+DEFAULT_TWO_FACTOR_AUTH = false
 
 SUPPORT = {
     :zendesk_url => "https://opennebula.zendesk.com/api/v2",
@@ -214,13 +230,13 @@ SUPPORT = {
     :author_name => "OpenNebula Support Team",
     :support_subscription => "http://opennebula.systems/support/",
     :account => "http://opennebula.systems/buy/",
-    :docs => "http://docs.opennebula.org/5.8/",
+    :docs => "http://docs.opennebula.org/5.10/",
     :community => "http://opennebula.org/support/community/",
     :project => "OpenNebula"
 }
 
 UPGRADE = {
-    :upgrade => "<span style='color: #0098c3'>Upgrade Available</span>&nbsp;<span style='color:#DC7D24'><i class='fas fa-exclamation-circle'></i></span>",
+    :upgrade => "<span style='color: #0098c3' id='itemUpdate' style='display:none;'>Upgrade Available</span>&nbsp;<span style='color:#DC7D24'><i class='fas fa-exclamation-circle'></i></span>",
     :no_upgrade => "",
     :url => "http://opennebula.org/software/"
 }
@@ -305,7 +321,7 @@ helpers do
         end
 
         client  = $cloud_auth.client(result)
-	    user_id = OpenNebula::User::SELF
+        user_id = OpenNebula::User::SELF
 
         user    = OpenNebula::User.new_with_id(user_id, client)
         rc = user.info
@@ -314,9 +330,28 @@ helpers do
             return [500, '']
         end
 
+        # two factor_auth
+        two_factor_auth =
+            if user[TWO_FACTOR_AUTH_SECRET_XPATH]
+                user[TWO_FACTOR_AUTH_SECRET_XPATH] != ""
+            else
+                DEFAULT_TWO_FACTOR_AUTH
+            end
+        if two_factor_auth
+            two_factor_auth_token = params[:two_factor_auth_token]
+            if !two_factor_auth_token || two_factor_auth_token == ""
+                return [202, { code: "two_factor_auth" }.to_json]
+            else
+                unless Sunstone2FAuth.authenticate(user[TWO_FACTOR_AUTH_SECRET_XPATH], two_factor_auth_token)
+                    logger.info { "Unauthorized two factor authentication login attempt" }
+                    return [401, ""]
+                end
+            end
+        end
+
         # If active zone endpoint is not defined, pull it
         # from user template if exists
-	    unless user[DEFAULT_ZONE_ENDPOINT_XPATH].nil? or user[DEFAULT_ZONE_ENDPOINT_XPATH].empty?
+        unless user[DEFAULT_ZONE_ENDPOINT_XPATH].nil? or user[DEFAULT_ZONE_ENDPOINT_XPATH].empty?
             session[:active_zone_endpoint] ||=
                    user[DEFAULT_ZONE_ENDPOINT_XPATH]
         end
@@ -380,6 +415,12 @@ helpers do
         end
 
         # end user options
+
+        # secure cookies
+        if request.scheme == 'https'
+            env['rack.session.options'][:secure] = true
+        end
+        # end secure cookies
 
         if params[:remember] == 'true'
             env['rack.session.options'][:expire_after] = 30*60*60*24-1
@@ -492,6 +533,11 @@ end
 
 after do
     unless request.path=='/login' || request.path=='/' || request.path=='/'
+        # secure cookies
+        if request.scheme == 'https'
+            env['rack.session.options'][:secure] = true
+        end
+        # end secure cookies
         unless session[:remember] == "true"
             if params[:timeout] == "true"
                 env['rack.session.options'][:defer] = true
@@ -540,6 +586,15 @@ get '/login' do
     else
         redirect to('/')
     end
+end
+
+get '/two_factor_auth_hotp_qr_code' do
+    content_type 'image/svg+xml'
+    issuer = $conf[:two_factor_auth_issuer].nil?? "sunstone-opennebula" : $conf[:two_factor_auth_issuer]
+    totp = SunstoneOPTP.build(params[:secret], issuer)
+    totp_uri = totp.provisioning_uri(session[:user])
+    qr_code = SunstoneQRCode.build(totp_uri)
+    [200, qr_code.as_svg]
 end
 
 get '/vnc' do

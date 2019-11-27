@@ -18,27 +18,38 @@ package goca
 
 import (
 	"testing"
+
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/marketplace"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/marketplace/keys"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 )
 
-func TestMarketplace(t *testing.T){
+func TestMarketplace(t *testing.T) {
 	var mkt_name string = "marketplace_test_go"
 
-	var market *MarketPlace
+	var market *marketplace.MarketPlace
 
-	var mkt_template string =  "NAME = \"" + mkt_name + "\"\n" +
-							"MARKET_MAD = \"http\"\n" +
-							"BASE_URL = \"http://url/\"\n" +
-							"PUBLIC_DIR = \"/var/loca/market-http\""
+	tpl := marketplace.NewTemplate()
+	tpl.Add(keys.Name, mkt_name)
+	tpl.Add(keys.MarketMAD, "http")
+	tpl.Add(keys.BaseUrl, "http://url/")
+	tpl.Add(keys.PublicDir, "/var/loca/market-http")
 
 	//Create Marketpkace
-	market_id, err := CreateMarketPlace(mkt_template)
+	market_id, err := testCtrl.MarketPlaces().Create(tpl.String())
+	if err != nil {
+		t.Fatalf("Test failed:\n" + err.Error())
+	}
 
 	if err != nil {
 		t.Errorf("Test failed:\n" + err.Error())
 	}
 
-	market = NewMarketPlace(market_id)
-	market.Info()
+	marketCtrl := testCtrl.MarketPlace(market_id)
+	market, err = marketCtrl.Info(false)
+	if err != nil {
+		t.Errorf("Test failed:\n" + err.Error())
+	}
 
 	actual := market.Name
 
@@ -49,16 +60,19 @@ func TestMarketplace(t *testing.T){
 	tmpl := "ATT1 = \"VAL1\""
 
 	//Update Marketpkace
-	err = market.Update(tmpl, 1)
+	err = marketCtrl.Update(tmpl, 1)
 
 	if err != nil {
 		t.Errorf("Test failed:\n" + err.Error())
 	}
 
-	market.Info()
+	market, err = marketCtrl.Info(false)
+	if err != nil {
+		t.Errorf("Test failed:\n" + err.Error())
+	}
 
 	actual_mm := market.MarketMad
-	actual_1, err := market.Template.Dynamic.GetContentByName("ATT1")
+	actual_1, err := market.Template.GetStr("ATT1")
 	if err != nil {
 		t.Errorf("Test failed, can't retrieve '%s', error: %s", "ATT1", err.Error())
 	} else {
@@ -72,15 +86,18 @@ func TestMarketplace(t *testing.T){
 	}
 
 	//Change permissions for Marketpkace
-	err = market.Chmod(1,1,1,1,1,1,1,1,1)
+	err = marketCtrl.Chmod(&shared.Permissions{1, 1, 1, 1, 1, 1, 1, 1, 1})
 
 	if err != nil {
 		t.Errorf("Test failed:\n" + err.Error())
 	}
 
-	market.Info()
+	market, err = marketCtrl.Info(false)
+	if err != nil {
+		t.Errorf("Test failed:\n" + err.Error())
+	}
 
-	expected_perm := Permissions{ 1, 1, 1, 1, 1, 1, 1, 1, 1 }
+	expected_perm := shared.Permissions{1, 1, 1, 1, 1, 1, 1, 1, 1}
 	actual_perm := *market.Permissions
 
 	if actual_perm != expected_perm {
@@ -88,13 +105,16 @@ func TestMarketplace(t *testing.T){
 	}
 
 	//Change owner of Marketpkace
-	err = market.Chown(1,1)
+	err = marketCtrl.Chown(1, 1)
 
 	if err != nil {
 		t.Errorf("Test failed:\n" + err.Error())
 	}
 
-	market.Info()
+	market, err = marketCtrl.Info(false)
+	if err != nil {
+		t.Errorf("Test failed:\n" + err.Error())
+	}
 
 	expected_usr := 1
 	expected_grp := 1
@@ -112,13 +132,16 @@ func TestMarketplace(t *testing.T){
 	rename := mkt_name + "-renamed"
 
 	//Rename Marketpkace
-	err = market.Rename(rename)
+	err = marketCtrl.Rename(rename)
 
 	if err != nil {
 		t.Errorf("Test failed:\n" + err.Error())
 	}
 
-	market.Info()
+	market, err = marketCtrl.Info(false)
+	if err != nil {
+		t.Errorf("Test failed:\n" + err.Error())
+	}
 
 	actual = market.Name
 
@@ -127,7 +150,7 @@ func TestMarketplace(t *testing.T){
 	}
 
 	//Delete Marketpkace
-	err = market.Delete()
+	err = marketCtrl.Delete()
 
 	if err != nil {
 		t.Errorf("Test failed:\n" + err.Error())

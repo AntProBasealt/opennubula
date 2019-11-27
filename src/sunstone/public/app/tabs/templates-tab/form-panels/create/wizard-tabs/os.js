@@ -292,6 +292,13 @@ define(function(require) {
           html += "</select>";
           $("#kvm-info", context).append(html);
 
+          var html = "<select id=\"sd-disk-bus\" wizard_field=\"SD_DISK_BUS\">";
+          html += "<option value=\"\">" + " " + "</option>";
+          html += "<option value='scsi'>SCSI</option>";
+          html += "<option value='sata'>SATA</option>";
+          html += "</select>";
+          $("#sd-disk-bus-info", context).append(html);
+
           var html = "<select id=\"model-cpu\" wizard_field=\"MODEL\">";
           html += "<option value=\"\">" + " " + "</option>";
           html += "<option value=\"host-passthrough\">host-passthrough</option>";
@@ -315,9 +322,15 @@ define(function(require) {
   function _retrieve(context) {
     var templateJSON = {};
     var osJSON = {};
-    $.extend(osJSON, WizardFields.retrieve(".bootTab", context));
-    $.extend(osJSON, WizardFields.retrieve(".kernelTab", context));
-    $.extend(osJSON, WizardFields.retrieve(".ramdiskTab", context));
+    $.extend(osJSON, WizardFields.retrieve(
+      $(".bootTab", context)
+    ));
+    $.extend(osJSON, WizardFields.retrieve(
+      $(".kernelTab", context)
+    ));
+    $.extend(osJSON, WizardFields.retrieve(
+      $(".ramdiskTab", context)
+    ));
 
     var boot = _retrieveBootValue(context);
 
@@ -327,13 +340,24 @@ define(function(require) {
       osJSON["BOOT"] = "";
     }
 
-    if (!$.isEmptyObject(osJSON)) { templateJSON["OS"] = osJSON; };
+    if (!$.isEmptyObject(osJSON)) {
+      templateJSON["OS"] = osJSON; 
+    }
 
-    var featuresJSON = WizardFields.retrieve(".featuresTab", context);
-    if (!$.isEmptyObject(featuresJSON)) { templateJSON["FEATURES"] = featuresJSON; };
+    var featuresJSON = WizardFields.retrieve(
+      $(".featuresTab", context)
+    );
+    if (!$.isEmptyObject(featuresJSON)) { 
+      templateJSON["FEATURES"] = featuresJSON; 
+    }
 
-    var cpuModelJSON = WizardFields.retrieve(".cpuTab", context);
-    if (!$.isEmptyObject(cpuModelJSON)) { templateJSON["CPU_MODEL"] = cpuModelJSON; };
+    var cpuModelJSON = WizardFields.retrieve(
+      $(".cpuTab", context)
+    );
+
+    if (!$.isEmptyObject(cpuModelJSON)) { 
+      templateJSON["CPU_MODEL"] = cpuModelJSON; 
+    }
 
     return templateJSON;
   }

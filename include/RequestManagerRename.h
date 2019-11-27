@@ -39,12 +39,12 @@ protected:
         auth_op = AuthRequest::MANAGE;
     };
 
-    virtual ~RequestManagerRename(){};
+    ~RequestManagerRename(){};
 
     /* -------------------------------------------------------------------- */
 
     void request_execute(xmlrpc_c::paramList const& _paramList,
-                        RequestAttributes& att);
+                        RequestAttributes& att) override;
 
     /**
      *  Gets and object by name and owner. Default implementation returns no
@@ -122,19 +122,17 @@ public:
         Nebula& nd  = Nebula::instance();
         pool        = nd.get_vmpool();
         auth_object = PoolObjectSQL::VM;
+        vm_action   = VMActions::RENAME_ACTION;
+    }
 
-        auth_op     = nd.get_vm_auth_op(History::RENAME_ACTION);
-    };
+    ~VirtualMachineRename() = default;
 
-    ~VirtualMachineRename(){};
-
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return -1;
     }
 
-
-    int extra_updates(PoolObjectSQL * obj)
+    int extra_updates(PoolObjectSQL * obj) override
     {
         VirtualMachine * vm;
 
@@ -148,7 +146,7 @@ public:
         vm = static_cast<VirtualMachine *>(obj);
 
         return vmpool->update_search(vm);
-    };
+    }
 };
 
 /* ------------------------------------------------------------------------- */
@@ -168,7 +166,7 @@ public:
 
     ~TemplateRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name, uid);
     }
@@ -191,7 +189,7 @@ public:
 
     ~VirtualNetworkTemplateRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name, uid);
     }
@@ -214,7 +212,7 @@ public:
 
     ~VirtualNetworkRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name, uid);
     }
@@ -236,7 +234,7 @@ public:
 
     ~ImageRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name, uid);
     }
@@ -258,7 +256,7 @@ public:
 
     ~DocumentRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return -1;
     }
@@ -280,12 +278,12 @@ public:
 
     ~ClusterRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name);
     }
 
-    void batch_rename(int oid);
+    void batch_rename(int oid) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -304,12 +302,12 @@ public:
 
     ~DatastoreRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name);
     }
 
-    void batch_rename(int oid);
+    void batch_rename(int oid) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -330,12 +328,12 @@ public:
 
     ~HostRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name);
     }
 
-    void batch_rename(int oid);
+    void batch_rename(int oid) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -354,7 +352,7 @@ public:
 
     ~ZoneRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name);
     }
@@ -376,7 +374,7 @@ public:
 
     ~SecurityGroupRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name, uid);
     }
@@ -398,7 +396,7 @@ public:
 
     ~VdcRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name);
     }
@@ -420,7 +418,7 @@ public:
 
     ~VirtualRouterRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return -1;
     }
@@ -442,12 +440,12 @@ public:
 
     ~MarketPlaceRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name);
     }
 
-    void batch_rename(int oid);
+    void batch_rename(int oid) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -466,7 +464,7 @@ public:
 
     ~MarketPlaceAppRename(){};
 
-    int exist(const string& name, int uid)
+    int exist(const string& name, int uid) override
     {
         return pool->exist(name, uid);
     }
@@ -487,6 +485,28 @@ public:
     };
 
     ~VMGroupRename(){};
+
+    int exist(const string& name, int uid) override
+    {
+        return pool->exist(name, uid);
+    }
+};
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+class HookRename: public RequestManagerRename
+{
+public:
+    HookRename():
+        RequestManagerRename("one.hook.rename", "Renames a hook")
+    {
+        Nebula& nd  = Nebula::instance();
+        pool        = nd.get_hkpool();
+        auth_object = PoolObjectSQL::HOOK;
+    };
+
+    ~HookRename(){};
 
     int exist(const string& name, int uid)
     {

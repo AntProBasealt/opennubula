@@ -113,7 +113,7 @@ DEV="/dev/${VG_NAME}/${LV_NAME}"
 # Execute lvcreate with a lock in the frontend
 CREATE_CMD=$(cat <<EOF
     set -e -o pipefail
-    $SUDO $SYNC
+    $SYNC
     $SUDO $LVSCAN
     $SUDO $LVCREATE --wipesignatures n -L${SIZE}M -n $LV_NAME $VG_NAME
 EOF
@@ -132,7 +132,7 @@ CLONE_CMD=$(cat <<EOF
     # zero trailing space
     if [ "${ZERO_LVM_ON_CREATE}" = "yes" ]; then
     LVSIZE=\$(${SUDO} ${LVS} --nosuffix --noheadings --units B -o lv_size "${DEV}" | tr -d '[:blank:]')
-    ${DD} if=/dev/zero of="${DEV}" bs=64k \
+    ${DD} if=/dev/zero of="${DEV}" bs=${DD_BLOCK_SIZE:-64k} \
         oflag=seek_bytes iflag=count_bytes \
         seek="${ZERO_SEEK_BYTES}" count="\$(( LVSIZE - ${ZERO_SEEK_BYTES} ))"
     fi

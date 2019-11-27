@@ -355,7 +355,6 @@ AllCops:
     - src/vnm_mad/remotes/lib/vlan.rb
     - src/vnm_mad/remotes/lib/address.rb
     - src/cli/command_parser.rb
-    - src/cli/cli_helper.rb
     - src/cli/one_helper.rb
     - src/cli/one_helper/onevmgroup_helper.rb
     - src/cli/one_helper/onemarket_helper.rb
@@ -370,7 +369,6 @@ AllCops:
     - src/cli/one_helper/onemarketapp_helper.rb
     - src/cli/one_helper/onegroup_helper.rb
     - src/cli/one_helper/onevnet_helper.rb
-    - src/cli/one_helper/oneacl_helper.rb
     - src/cli/one_helper/onevcenter_helper.rb
     - src/cli/one_helper/onecluster_helper.rb
     - src/cli/one_helper/onevntemplate_helper.rb
@@ -550,12 +548,14 @@ AllCops:
     - src/onedb/shared/3.8.4_to_3.8.5.rb
     - src/onedb/shared/3.7.80_to_3.8.0.rb
     - src/onedb/shared/3.1.80_to_3.2.0.rb
-    - src/onedb/shared/5.5.80_to_5.6.0.rb
+    - src/onedb/shared/5.6.0_to_5.10.0.rb
     - src/onedb/shared/3.3.80_to_3.4.0.rb
     - src/onedb/shared/4.3.90_to_4.4.0.rb
     - src/onedb/shared/3.9.90_to_4.0.0.rb
     - src/onedb/shared/4.0.0_to_4.0.1.rb
     - src/onedb/shared/4.1.80_to_4.2.0.rb
+    - src/onedb/shared/5.6.0_to_5.10.0.rb
+    - src/onedb/shared/5.5.80_to_5.6.0.rb
     - src/onedb/local/5.3.80_to_5.4.0.rb
     - src/onedb/local/4.13.80_to_4.13.85.rb
     - src/onedb/local/5.6.0_to_5.7.80.rb
@@ -569,6 +569,9 @@ AllCops:
     - src/onedb/local/4.9.80_to_4.10.3.rb
     - src/onedb/local/5.5.80_to_5.6.0.rb
     - src/onedb/local/4.7.80_to_4.9.80.rb
+    - src/onedb/local/5.8.0_to_5.9.80.rb
+    - src/onedb/local/5.8.0_to_5.10.0.rb
+    - src/onedb/local/5.6.0_to_5.10.0.rb
     - src/onedb/onedb_live.rb
     - src/onedb/onedb_backend.rb
     - src/onedb/sqlite2mysql.rb
@@ -602,12 +605,6 @@ Layout/IndentationWidth:
 Layout/SpaceInsideBlockBraces:
     SpaceBeforeBlockParameters: false
 
-# X indentation raw & method call
-Layout/IndentFirstArrayElement:
-    EnforcedStyle: consistent
-
-Layout/IndentFirstHashElement:
-    EnforcedStyle: consistent
 ###
 
 # Align the end keyword
@@ -731,6 +728,9 @@ Style/SafeNavigation:
 Style/FloatDivision:
     Enabled: false
 
+Style/RedundantBegin:
+    Enabled: false
+
 ######
 # LINT
 ######
@@ -813,7 +813,7 @@ Naming/ConstantName:
 Naming/HeredocDelimiterNaming:
     Enabled: false
 
-Naming/RescuedExceptionsVariableName:
+Naming/UncommunicativeMethodParamName:
     Enabled: false
 
 ###

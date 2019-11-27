@@ -17,7 +17,7 @@
 define(function(require) {
   /*
     DEPENDENCIES
-   */
+  */
   var Notifier = require("utils/notifier");
   var BaseFormPanel = require("utils/form-panels/form-panel");
   var Sunstone = require("sunstone");
@@ -49,7 +49,8 @@ define(function(require) {
     require("./create/wizard-tabs/scheduling"),
     require("./create/wizard-tabs/hybrid"),
     require("./create/wizard-tabs/vmgroup"),
-    require("./create/wizard-tabs/other")
+    require("./create/wizard-tabs/other"),
+    require("./create/wizard-tabs/numa")
   ];
 
   var TEMPLATES_TAB_ID = require("tabs/templates-tab/tabId");
@@ -57,7 +58,7 @@ define(function(require) {
 
   /*
     CONSTRUCTOR
-   */
+  */
 
   function FormPanel() {
     var create_title;
@@ -161,9 +162,31 @@ define(function(require) {
     var templateJSON = {};
     $.each(this.wizardTabs, function(index, wizardTab) {
       $.extend(true, templateJSON, wizardTab.retrieve($("#" + wizardTab.wizardTabId, context)));
-
       var a = templateJSON;
     });
+
+
+    if(templateJSON["TOPOLOGY"] && templateJSON["TOPOLOGY"]["BORRAR"]){
+      delete templateJSON["TOPOLOGY"];
+    }
+
+    if(
+      templateJSON["TOPOLOGY"] && 
+      templateJSON["TOPOLOGY"]["HUGEPAGE_SIZE"] !== undefined && 
+      templateJSON["TOPOLOGY"]["HUGEPAGE_SIZE"] !== null &&
+      templateJSON["TOPOLOGY"]["HUGEPAGE_SIZE"].length<=0
+    ){
+      delete templateJSON["TOPOLOGY"]["HUGEPAGE_SIZE"];
+    }
+
+    if(
+      templateJSON["TOPOLOGY"] && 
+      templateJSON["TOPOLOGY"]["MEMORY_ACCESS"] !== undefined && 
+      templateJSON["TOPOLOGY"]["MEMORY_ACCESS"] !== null &&
+      templateJSON["TOPOLOGY"]["MEMORY_ACCESS"].length<=0
+    ){
+      delete templateJSON["TOPOLOGY"]["MEMORY_ACCESS"];
+    }
 
     // vCenter PUBLIC_CLOUD is not defined in the hybrid tab. Because it is
     // part of an array, and it is filled in different tabs, the $.extend deep
@@ -196,13 +219,43 @@ define(function(require) {
 
       delete templateJSON["NIC_PCI"];
     }
-
     return templateJSON;
   }
 
   function _submitWizard(context) {
     var templateJSON = this.retrieve(context);
-
+    var current = {};
+    cachedTemplate = OpenNebulaAction.cache("VMTEMPLATE");
+    if(
+      this && 
+      this.resourceId && 
+      cachedTemplate && 
+      cachedTemplate.data &&
+      Array.isArray(cachedTemplate.data)
+    ){
+      var id = this.resourceId;
+      var currentTemplate = cachedTemplate.data.filter(function(vmtemplate){
+        var rtn = false;
+        if(
+          vmtemplate && 
+          vmtemplate.VMTEMPLATE && 
+          vmtemplate.VMTEMPLATE.TEMPLATE && 
+          vmtemplate.VMTEMPLATE.ID && 
+          vmtemplate.VMTEMPLATE.ID === id
+        ){
+          return vmtemplate.VMTEMPLATE.TEMPLATE;
+        }
+        return rtn;
+      });
+      if(
+        currentTemplate &&
+        currentTemplate[0] &&
+        currentTemplate[0].VMTEMPLATE && 
+        currentTemplate[0].VMTEMPLATE.TEMPLATE
+      ){
+        current = currentTemplate[0].VMTEMPLATE.TEMPLATE;
+      }
+    }
     if (this.action == "create") {
       Sunstone.runAction(this.resource+".create", {"vmtemplate": templateJSON});
       return false;
@@ -249,17 +302,34 @@ define(function(require) {
                   disks.push(disk);
                 });
                 templateJSON.DISK = disks;
-                Sunstone.runAction(actionUpdate, resourceId, TemplateUtils.templateToString(templateJSON));
+                Sunstone.runAction(
+                  actionUpdate,
+                  resourceId,
+                  TemplateUtils.templateToString(
+                    $.extend( current, templateJSON)
+                  )
+                );
               }else{
-                Sunstone.runAction(actionUpdate, resourceId, TemplateUtils.templateToString(templateJSON));
+                Sunstone.runAction(
+                  actionUpdate,
+                  resourceId,
+                  TemplateUtils.templateToString(
+                    $.extend( current, templateJSON)
+                  )
+                );
               }
             }
           }
         };
-
         OpenNebulaAction.show(params,OpenNebulaTemplate.resource);
       }else{
-        Sunstone.runAction(actionUpdate, resourceId, TemplateUtils.templateToString(templateJSON));
+        Sunstone.runAction(
+          actionUpdate,
+          resourceId,
+          TemplateUtils.templateToString(
+            $.extend( current, templateJSON)
+          )
+        );
       }
       return false;
     }
@@ -284,7 +354,9 @@ define(function(require) {
     this.setHeader(element);
 
     this.resourceId = element.ID;
-
+    if(element && element.TEMPLATE && element.TEMPLATE.SCHED_RANK){
+      $("#SCHED_RANK").val(element.TEMPLATE.SCHED_RANK);
+    }
     var templateJSON = element.TEMPLATE;
 
     // Fills the name

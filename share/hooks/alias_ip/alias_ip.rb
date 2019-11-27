@@ -20,12 +20,18 @@ ONE_LOCATION = ENV['ONE_LOCATION']
 
 if !ONE_LOCATION
     RUBY_LIB_LOCATION = '/usr/lib/one/ruby'
-    PACKET_LOCATION = '/usr/lib/one/ruby/vendors/packethost/lib'
-    LOG_FILE = '/var/log/one/hook-alias_ip.log'
+    GEMS_LOCATION     = '/usr/share/one/gems'
+    PACKET_LOCATION   = '/usr/lib/one/ruby/vendors/packethost/lib'
+    LOG_FILE          = '/var/log/one/hook-alias_ip.log'
 else
     RUBY_LIB_LOCATION = ONE_LOCATION + '/lib/ruby'
-    PACKET_LOCATION = '/usr/lib/one/ruby/vendors/packethost/lib'
-    LOG_FILE = ONE_LOCATION + '/var/hook-alias_ip.log'
+    GEMS_LOCATION     = ONE_LOCATION + '/share/gems'
+    PACKET_LOCATION   = ONE_LOCATION + '/ruby/vendors/packethost/lib'
+    LOG_FILE          = ONE_LOCATION + '/var/hook-alias_ip.log'
+end
+
+if File.directory?(GEMS_LOCATION)
+    Gem.use_paths(GEMS_LOCATION)
 end
 
 $LOAD_PATH << RUBY_LIB_LOCATION
@@ -37,18 +43,17 @@ include OpenNebula
 # rubocop:enable Style/MixinUsage
 
 require 'base64'
+require 'nokogiri'
 require 'open3'
 require 'packet'
 
 ###
 
-VM_ID  = ARGV[0]
-VM_XML = Base64.decode64(ARGV[1])
+raw_vm_template = Base64.decode64(STDIN.read)
+xml_vm_template = Nokogiri::XML(raw_vm_template)
 
-if VM_ID.nil? || VM_ID.empty? || VM_XML.nil? || VM_XML.empty?
-    STDERR.puts 'USAGE: <VM ID> <VM XML>'
-    exit(-1)
-end
+VM_ID  = xml_vm_template.xpath('VM/ID').text
+VM_XML = raw_vm_template
 
 ##########
 # Helpers
@@ -67,7 +72,7 @@ end
 
 def one_fetch(client, type, id)
     object = type.new_with_id(id, client)
-    rc = object.info
+    rc = object.info(true)
 
     if OpenNebula.is_error?(rc)
         STDERR.puts(rc.message)
@@ -106,22 +111,10 @@ def device_has_ip?(packet_client, device_id, ip_id)
 end
 
 def manage_packet(host, ip, address_range, assign = true)
-    cidr = "#{ip}/32"
-
-    system = OpenNebula::System.new(OpenNebula::Client.new)
-    config = system.get_configuration
-
-    if OpenNebula.is_error?(config)
-        STDERR.puts("Error getting oned configuration : #{config.message}")
-        exit(-1)
-    end
-
-    token = config['ONE_KEY']
-    ar_token = OpenNebula.decrypt({ :value => address_range['PACKET_TOKEN'] },
-                                  token)[:value]
+    cidr         = "#{ip}/32"
     ar_deploy_id = address_range['DEPLOY_ID']
 
-    packet_client = Packet::Client.new(ar_token)
+    packet_client = Packet::Client.new(address_range['PACKET_TOKEN'])
     packet_ip = find_packet_ip_assignment(packet_client, ar_deploy_id, cidr)
 
     if assign == true

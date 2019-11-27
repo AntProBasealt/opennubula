@@ -76,10 +76,18 @@ helpers do
             end
         end
 
-        return VCenterDriver::VIClient.new({
+        connection = {
             :user     => vuser,
             :password => vpass,
-            :host     => vhost})
+            :host     => vhost
+        }
+
+        if !vhost.nil? && vhost.split(":").length == 2
+            connection[:host] = vhost.split(":")[0]
+            connection[:port] = vhost.split(":")[1]
+        end
+
+        return VCenterDriver::VIClient.new(connection)
     end
 
     def return_error(code, msg)
@@ -103,7 +111,7 @@ helpers do
 
 end
 
-get '/vcenter' do
+get '/vcenter/hosts' do
     begin
         dc_folder = VCenterDriver::DatacenterFolder.new(vcenter_client)
 
@@ -178,8 +186,8 @@ end
 get '/vcenter/networks' do
     begin
         new_vcenter_importer("networks")
-
-        [200, $importer.retrieve_resources.to_json]
+        opts = {:filter => true}
+        [200, $importer.retrieve_resources(opts).to_json]
     rescue Exception => e
         logger.error("[vCenter] " + e.message)
         error = Error.new(e.message)
@@ -246,4 +254,8 @@ post '/vcenter/wild' do
         error = Error.new(e.message)
         error 403, error.to_json
     end
+end
+
+post '/vcenter/register_hooks' do
+  VCenterDriver::VcImporter.register_hooks
 end

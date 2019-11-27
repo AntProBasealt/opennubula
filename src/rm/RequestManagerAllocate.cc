@@ -21,12 +21,13 @@
 #include "MarketPlacePool.h"
 #include "MarketPlaceAppPool.h"
 #include "VirtualMachineDisk.h"
+#include "HookPool.h"
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
 bool RequestManagerAllocate::allocate_authorization(
-		xmlrpc_c::paramList const&  paramList,
+        xmlrpc_c::paramList const&  paramList,
         Template *          tmpl,
         RequestAttributes&  att,
         PoolObjectAuth *    cluster_perms)
@@ -62,7 +63,7 @@ bool RequestManagerAllocate::allocate_authorization(
 /* -------------------------------------------------------------------------- */
 
 bool VirtualMachineAllocate::allocate_authorization(
-		xmlrpc_c::paramList const&  paramList,
+        xmlrpc_c::paramList const&  paramList,
         Template *          tmpl,
         RequestAttributes&  att,
         PoolObjectAuth *    cluster_perms)
@@ -102,7 +103,13 @@ bool VirtualMachineAllocate::allocate_authorization(
         return false;
     }
 
-    // -------------------------- Check Quotas  ----------------------------
+    // ---------------------- Check Quotas & Topology --------------------------
+
+    if (VirtualMachine::parse_topology(ttmpl, att.resp_msg) != 0)
+    {
+        failure_response(ALLOCATE, att);
+        return false;
+    }
 
     VirtualMachineTemplate aux_tmpl(*ttmpl);
 
@@ -259,6 +266,17 @@ void RequestManagerAllocate::request_execute(xmlrpc_c::paramList const& params,
         cluster->unlock();
     }
 
+    //Take object body for hooks.
+    PoolObjectSQL * obj = pool->get(id);
+
+    if (obj != nullptr)
+    {
+        obj->to_xml(att.extra_xml);
+
+        obj->unlock();
+    }
+
+    att.resp_id = id;
     success_response(id, att);
 }
 
@@ -642,6 +660,17 @@ void ImageAllocate::request_execute(xmlrpc_c::paramList const& params,
         ds->unlock();
     }
 
+    // Take image body for Hooks
+    Image * img = ipool->get(id);
+
+    if (img != nullptr)
+    {
+        img->to_xml(att.extra_xml);
+
+        img->unlock();
+    }
+
+    att.resp_id = id;
     success_response(id, att);
 }
 
@@ -1325,3 +1354,37 @@ Request::ErrorCode VMGroupAllocate::pool_allocate(
     return Request::SUCCESS;
 }
 
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+Request::ErrorCode HookAllocate::pool_allocate(
+        xmlrpc_c::paramList const&  paramList,
+        Template *                  tmpl,
+        int&                        id,
+        RequestAttributes&          att)
+{
+    std::string hk_type;
+
+    HookPool * hkpool = static_cast<HookPool *>(pool);
+
+    tmpl->get("TYPE", hk_type);
+
+    if (Hook::str_to_hook_type(hk_type) == Hook::UNDEFINED)
+    {
+        ostringstream oss;
+
+        oss << "Invalid Hook type: " << hk_type;
+        att.resp_msg = oss.str();
+
+        return Request::INTERNAL;
+    }
+
+    id = hkpool->allocate(tmpl, att.resp_msg);
+
+    if (id < 0)
+    {
+        return Request::INTERNAL;
+    }
+
+    return Request::SUCCESS;
+}

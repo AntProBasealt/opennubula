@@ -20,10 +20,16 @@ ONE_LOCATION = ENV['ONE_LOCATION']
 
 if !ONE_LOCATION
     RUBY_LIB_LOCATION = '/usr/lib/one/ruby'
-    REMOTES_LOCATION = '/var/lib/one/remotes/'
+    GEMS_LOCATION     = '/usr/share/one/gems'
+    REMOTES_LOCATION  = '/var/lib/one/remotes/'
 else
     RUBY_LIB_LOCATION = ONE_LOCATION + '/lib/ruby'
-    REMOTES_LOCATION = ONE_LOCATION + '/var/remotes/'
+    GEMS_LOCATION     = ONE_LOCATION + '/share/gems'
+    REMOTES_LOCATION  = ONE_LOCATION + '/var/remotes/'
+end
+
+if File.directory?(GEMS_LOCATION)
+    Gem.use_paths(GEMS_LOCATION)
 end
 
 $LOAD_PATH << RUBY_LIB_LOCATION
@@ -97,6 +103,14 @@ CommandParser::CmdParser.new(ARGV) do
         :format => String
     }
 
+    PORT = {
+        :name => 'port',
+        :short => '-p port',
+        :large => '--port port',
+        :format => String,
+        :description => 'vCenter API port, defaults to 443 (SSL) or 80'
+    }
+
     USE_DEFAULTS = {
         :name => 'defaults',
         :large => '--use-defaults',
@@ -138,6 +152,37 @@ CommandParser::CmdParser.new(ARGV) do
             :options => [OBJECT, HOST, DATASTORE, VCENTER, USER, PASS] do
         begin
             args = helper.parse_opts(options)
+            args[:filter] = true
+            vi_client = VCenterDriver::VIClient.new_from_host(options[:host])
+            importer = VCenterDriver::VcImporter
+                       .new_child(helper.client, vi_client, options[:object])
+
+            list = importer.retrieve_resources(args)
+
+            helper.list_object(options, list)
+        rescue StandardError => e
+            puts e.message
+        end
+
+        exit 0
+    end
+
+    list_desc = <<-EOT.unindent
+        Show a list with unimported vCenter objects excluding all filters
+
+        Examples:
+          - listing networks including uplinks:
+
+            onevcenter list_all -o networks -h <host_id>
+
+    EOT
+
+    command :list_all,
+            list_desc,
+            :options => [OBJECT, HOST, DATASTORE, VCENTER, USER, PASS] do
+        begin
+            args = helper.parse_opts(options)
+            args[:filter] = false
             vi_client = VCenterDriver::VIClient.new_from_host(options[:host])
             importer = VCenterDriver::VcImporter
                        .new_child(helper.client, vi_client, options[:object])
@@ -234,7 +279,7 @@ CommandParser::CmdParser.new(ARGV) do
     EOT
     command :hosts,
             host_desc,
-            :options => [VCENTER, USER, PASS, USE_DEFAULTS] do
+            :options => [VCENTER, USER, PASS, USE_DEFAULTS, PORT] do
         con_ops = helper.connection_options('Hosts', options)
 
         VCenterDriver::VcImporter.import_clusters(con_ops, options)

@@ -60,11 +60,85 @@ public:
     };
 
     /**
+     *  Functions to convert to/from string the Host states
+     */
+    static int str_to_state(std::string& st, HostState& state)
+    {
+        one_util::toupper(st);
+
+        state = INIT;
+
+        if ( st == "INIT" ) {
+            state = INIT;
+        } else if ( st == "MONITORING_MONITORED" ) {
+            state = MONITORING_MONITORED;
+        } else if ( st == "MONITORED" ) {
+            state = MONITORED;
+        } else if ( st == "ERROR" ) {
+            state = ERROR;
+        } else if ( st == "DISABLED" ) {
+            state = DISABLED;
+        } else if ( st == "MONITORING_ERROR" ) {
+            state = MONITORING_ERROR;
+        } else if ( st == "MONITORING_INIT" ) {
+            state = MONITORING_INIT;
+        } else if ( st == "MONITORING_DISABLED" ) {
+            state = MONITORING_DISABLED;
+        } else if ( st == "OFFLINE" ) {
+            state = OFFLINE;
+        }
+        else
+        {
+            return -1;
+        }
+
+        return 0;
+    }
+
+    static string& state_to_str(std::string& st, HostState state)
+    {
+        st = "";
+
+        switch (state)
+        {
+            case INIT:
+                st = "INIT";
+                break;
+            case MONITORING_MONITORED:
+                st = "MONITORING_MONITORED";
+                break;
+            case MONITORED:
+                st = "MONITORED";
+                break;
+            case ERROR:
+                st = "ERROR";
+                break;
+            case DISABLED:
+                st = "DISABLED";
+                break;
+            case MONITORING_ERROR:
+                st = "MONITORING_ERROR";
+                break;
+            case MONITORING_INIT:
+                st = "MONITORING_INIT";
+                break;
+            case MONITORING_DISABLED:
+                st = "MONITORING_DISABLED";
+                break;
+            case OFFLINE:
+                st = "OFFLINE";
+                break;
+        }
+
+        return st;
+    }
+
+    /**
      * Function to print the Host object into a string in XML format
      *  @param xml the resulting XML string
      *  @return a reference to the generated string
      */
-    string& to_xml(string& xml) const;
+    string& to_xml(string& xml) const override;
 
     /**
      *  Rebuilds the object from an xml formatted string
@@ -72,7 +146,7 @@ public:
      *
      *    @return 0 on success, -1 otherwise
      */
-    int from_xml(const string &xml_str);
+    int from_xml(const string &xml_str) override;
 
      /**
       *  Checks if the host is a remote public cloud
@@ -106,6 +180,20 @@ public:
      {
         state = ERROR;
      }
+
+    /**
+     *  Test if the Host has changed state since last time prev state was set
+     *    @return true if Host changed state
+     */
+    bool has_changed_state();
+
+    /**
+     *  Sets the previous state to the current one
+     */
+    void set_prev_state()
+    {
+        prev_state = state;
+    };
 
      /**
       *  Updates the Host's last_monitored time stamp.
@@ -264,11 +352,13 @@ public:
      *    @param cpu reserved cpu (in percentage)
      *    @param mem reserved mem (in KB)
      */
-    void get_reserved_capacity(string& cpu, string& mem)
+    void get_reserved_capacity(string& cpu, string& mem) const
     {
         get_template_attribute("RESERVED_CPU", cpu);
         get_template_attribute("RESERVED_MEM", mem);
     }
+
+    void get_cluster_capacity(string& cluster_rcpu, string& cluster_rmem) const;
 
     // -------------------------------------------------------------------------
     // Share functions.
@@ -280,97 +370,55 @@ public:
     }
 
     /**
-     *  Adds a new VM to the given share by incrementing the cpu, mem and disk
-     *  counters
-     *    @param vm_id id of the vm to add to the host
-     *    @param cpu needed by the VM (percentage)
-     *    @param mem needed by the VM (in KB)
-     *    @param disk needed by the VM
-     *    @param pci devices needed by th VM
+     *  Adds a new VM to the host share by incrementing usage counters
+     *    @param sr the capacity request of the VM
      *    @return 0 on success
      */
-    void add_capacity(int vm_id, long long cpu, long long mem, long long disk,
-            vector<VectorAttribute *> pci)
+    void add_capacity(HostShareCapacity &sr)
     {
-        if ( vm_collection.add(vm_id) == 0 )
+        if ( vm_collection.add(sr.vmid) == 0 )
         {
-            host_share.add(vm_id, cpu, mem, disk, pci);
+            host_share.add(sr);
         }
         else
         {
             ostringstream oss;
-            oss << "Trying to add VM " << vm_id
-                << ", that it is already associated to host " << oid << ".";
+            oss << "VM " << sr.vmid << " is already in host " << oid << ".";
 
             NebulaLog::log("ONE", Log::ERROR, oss);
         }
     };
 
     /**
-     *  Deletes a new VM from the given share by decrementing the cpu,mem and
-     *  disk counters
-     *    @param vm_id id of the vm to delete from the host
-     *    @param cpu used by the VM (percentage)
-     *    @param mem used by the VM (in KB)
-     *    @param disk used by the VM
-     *    @param pci devices needed by th VM
+     *  Deletes a new VM to the host share by incrementing usage counters
+     *    @param sr the capacity request of the VM
      *    @return 0 on success
      */
-    void del_capacity(int vm_id, long long cpu, long long mem, long long disk,
-            const vector<VectorAttribute *>& pci)
+    void del_capacity(HostShareCapacity& sr)
     {
-        if ( vm_collection.del(vm_id) == 0 )
+        if ( vm_collection.del(sr.vmid) == 0 )
         {
-            host_share.del(cpu, mem, disk, pci);
+            host_share.del(sr);
         }
         else
         {
             ostringstream oss;
-            oss << "Trying to remove VM " << vm_id
-                << ", that it is not associated to host " << oid << ".";
+            oss << "VM " << sr.vmid << " is not in host " << oid << ".";
 
             NebulaLog::log("ONE", Log::ERROR, oss);
         }
     };
 
     /**
-     *  Updates the capacity used in a host when a VM is resized
-     *  counters
-     *    @param cpu increment of cpu requested by the VM
-     *    @param mem increment of memory requested by the VM
-     *    @param disk not used
-     *    @return 0 on success
-     */
-    void update_capacity(int cpu, long int mem, int disk)
-    {
-        host_share.update(cpu,mem,disk);
-    };
-
-    /**
-     *  Tests whether a new VM can be hosted by the host or not
-     *    @param cpu needed by the VM (percentage)
-     *    @param mem needed by the VM (in Kb)
-     *    @param disk needed by the VM
-     *    @param pci devices needed by the VM
-     *    @param error Returns the error reason, if any
+     *  Tests whether a VM device capacity can be allocated in the host
+     *    @param sr capacity requested by the VM
+     *    @param error returns the error reason, if any
+     *
      *    @return true if the share can host the VM
      */
-    bool test_capacity(long long cpu, long long mem, long long disk,
-                       vector<VectorAttribute *> &pci, string& error) const
+    bool test_capacity(HostShareCapacity &sr, string& error)
     {
-        return host_share.test(cpu, mem, disk, pci, error);
-    }
-
-    /**
-     *  Tests whether a new VM can be hosted by the host or not, checking the
-     *  PCI devices only.
-     *    @param pci devices needed by the VM
-     *    @param error Returns the error reason, if any
-     *    @return true if the share can host the VM
-     */
-    bool test_capacity(vector<VectorAttribute *> &pci, string& error) const
-    {
-        return host_share.test(pci, error);
+        return host_share.test(sr, error);
     }
 
     /**
@@ -384,16 +432,16 @@ public:
     /**
      *  Factory method for host templates
      */
-    Template * get_new_template() const
+    Template * get_new_template() const override
     {
         return new HostTemplate;
     }
 
     /**
      *  Executed after an update operation to process the new template
-     *    - encrypt VCENTER_PASSWORD attribute.
+     *    - encrypt secret attributes.
      */
-    int post_update_template(string& error);
+    int post_update_template(string& error) override;
 
     /**
      * Returns the rediscovered VMs (from poff to running) in the previous
@@ -430,6 +478,7 @@ private:
      *  The state of the Host
      */
     HostState   state;
+    HostState   prev_state;
 
     /**
      *  Name of the IM driver used to monitor this host
@@ -494,7 +543,7 @@ private:
          int           cluster_id,
          const string& cluster_name);
 
-    virtual ~Host();
+    virtual ~Host() = default;
 
     // *************************************************************************
     // DataBase implementation (Private)
@@ -543,7 +592,7 @@ private:
      *    @param db pointer to the db
      *    @return 0 on success
      */
-    int insert(SqlDB *db, string& error_str)
+    int insert(SqlDB *db, string& error_str) override
     {
         return insert_replace(db, false, error_str);
     };
@@ -553,7 +602,7 @@ private:
      *    @param db pointer to the db
      *    @return 0 on success
      */
-    int update(SqlDB *db)
+    int update(SqlDB *db) override
     {
         string error_str;
         return insert_replace(db, true, error_str);

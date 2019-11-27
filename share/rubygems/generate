@@ -19,7 +19,7 @@
 require 'fileutils'
 require 'tmpdir'
 
-VERSION = "5.8.5"
+VERSION = "5.10.0"
 
 def version
     v = VERSION
@@ -206,11 +206,28 @@ def generate_gem_file(gem_file, description, files)
 end
 
 def generate_gem(description)
-    tmp = "./tmp/#{description[:name]}"
-    files=file_list(description)
-    copy_files(files, '', tmp+"/")
+    Dir.mktmpdir do |tmp|
+        files=file_list(description)
+        copy_files(files, '', tmp+"/")
 
-    generate_gem_file("#{tmp}/#{description[:name]}.gemspec", description, files)
+        gem_file=tmp+"/gem.gemspec"
+        generate_gem_file(gem_file, description, files)
+
+        pwd=Dir.pwd
+
+        Dir.chdir(tmp) do
+            system("gem build gem.gemspec")
+
+            if $?.exitstatus!=0
+                puts "Error generating gem"
+                exit(-1)
+            end
+
+            Dir.glob("*.gem").each do |f|
+                FileUtils.cp(f, pwd)
+            end
+        end
+    end
 end
 
 # Go to source code root dir

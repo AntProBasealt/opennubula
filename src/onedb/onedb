@@ -26,25 +26,31 @@ end
 
 NOKOGIRI_ENCODING = nk_encoding
 
-ONE_LOCATION = ENV["ONE_LOCATION"]
+ONE_LOCATION = ENV['ONE_LOCATION']
 
 if !ONE_LOCATION
-    LIB_LOCATION      = "/usr/lib/one"
-    RUBY_LIB_LOCATION = LIB_LOCATION + "/ruby"
-    VAR_LOCATION      = "/var/lib/one"
-    ETC_LOCATION      = "/etc/one"
-    LOCK_FILE         = "/var/lock/one/one"
+    LIB_LOCATION      = '/usr/lib/one'
+    RUBY_LIB_LOCATION = LIB_LOCATION + '/ruby'
+    GEMS_LOCATION     = '/usr/share/one/gems'
+    VAR_LOCATION      = '/var/lib/one'
+    ETC_LOCATION      = '/etc/one'
+    LOCK_FILE         = '/var/lock/one/one'
 else
-    LIB_LOCATION      = ONE_LOCATION + "/lib"
-    RUBY_LIB_LOCATION = LIB_LOCATION + "/ruby"
-    VAR_LOCATION      = ONE_LOCATION + "/var"
-    ETC_LOCATION      = ONE_LOCATION + "/etc"
-    LOCK_FILE         = VAR_LOCATION + "/.lock"
+    LIB_LOCATION      = ONE_LOCATION + '/lib'
+    RUBY_LIB_LOCATION = LIB_LOCATION + '/ruby'
+    GEMS_LOCATION     = ONE_LOCATION + '/share/gems'
+    VAR_LOCATION      = ONE_LOCATION + '/var'
+    ETC_LOCATION      = ONE_LOCATION + '/etc'
+    LOCK_FILE         = VAR_LOCATION + '/.lock'
 end
 
-$: << RUBY_LIB_LOCATION
-$: << RUBY_LIB_LOCATION+'/onedb'
-$: << RUBY_LIB_LOCATION+'/cli'
+if File.directory?(GEMS_LOCATION)
+    Gem.use_paths(GEMS_LOCATION)
+end
+
+$LOAD_PATH << RUBY_LIB_LOCATION
+$LOAD_PATH << RUBY_LIB_LOCATION + '/onedb'
+$LOAD_PATH << RUBY_LIB_LOCATION + '/cli'
 
 require 'command_parser'
 require 'optparse/time'
@@ -154,6 +160,17 @@ DBNAME={
     :proc => lambda { |o, options|
         options[:backend] = :mysql
         options[:db_name] = o
+    }
+}
+
+ENCODING={
+    :name => "encoding",
+    :large => "--encoding charset",
+    :format => String,
+    :description => "MySQL encoding to use for the connection",
+    :proc => lambda { |o, options|
+        options[:backend]  = :mysql
+        options[:encoding] = o
     }
 }
 
@@ -315,7 +332,7 @@ cmd=CommandParser::CmdParser.new(ARGV) do
     # Global options
     ###########################################################################
     set :option, CommandParser::OPTIONS
-    set :option, [SQLITE, SERVER, PORT, USERNAME, PASSWORD, DBNAME]
+    set :option, [SQLITE, SERVER, PORT, USERNAME, PASSWORD, DBNAME, ENCODING]
 
     ###########################################################################
     # Backup

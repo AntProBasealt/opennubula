@@ -331,7 +331,7 @@ class DatacenterFolder
         { vcenter_instance_name => template_objects }
     end
 
-    def get_unimported_networks(npool,vcenter_instance_name, hpool)
+    def get_unimported_networks(npool,vcenter_instance_name, hpool, args)
         vcenter_uuid = get_vcenter_instance_uuid
         pc = @vi_client.vim.serviceContent.propertyCollector
 
@@ -373,18 +373,34 @@ class DatacenterFolder
 
             next if exist
 
+            if args[:filter]
+                # Exclude networks without hosts
+                next if r.obj['host'].empty?
+
+                # Exclude DVS uplinks
+                unless r.obj['tag'].empty?
+                    next if r.obj['tag'][0][:key] == 'SYSTEM/DVS.UPLINKPG'
+                end
+                # Exclude NSX uplinks
+                next if r.obj['name'].match(/^vxw-vmknicPg-dvs-(.*)/)
+            end
+
             networks[r.obj._ref] = r.to_hash if r.obj.is_a?(RbVmomi::VIM::DistributedVirtualPortgroup) || r.obj.is_a?(RbVmomi::VIM::Network) || r.obj.is_a?(RbVmomi::VIM::OpaqueNetwork)
 
             if r.obj.is_a?(RbVmomi::VIM::DistributedVirtualPortgroup)
-                networks[r.obj._ref][:network_type] = "Distributed Port Group"
-            elsif r.obj.is_a?(RbVmomi::VIM::Network)
-                networks[r.obj._ref][:network_type] = "Port Group"
+                # Here can be NETWORK_TYPE_DPG or NETWORK_TYPE_NSXV
+                if r['name'].match(/^vxw-dvs-(.*)-virtualwire-(.*)-sid-(.*)/)
+                    networks[r.obj._ref][:network_type] = VCenterDriver::Network::NETWORK_TYPE_NSXV
+                else
+                    networks[r.obj._ref][:network_type] = VCenterDriver::Network::NETWORK_TYPE_DPG
+                end
             elsif r.obj.is_a?(RbVmomi::VIM::OpaqueNetwork)
-                networks[r.obj._ref][:network_type] = "Opaque Network"
+                networks[r.obj._ref][:network_type] = VCenterDriver::Network::NETWORK_TYPE_NSXT
+            elsif r.obj.is_a?(RbVmomi::VIM::Network)
+                networks[r.obj._ref][:network_type] = VCenterDriver::Network::NETWORK_TYPE_PG
             else
-                networks[r.obj._ref][:network_type] = "Unknown Network"
+                networks[r.obj._ref][:network_type] = VCenterDriver::Network::NETWORK_TYPE_UNKNOWN
             end
-            # networks[r.obj._ref][:network_type] = r.obj.is_a?(RbVmomi::VIM::DistributedVirtualPortgroup) ? "Distributed Port Group" : "Port Group"
             networks[r.obj._ref][:uplink] = false
             networks[r.obj._ref][:processed] = false
 
@@ -437,6 +453,7 @@ class DatacenterFolder
 
                         networks[s.portgroupKey][:uplink] = s.uplinkPortgroup
                         networks[s.portgroupKey][:processed] = true
+                        networks[s.portgroupKey][:sw_name] = s.switchName
                     end
                 end
                 clusters[r.obj._ref] = r.to_hash if r.obj.is_a?(RbVmomi::VIM::ClusterComputeResource)
@@ -466,6 +483,28 @@ class DatacenterFolder
                 one_cluster = VCenterDriver::ClusterComputeResource.new_from_ref(ref, @vi_client)
                 location = VCenterDriver::VIHelper.get_location(one_cluster.item)
 
+                one_cluster['host'].each do |host|
+                    begin
+                        esx_host = VCenterDriver::ESXHost.new_from_ref(host._ref, @vi_client)
+                        esx_host.lock
+
+                        pg_inside = esx_host.get_pg_inside
+
+                        networks.each {|ref, n|
+                            next if networks[ref][:sw_name]
+                            pg_inside.each do |vswitch, network_names|
+                                network_names.each do |name|
+                                    if n['name'] == name
+                                        networks[ref][:sw_name] = vswitch
+                                    end
+                                end
+                            end
+                        }
+                    ensure
+                        esx_host.unlock if esx_host
+                    end
+                end
+
                 network_obj = info['network']
                 cname = info['name']
 
@@ -487,6 +526,7 @@ class DatacenterFolder
                         opts[:network_name] = networks[network_ref]['name']
                         opts[:network_ref]  = network_ref
                         opts[:network_type] = networks[network_ref][:network_type]
+                        opts[:sw_name] = networks[network_ref][:sw_name]
 
                         networks[network_ref] = networks[network_ref].merge(VCenterDriver::Network.to_one_template(opts))
                     else
@@ -681,11 +721,47 @@ class Datacenter
     # Check if distributed port group exists in datacenter
     ########################################################################
     def dpg_exists(pg_name, net_folder)
-
         return net_folder.items.values.select{ |dpg|
             dpg.instance_of?(VCenterDriver::DistributedPortGroup) &&
             dpg['name'] == pg_name
         }.first rescue nil
+    end
+
+    ########################################################################
+    # Check if Opaque Network exists in datacenter
+    ########################################################################
+    def nsx_network(nsx_id, pgType)
+        timeout = 180
+        if pgType == VCenterDriver::Network::NETWORK_TYPE_NSXT
+            while timeout > 0
+                netFolder = self.network_folder
+                netFolder.fetch!
+                netFolder.items.values.each{ |net|
+                    if net.instance_of?(VCenterDriver::OpaqueNetwork) &&
+                      net.item.summary.opaqueNetworkId == nsx_id
+                        return net.item._ref
+                    end
+                }
+                sleep(1)
+                timeout -= 1
+            end
+        # Not used right now, but maybe neccesary in the future.
+        elsif pgType == VCenterDriver::Network::NETWORK_TYPE_NSXV
+            while timeout > 0
+                netFolder = self.network_folder
+                netFolder.fetch!
+                netFolder.items.values.each{ |net|
+                    if net.instance_of?(VCenterDriver::DistributedPortGroup) &&
+                      net.item.key == nsx_id
+                        return net.item._ref
+                    end
+                }
+                sleep(1)
+                timeout -= 1
+            end
+        else
+            raise "Unknown network Port Group type: #{pgType}"
+        end
     end
 
     ########################################################################

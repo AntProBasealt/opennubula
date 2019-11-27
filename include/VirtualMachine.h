@@ -37,6 +37,7 @@ using namespace std;
 
 class AuthRequest;
 class Snapshots;
+class HostShareCapacity;
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -226,7 +227,7 @@ public:
      *  Test if the VM has changed state since last time prev state was set
      *    @return true if VM changed state
      */
-    bool has_changed_state()
+    bool has_changed_state() const
     {
         return (prev_lcm_state != lcm_state || prev_state != state);
     }
@@ -293,7 +294,7 @@ public:
      *  Updates VM dynamic information (id).
      *   @param _deploy_id the VMM driver specific id
      */
-    void set_deploy_id (const string& _deploy_id)
+    void set_deploy_id(const string& _deploy_id)
     {
         deploy_id = _deploy_id;
     };
@@ -652,7 +653,7 @@ public:
      *  function MUST be called before this one.
      *    @return the action that closed the current history record
      */
-    const History::VMAction get_action() const
+    const VMActions::Action get_action() const
     {
         return history->action;
     };
@@ -661,7 +662,7 @@ public:
      *  Returns the action that closed the history record in the previous host
      *    @return the action that closed the history record in the previous host
      */
-    const History::VMAction get_previous_action() const
+    const VMActions::Action get_previous_action() const
     {
         return previous_history->action;
     };
@@ -670,7 +671,7 @@ public:
      *  Get host id where the VM is or is going to execute. The hasHistory()
      *  function MUST be called before this one.
      */
-    int get_hid()
+    int get_hid() const
     {
         return history->hid;
     }
@@ -679,7 +680,7 @@ public:
      *  Get host id where the VM was executing. The hasPreviousHistory()
      *  function MUST be called before this one.
      */
-    int get_previous_hid()
+    int get_previous_hid() const
     {
         return previous_history->hid;
     }
@@ -688,7 +689,7 @@ public:
      *  Get cluster id where the VM is or is going to execute. The hasHistory()
      *  function MUST be called before this one.
      */
-    int get_cid()
+    int get_cid() const
     {
         return history->cid;
     }
@@ -697,7 +698,7 @@ public:
      *  Get cluster id where the VM was executing. The hasPreviousHistory()
      *  function MUST be called before this one.
      */
-    int get_previous_cid()
+    int get_previous_cid() const
     {
         return previous_history->cid;
     }
@@ -708,7 +709,7 @@ public:
      */
     void set_stime(time_t _stime)
     {
-        history->stime=_stime;
+        history->stime = _stime;
     };
 
     /**
@@ -733,7 +734,7 @@ public:
      */
     void set_etime(time_t _etime)
     {
-        history->etime=_etime;
+        history->etime = _etime;
     };
 
     /**
@@ -742,7 +743,7 @@ public:
      */
     void set_previous_etime(time_t _etime)
     {
-        previous_history->etime=_etime;
+        previous_history->etime = _etime;
     };
 
     /**
@@ -751,7 +752,7 @@ public:
      */
     void set_prolog_stime(time_t _stime)
     {
-        history->prolog_stime=_stime;
+        history->prolog_stime = _stime;
     };
 
     /**
@@ -760,7 +761,7 @@ public:
      */
     void set_prolog_etime(time_t _etime)
     {
-        history->prolog_etime=_etime;
+        history->prolog_etime = _etime;
     };
 
     /**
@@ -769,13 +770,13 @@ public:
      */
     void set_running_stime(time_t _stime)
     {
-        history->running_stime=_stime;
+        history->running_stime = _stime;
     };
 
     /**
      *  Gets the running start time for the VM
      */
-    time_t get_running_stime()
+    time_t get_running_stime() const
     {
         return history->running_stime;
     }
@@ -786,7 +787,7 @@ public:
      */
     void set_running_etime(time_t _etime)
     {
-        history->running_etime=_etime;
+        history->running_etime = _etime;
     };
 
     /**
@@ -795,7 +796,7 @@ public:
      */
     void set_previous_running_etime(time_t _etime)
     {
-        previous_history->running_etime=_etime;
+        previous_history->running_etime = _etime;
     };
 
     /**
@@ -804,7 +805,7 @@ public:
      */
     void set_epilog_stime(time_t _stime)
     {
-        history->epilog_stime=_stime;
+        history->epilog_stime = _stime;
     };
 
     /**
@@ -813,14 +814,14 @@ public:
      */
     void set_epilog_etime(time_t _etime)
     {
-        history->epilog_etime=_etime;
+        history->epilog_etime = _etime;
     };
 
     /**
      *  Sets the action that closed the history record
      *    @param action that closed the history record
      */
-    void set_action(History::VMAction action, int uid, int gid, int req_id)
+    void set_action(VMActions::Action action, int uid, int gid, int req_id)
     {
         history->action = action;
 
@@ -830,7 +831,7 @@ public:
         history->req_id = req_id;
     };
 
-    void set_internal_action(History::VMAction action)
+    void set_internal_action(VMActions::Action action)
     {
         history->action = action;
 
@@ -842,7 +843,7 @@ public:
 
     void clear_action()
     {
-        history->action = History::NONE_ACTION;
+        history->action = VMActions::NONE_ACTION;
 
         history->uid = -1;
         history->gid = -1;
@@ -850,7 +851,7 @@ public:
         history->req_id = -1;
     }
 
-    void set_previous_action(History::VMAction action, int uid, int gid,int rid)
+    void set_previous_action(VMActions::Action action, int uid, int gid,int rid)
     {
         previous_history->action = action;
 
@@ -869,7 +870,7 @@ public:
      *  @param xml the resulting XML string
      *  @return a reference to the generated string
      */
-    string& to_xml(string& xml) const
+    string& to_xml(string& xml) const override
     {
         return to_xml_extended(xml, 1);
     }
@@ -899,12 +900,12 @@ public:
      *
      *    @return 0 on success, -1 otherwise
      */
-    int from_xml(const string &xml_str);
+    int from_xml(const string &xml_str) override;
 
     /**
      *  Factory method for virtual machine templates
      */
-    Template * get_new_template() const
+    Template * get_new_template() const override
     {
         return new VirtualMachineTemplate;
     }
@@ -928,7 +929,7 @@ public:
      *    @return 0 on success
      */
     int replace_template(const string& tmpl_str, bool keep_restricted,
-            string& error);
+            string& error) override;
 
     /**
      *  Append new attributes to the *user template*.
@@ -939,23 +940,23 @@ public:
      *    @return 0 on success
      */
     int append_template(const string& tmpl_str, bool keep_restricted,
-            string& error);
+            string& error) override;
 
     /**
      *  This function gets an attribute from the user template
      *    @param name of the attribute
      *    @param value of the attribute
      */
-    void get_user_template_attribute(const char * name, string& value) const
+    void get_user_template_attribute(const string& name, string& value) const
     {
-        user_obj_template->get(name,value);
+        user_obj_template->get(name, value);
     }
 
     /**
      *  Sets an error message with timestamp in the template
      *    @param message Message string
      */
-    void set_template_error_message(const string& message);
+    void set_template_error_message(const string& message) override;
 
     /**
      *  Sets an error message with timestamp in the template
@@ -967,7 +968,7 @@ public:
     /**
      *  Deletes the error message from the template
      */
-    void clear_template_error_message();
+    void clear_template_error_message() override;
 
     /**
      *  Sets an error message with timestamp in the template (ERROR_MONITOR)
@@ -1011,14 +1012,10 @@ public:
     };
 
     /**
-     *  Get the VM physical requirements for the host.
-     *    @param cpu
-     *    @param memory
-     *    @param disk
-     *    @param pci_dev
+     *  Get the VM physical capacity requirements for the host.
+     *    @param sr the HostShareCapacity to store the capacity request.
      */
-    void get_requirements(int& cpu, int& memory, int& disk,
-            vector<VectorAttribute *>& pci_dev);
+    void get_capacity(HostShareCapacity &sr) const;
 
     /**
      * Adds automatic placement requirements: Datastore and Cluster
@@ -1034,26 +1031,26 @@ public:
     }
 
     /**
-     *  Checks if the resize parameters are valid
-     *    @param cpu New CPU. 0 means unchanged.
-     *    @param memory New MEMORY. 0 means unchanged.
-     *    @param vcpu New VCPU. 0 means unchanged.
-     *    @param error_str Error reason, if any
-     *
-     *    @return 0 on success
-     */
-     int check_resize(float cpu, long int memory, int vcpu, string& error_str);
-
-    /**
      *  Resize the VM capacity
      *    @param cpu
      *    @param memory
      *    @param vcpu
-     *    @param error_str Error reason, if any
-     *
-     *    @return 0 on success
      */
-     int resize(float cpu, long int memory, int vcpu, string& error_str);
+     int resize(float cpu, long int memory, unsigned int vcpu, string& error);
+
+    /**
+     *  Parse TOPOLOGY and NUMA_NODE
+     *    @param tmpl template of the virtual machine
+     *    @param error if any
+     *
+     *    @return 0 on sucess
+     */
+    static int parse_topology(Template * tmpl, std::string &error);
+
+    /**
+     *  @return true if the VM is being deployed with a pinned policy
+     */
+    bool is_pinned() const;
 
     // ------------------------------------------------------------------------
     // Virtual Machine Disks
@@ -1135,14 +1132,14 @@ public:
     /**
      *  Return state of the VM right before import
      */
-    string get_import_state();
+    string get_import_state() const;
 
     /**
      * Checks if the current VM MAD supports the given action for imported VMs
      * @param action VM action to check
      * @return true if the current VM MAD supports the given action for imported VMs
      */
-    bool is_imported_action_supported(History::VMAction action) const;
+    bool is_imported_action_supported(VMActions::Action action) const;
 
     // ------------------------------------------------------------------------
     // Virtual Router related functions
@@ -1151,13 +1148,13 @@ public:
      * Returns the Virtual Router ID if this VM is a VR, or -1
      * @return VR ID or -1
      */
-    int get_vrouter_id();
+    int get_vrouter_id() const;
 
     /**
      * Returns true if this VM is a Virtual Router
      * @return true if this VM is a Virtual Router
      */
-    bool is_vrouter();
+    bool is_vrouter() const;
 
     // ------------------------------------------------------------------------
     // Context related functions
@@ -1196,7 +1193,7 @@ public:
      *    @param err description if any
      *    @return template with the attributes
      */
-    VirtualMachineTemplate * get_updateconf_template();
+    VirtualMachineTemplate * get_updateconf_template() const;
 
     // -------------------------------------------------------------------------
     // "Save as" Disk related functions (save_as hot)
@@ -1267,7 +1264,7 @@ public:
      *    @return -1 if failure
      */
     int get_saveas_disk(int& disk_id, string& source, int& image_id,
-            string& snap_id, string& tm_mad, string& ds_id)
+            string& snap_id, string& tm_mad, string& ds_id) const
     {
         return disks.get_saveas_info(disk_id, source, image_id, snap_id,
                 tm_mad, ds_id);
@@ -1306,7 +1303,7 @@ public:
      *
      * @return the disk waiting for an attachment action, or 0
      */
-    VirtualMachineDisk * get_attach_disk()
+    VirtualMachineDisk * get_attach_disk() const
     {
         return disks.get_attach();
     }
@@ -1356,7 +1353,7 @@ public:
      *
      * @return the disk or 0 if not found
      */
-    VirtualMachineDisk * get_resize_disk()
+    VirtualMachineDisk * get_resize_disk() const
     {
         return disks.get_resize();
     }
@@ -1456,7 +1453,7 @@ public:
 
         one_util::split_unique(nic->vector_value("ALIAS_IDS"), ',', a_ids);
 
-        for(std::set<int>::iterator it = a_ids.begin(); it != a_ids.end(); it++)
+        for (std::set<int>::iterator it = a_ids.begin(); it != a_ids.end(); it++)
         {
             VirtualMachineNic * nic_a = nics.delete_nic(*it);
 
@@ -1555,7 +1552,7 @@ public:
      *    @param snap_id of the snapshot
      */
     int get_snapshot_disk(int& ds_id, string& tm_mad, int& disk_id,
-            int& snap_id)
+            int& snap_id) const
     {
         return disks.get_active_snapshot(ds_id, tm_mad, disk_id, snap_id);
     }
@@ -1606,7 +1603,7 @@ public:
     /**
      *  @return the on-going ACTION associated to the ACTIVE snapshot
      */
-    string get_snapshot_action();
+    string get_snapshot_action() const;
 
     /**
      * Replaces HYPERVISOR_ID for the active SNAPSHOT
@@ -2038,11 +2035,11 @@ private:
      *  netowrking updates.
      *    @param context attribute of the VM
      *    @param error string if any
-     *    @param  only_auto boolean to generate context only for vnets 
+     *    @param  only_auto boolean to generate context only for vnets
      *            with NETWORK_MODE = auto
      *    @return 0 on success
      */
-    int generate_network_context(VectorAttribute * context, string& error, 
+    int generate_network_context(VectorAttribute * context, string& error,
             bool only_auto);
 
     /**
@@ -2186,6 +2183,16 @@ private:
      */
     int parse_sched_action(string& error_str);
 
+    /**
+     *  Encrypt all secret attributes
+     */
+    virtual void encrypt() override;
+
+    /**
+     *  Decrypt all secret attributes
+     */
+    virtual void decrypt() override;
+
 protected:
 
     //**************************************************************************
@@ -2229,21 +2236,21 @@ protected:
      *    @param db pointer to the db
      *    @return 0 on success
      */
-    int select(SqlDB * db);
+    int select(SqlDB * db) override;
 
     /**
      *  Writes the Virtual Machine and its associated template in the database.
      *    @param db pointer to the db
      *    @return 0 on success
      */
-    int insert(SqlDB * db, string& error_str);
+    int insert(SqlDB * db, string& error_str) override;
 
     /**
      *  Writes/updates the Virtual Machine data fields in the database.
      *    @param db pointer to the db
      *    @return 0 on success
      */
-    int update(SqlDB * db)
+    int update(SqlDB * db) override
     {
         string error_str;
         return insert_replace(db, true, error_str);
@@ -2254,7 +2261,7 @@ protected:
      *   @param db pointer to the db
      *   @return -1
      */
-    int drop(SqlDB * db)
+    int drop(SqlDB * db) override
     {
         NebulaLog::log("ONE",Log::ERROR, "VM Drop not implemented!");
         return -1;

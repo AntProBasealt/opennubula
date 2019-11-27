@@ -46,7 +46,14 @@ class NetworkFolder
             item_name = item._ref
             @items[item_name.to_sym] = DistributedVirtualSwitch.new(item)
         end
+
+        VIClient.get_entities(@item, "OpaqueNetwork").each do |item|
+            item_name = item._ref
+            @items[item_name.to_sym] = OpaqueNetwork.new(item)
+        end
     end
+
+    
 
     ########################################################################
     # Returns a Network. Uses the cache if available.
@@ -67,6 +74,12 @@ class Network
     attr_accessor :item
 
     include Memoize
+
+    NETWORK_TYPE_PG = "Port Group"
+    NETWORK_TYPE_DPG = "Distributed Port Group"
+    NETWORK_TYPE_NSXV = "NSX-V" #"Virtual Wire"
+    NETWORK_TYPE_NSXT = "Opaque Network"
+    NETWORK_TYPE_UNKNOWN = "Unknown Network"
 
     def initialize(item, vi_client=nil)
         begin
@@ -126,6 +139,7 @@ class Network
         network_name          = opts[:network_name]
         network_ref           = opts[:network_ref]
         network_type          = opts[:network_type]
+        sw_name               = opts[:sw_name]
 
         vcenter_uuid          = opts[:vcenter_uuid]
         vcenter_instance_name = opts[:vcenter_instance_name]
@@ -151,12 +165,12 @@ class Network
         one_tmp[:ref]  = network_ref
 
         one_tmp[:one] = to_one(network_import_name, bridge_name, network_ref, network_type,
-                               vcenter_uuid, unmanaged, template_ref, dc_ref, template_id)
+                               vcenter_uuid, unmanaged, template_ref, dc_ref, template_id, sw_name)
         return one_tmp
     end
 
     def self.to_one(network_import_name, network_name, network_ref, network_type,
-                    vcenter_uuid, unmanaged, template_ref, dc_ref, template_id)
+                    vcenter_uuid, unmanaged, template_ref, dc_ref, template_id, sw_name)
 
         template = "NAME=\"#{network_import_name}\"\n"\
                    "BRIDGE=\"#{network_name}\"\n"\
@@ -171,6 +185,8 @@ class Network
         end
 
         template += "VCENTER_TEMPLATE_REF=\"#{template_ref}\"\n" if template_ref
+
+        template += "VCENTER_SWITCH_NAME=\"#{sw_name}\"\n" if sw_name
 
         return template
     end
@@ -209,13 +225,14 @@ class Network
         netString = network.class.to_s
         case netString
         when "DistributedVirtualPortgroup"
-            return "Distributed Port Group"
-        when "Network"
-            return "Port Group"
+            return VCenterDriver::Network::NETWORK_TYPE_DPG
         when "OpaqueNetwork"
-            return "Opaque Network"
+            return VCenterDriver::Network::NETWORK_TYPE_NSXT
+        when "Network"
+            return VCenterDriver::Network::NETWORK_TYPE_PG
+
         else 
-            return "Network not defined" 
+            return "Network not defined"
         end
     end
 
@@ -258,7 +275,7 @@ class PortGroup < Network
     end
 
     def network_type
-        "Port Group"
+        VCenterDriver::Network::NETWORK_TYPE_PG
     end
 end # class PortGroup
 
@@ -286,7 +303,7 @@ class DistributedPortGroup < Network
     end
 
     def network_type
-        "Distributed Port Group"
+        VCenterDriver::Network::NETWORK_TYPE_DPG
     end
 end # class DistributedPortGroup
 
@@ -312,7 +329,7 @@ class OpaqueNetwork < Network
     end
 
     def network_type
-        "Opaque Network"
+        VCenterDriver::Network::NETWORK_TYPE_NSXT
     end
 end # class OpaqueNetwork
 
@@ -350,7 +367,7 @@ class NetImporter < VCenterDriver::VcImporter
             raise "Could not get OpenNebula HostPool: #{hpool.message}"
         end
 
-        rs = dc_folder.get_unimported_networks(npool, @vi_client.vc_name,hpool)
+        rs = dc_folder.get_unimported_networks(npool, @vi_client.vc_name,hpool, args)
 		@list = rs
     end
 
@@ -399,6 +416,27 @@ class NetImporter < VCenterDriver::VcImporter
 
         net = VCenterDriver::Network.new_from_ref(selected[:ref], @vi_client)
         vid = VCenterDriver::Network.retrieve_vlanid(net.item) if net
+
+        # If type is NSX we need to update values
+        if selected[:type] == VCenterDriver::Network::NETWORK_TYPE_NSXV
+            host_id = @vi_client.instance_variable_get '@host_id'
+            nsx_client = NSXDriver::NSXClient.new_from_id(host_id)
+            nsx_net = NSXDriver::VirtualWire
+                      .new_from_name(nsx_client, selected[:name])
+            selected[:one] << "NSX_ID=\"#{nsx_net.ls_id}\"\n"
+            selected[:one] << "NSX_VNI=\"#{nsx_net.ls_vni}\"\n"
+            selected[:one] << "NSX_TZ_ID=\"#{nsx_net.tz_id}\"\n"
+        end
+
+        if selected[:type] == VCenterDriver::Network::NETWORK_TYPE_NSXT
+            host_id = @vi_client.instance_variable_get '@host_id'
+            nsx_client = NSXDriver::NSXClient.new_from_id(host_id)
+            nsx_net = NSXDriver::OpaqueNetwork
+                      .new_from_name(nsx_client, selected[:name])
+            selected[:one] << "NSX_ID=\"#{nsx_net.ls_id}\"\n"
+            selected[:one] << "NSX_VNI=\"#{nsx_net.ls_vni}\"\n"
+            selected[:one] << "NSX_TZ_ID=\"#{nsx_net.tz_id}\"\n"
+        end
 
         if vid
             vlanid = VCenterDriver::Network.vlanid(vid)

@@ -18,28 +18,31 @@ package goca
 
 import (
 	"testing"
+
+	dyn "github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/template"
+
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 )
 
 // Helper to create a template
-func createTemplate(t *testing.T) (*Template, uint) {
+func createTemplate(t *testing.T) (*template.Template, int) {
 	templateName := GenName("template")
 
 	// Create template
-	tpl := NewTemplateBuilder()
+	tpl := vm.NewTemplate()
+	tpl.Add(keys.Name, templateName)
+	tpl.CPU(1).Memory(64)
 
-	tpl.AddValue("name", templateName)
-	tpl.AddValue("cpu", 1)
-	tpl.AddValue("memory", "64")
-
-	id, err := CreateTemplate(tpl.String())
+	id, err := testCtrl.Templates().Create(tpl.String())
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	// Get template by ID
-	template := NewTemplate(id)
+	template, err := testCtrl.Template(id).Info(false, false)
 
-	err = template.Info()
 	if err != nil {
 		t.Error(err)
 	}
@@ -59,12 +62,12 @@ func TestTemplateCreateAndDelete(t *testing.T) {
 
 	// Get template by Name
 	name := template.Name
-	template, err = NewTemplateFromName(name)
+	id, err := testCtrl.Templates().ByName(name)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = template.Info()
+	template, err = testCtrl.Template(id).Info(false, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -75,7 +78,7 @@ func TestTemplateCreateAndDelete(t *testing.T) {
 	}
 
 	// Delete template
-	err = template.Delete()
+	err = testCtrl.Template(id).Delete()
 	if err != nil {
 		t.Error(err)
 	}
@@ -85,51 +88,53 @@ func TestTemplateInstantiate(t *testing.T) {
 	templateName := GenName("template")
 
 	// Create template
-	tpl := NewTemplateBuilder()
+	tpl := vm.NewTemplate()
+	tpl.Add(keys.Name, templateName)
+	tpl.CPU(1).Memory(64)
 
-	tpl.AddValue("name", templateName)
-	tpl.AddValue("cpu", 1)
-	tpl.AddValue("memory", "64")
-
-	id, err := CreateTemplate(tpl.String())
+	id, err := testCtrl.Templates().Create(tpl.String())
 	if err != nil {
 		t.Error(err)
 	}
 
 	// Get template by ID
-	template := NewTemplate(id)
+	templateC := testCtrl.Template(id)
 
 	// Instantiate(name string, pending bool, extra string) (uint, error)
-	vmid, err := template.Instantiate("", false, "", false)
+	vmid, err := templateC.Instantiate("", false, "", false)
 	if err != nil {
 		t.Error(err)
 	}
 
-	vm := NewVM(vmid)
-	vm.Terminate()
+	err = testCtrl.VM(vmid).Terminate()
+	if err != nil {
+		t.Error(err)
+	}
 
 	// Delete template
-	err = template.Delete()
+	err = templateC.Delete()
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestTemplateUpdate(t *testing.T) {
-	template, _ := createTemplate(t)
 
-	tpl := NewTemplateBuilder()
-	tpl.AddValue("A", "B")
+	template, _ := createTemplate(t)
+	templateCtrl := testCtrl.Template(template.ID)
+
+	tpl := dyn.NewTemplate()
+	tpl.AddPair("A", "B")
 
 	// Update
-	template.Update(tpl.String(), 1)
+	templateCtrl.Update(tpl.String(), 1)
 
-	err := template.Info()
+	template, err := templateCtrl.Info(false, false)
 	if err != nil {
 		t.Error(err)
 	}
 
-	val, err := template.Template.Dynamic.GetContentByName("A")
+	val, err := template.Template.GetStr("A")
 	if err != nil {
 		t.Errorf("Test failed, can't retrieve '%s', error: %s", "A", err.Error())
 	} else {
@@ -139,7 +144,7 @@ func TestTemplateUpdate(t *testing.T) {
 	}
 
 	// Delete template
-	err = template.Delete()
+	err = templateCtrl.Delete()
 	if err != nil {
 		t.Error(err)
 	}

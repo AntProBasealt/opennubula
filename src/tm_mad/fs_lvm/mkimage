@@ -64,7 +64,7 @@ DEV="/dev/${VG_NAME}/${LV_NAME}"
 # Execute lvcreate with a lock in the frontend
 CREATE_CMD=$(cat <<EOF
     set -e -o pipefail
-    $SUDO $SYNC
+    $SYNC
     $SUDO $LVSCAN
     $SUDO $LVCREATE --wipesignatures n -L${SIZE}M -n $LV_NAME $VG_NAME
 EOF
@@ -84,7 +84,7 @@ MKIMAGE_CMD=$(cat <<EOF
 
     # zero the volume
     if [ "${ZERO_LVM_ON_CREATE}" = "yes" ]; then
-        ${DD} if=/dev/zero of="${DEV}" bs=64k || :
+        ${DD} if=/dev/zero of="${DEV}" bs=${DD_BLOCK_SIZE:-64k} || :
     fi
 
     [ "$FSTYPE" = "swap" ] && mkswap ${DEV}

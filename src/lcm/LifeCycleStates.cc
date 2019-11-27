@@ -22,8 +22,7 @@
 
 void LifeCycleManager::start_prolog_migrate(VirtualMachine* vm)
 {
-    int    cpu, mem, disk;
-    vector<VectorAttribute *> pci;
+    HostShareCapacity sr;
 
     time_t the_time = time(0);
 
@@ -52,12 +51,13 @@ void LifeCycleManager::start_prolog_migrate(VirtualMachine* vm)
 
     vmpool->update_history(vm);
 
-    vm->get_requirements(cpu, mem, disk, pci);
+    vmpool->update(vm);
+
+    vm->get_capacity(sr);
 
     if ( vm->get_hid() != vm->get_previous_hid() )
     {
-        hpool->del_capacity(vm->get_previous_hid(), vm->get_oid(), cpu, mem,
-            disk, pci);
+        hpool->del_capacity(vm->get_previous_hid(), sr);
     }
 
     vmpool->update(vm);
@@ -69,58 +69,57 @@ void LifeCycleManager::start_prolog_migrate(VirtualMachine* vm)
 
 void LifeCycleManager::revert_migrate_after_failure(VirtualMachine* vm)
 {
-        int    cpu, mem, disk;
-        vector<VectorAttribute *> pci;
+    HostShareCapacity sr;
 
-        time_t the_time = time(0);
+    time_t the_time = time(0);
 
-        //----------------------------------------------------
-        //           RUNNING STATE FROM SAVE_MIGRATE
-        //----------------------------------------------------
+    //----------------------------------------------------
+    //           RUNNING STATE FROM SAVE_MIGRATE
+    //----------------------------------------------------
 
-        vm->set_state(VirtualMachine::RUNNING);
+    vm->set_state(VirtualMachine::RUNNING);
 
-        vm->set_etime(the_time);
+    vm->set_etime(the_time);
 
-        vm->set_vm_info();
+    vm->set_vm_info();
 
-        vmpool->update_history(vm);
+    vmpool->update_history(vm);
 
-        vm->get_requirements(cpu, mem, disk, pci);
+    vm->get_capacity(sr);
 
-        if ( vm->get_hid() != vm->get_previous_hid() )
-        {
-            hpool->del_capacity(vm->get_hid(), vm->get_oid(), cpu, mem, disk, pci);
-        }
+    if ( vm->get_hid() != vm->get_previous_hid() )
+    {
+        hpool->del_capacity(vm->get_hid(), sr);
+    }
 
-        vm->set_previous_etime(the_time);
+    vm->set_previous_etime(the_time);
 
-        vm->set_previous_vm_info();
+    vm->set_previous_vm_info();
 
-        vm->set_previous_running_etime(the_time);
+    vm->set_previous_running_etime(the_time);
 
-        vmpool->update_previous_history(vm);
+    vmpool->update_previous_history(vm);
 
-        // --- Add new record by copying the previous one
+    // --- Add new record by copying the previous one
 
-        vm->cp_previous_history();
+    vm->cp_previous_history();
 
-        vm->set_stime(the_time);
+    vm->set_stime(the_time);
 
-        vm->set_running_stime(the_time);
+    vm->set_running_stime(the_time);
 
-        vm->set_last_poll(0);
+    vm->set_last_poll(0);
 
-        vmpool->insert_history(vm);
+    vmpool->insert_history(vm);
 
-        vmpool->update(vm);
+    vmpool->update(vm);
 
-        vm->log("LCM", Log::INFO, "Fail to save VM state while migrating."
-                " Assuming that the VM is still RUNNING (will poll VM).");
+    vm->log("LCM", Log::INFO, "Fail to save VM state while migrating."
+            " Assuming that the VM is still RUNNING (will poll VM).");
 
-        //----------------------------------------------------
+    //----------------------------------------------------
 
-        vmm->trigger(VMMAction::POLL,vm->get_oid());
+    vmm->trigger(VMMAction::POLL,vm->get_oid());
 }
 
 /* -------------------------------------------------------------------------- */
@@ -133,7 +132,7 @@ void  LifeCycleManager::save_success_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -217,7 +216,7 @@ void  LifeCycleManager::save_failure_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -265,7 +264,7 @@ void  LifeCycleManager::deploy_success_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -276,8 +275,7 @@ void  LifeCycleManager::deploy_success_action(int vid)
 
     if ( vm->get_lcm_state() == VirtualMachine::MIGRATE )
     {
-        int    cpu,mem,disk;
-        vector<VectorAttribute *> pci;
+        HostShareCapacity sr;
 
         time_t the_time = time(0);
 
@@ -295,9 +293,9 @@ void  LifeCycleManager::deploy_success_action(int vid)
 
         vmpool->update_previous_history(vm);
 
-        vm->get_requirements(cpu, mem, disk, pci);
+        vm->get_capacity(sr);
 
-        hpool->del_capacity(vm->get_previous_hid(),vm->get_oid(),cpu,mem,disk,pci);
+        hpool->del_capacity(vm->get_previous_hid(), sr);
 
         vm->set_state(VirtualMachine::RUNNING);
 
@@ -346,7 +344,7 @@ void  LifeCycleManager::deploy_failure_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -355,8 +353,7 @@ void  LifeCycleManager::deploy_failure_action(int vid)
 
     if ( vm->get_lcm_state() == VirtualMachine::MIGRATE )
     {
-        int    cpu, mem, disk;
-        vector<VectorAttribute *> pci;
+        HostShareCapacity sr;
 
         time_t the_time = time(0);
 
@@ -380,9 +377,9 @@ void  LifeCycleManager::deploy_failure_action(int vid)
 
         vmpool->update_previous_history(vm);
 
-        vm->get_requirements(cpu, mem, disk, pci);
+        vm->get_capacity(sr);
 
-        hpool->del_capacity(vm->get_hid(), vm->get_oid(), cpu, mem, disk, pci);
+        hpool->del_capacity(vm->get_hid(), sr);
 
         // --- Add new record by copying the previous one
 
@@ -479,7 +476,7 @@ void  LifeCycleManager::shutdown_success_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -585,7 +582,7 @@ void  LifeCycleManager::shutdown_failure_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -638,7 +635,7 @@ void LifeCycleManager::prolog_success_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -676,8 +673,8 @@ void LifeCycleManager::prolog_success_action(int vid)
 
                 case VirtualMachine::PROLOG_MIGRATE:
                 case VirtualMachine::PROLOG_MIGRATE_FAILURE: //recover success
-                    if (vm->get_action() == History::POFF_MIGRATE_ACTION ||
-                          vm->get_action() == History::POFF_HARD_MIGRATE_ACTION)
+                    if (vm->get_action() == VMActions::POFF_MIGRATE_ACTION ||
+                          vm->get_action() == VMActions::POFF_HARD_MIGRATE_ACTION)
                     {
                         action = VMMAction::DEPLOY;
                         vm->set_state(VirtualMachine::BOOT);
@@ -765,19 +762,18 @@ void LifeCycleManager::prolog_success_action(int vid)
 
 void  LifeCycleManager::prolog_failure_action(int vid)
 {
-    int cpu, mem, disk;
-    vector<VectorAttribute *> pci;
+    HostShareCapacity sr;
 
     time_t t = time(0);
 
     VirtualMachine * vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
 
-    switch(vm->get_lcm_state())
+    switch (vm->get_lcm_state())
     {
         case VirtualMachine::PROLOG:
             vm->set_state(VirtualMachine::PROLOG_FAILURE);
@@ -846,9 +842,9 @@ void  LifeCycleManager::prolog_failure_action(int vid)
                     break;
             }
 
-            vm->get_requirements(cpu, mem, disk, pci);
+            vm->get_capacity(sr);
 
-            hpool->del_capacity(vm->get_hid(), vm->get_oid(), cpu,mem,disk,pci);
+            hpool->del_capacity(vm->get_hid(), sr);
 
             // Clone previous history record into a new one
             vm->cp_previous_history();
@@ -857,7 +853,7 @@ void  LifeCycleManager::prolog_failure_action(int vid)
             vm->set_prolog_stime(t);
             vm->set_last_poll(0);
 
-            hpool->add_capacity(vm->get_hid(),vm->get_oid(),cpu,mem,disk,pci);
+            hpool->add_capacity(vm->get_hid(), sr);
 
             vmpool->insert_history(vm);
 
@@ -886,11 +882,11 @@ void  LifeCycleManager::prolog_failure_action(int vid)
 
 void  LifeCycleManager::epilog_success_action(int vid)
 {
-    VirtualMachine *    vm;
-    vector<VectorAttribute *> pci;
+    VirtualMachine * vm;
+
+    HostShareCapacity sr;
 
     time_t the_time = time(0);
-    int    cpu,mem,disk;
     unsigned int port;
 
     VirtualMachine::LcmState state;
@@ -898,7 +894,7 @@ void  LifeCycleManager::epilog_success_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -960,7 +956,7 @@ void  LifeCycleManager::epilog_success_action(int vid)
     VectorAttribute * graphics = vm->get_template_attribute("GRAPHICS");
 
     //Do not free VNC ports for STOP as it is stored in checkpoint file
-    if ( graphics != 0 && (graphics->vector_value("PORT", port) == 0) &&
+    if ( graphics != nullptr && (graphics->vector_value("PORT", port) == 0) &&
           state != VirtualMachine::EPILOG_STOP )
     {
         graphics->remove("PORT");
@@ -971,9 +967,9 @@ void  LifeCycleManager::epilog_success_action(int vid)
 
     vmpool->update(vm);
 
-    vm->get_requirements(cpu, mem, disk, pci);
+    vm->get_capacity(sr);
 
-    hpool->del_capacity(vm->get_hid(), vm->get_oid(), cpu, mem, disk, pci);
+    hpool->del_capacity(vm->get_hid(), sr);
 
     //----------------------------------------------------
 
@@ -995,7 +991,7 @@ void  LifeCycleManager::cleanup_callback_action(int vid)
 
     vm = vmpool->get_ro(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1028,7 +1024,7 @@ void  LifeCycleManager::epilog_failure_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1078,7 +1074,7 @@ void  LifeCycleManager::monitor_suspend_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1109,7 +1105,7 @@ void  LifeCycleManager::monitor_suspend_action(int vid)
 
         vm->set_vm_info();
 
-        vm->set_internal_action(History::MONITOR_ACTION);
+        vm->set_internal_action(VMActions::MONITOR_ACTION);
 
         vmpool->update_history(vm);
 
@@ -1136,7 +1132,7 @@ void  LifeCycleManager::monitor_done_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1169,7 +1165,7 @@ void  LifeCycleManager::monitor_poweroff_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1202,7 +1198,7 @@ void  LifeCycleManager::monitor_poweroff_action(int vid)
 
         vm->set_vm_info();
 
-        vm->set_internal_action(History::MONITOR_ACTION);
+        vm->set_internal_action(VMActions::MONITOR_ACTION);
 
         vmpool->update_history(vm);
 
@@ -1212,7 +1208,8 @@ void  LifeCycleManager::monitor_poweroff_action(int vid)
 
         dm->trigger(DMAction::POWEROFF_SUCCESS,vid);
 
-    } else if ( vm->get_lcm_state() == VirtualMachine::SHUTDOWN ||
+    }
+    else if ( vm->get_lcm_state() == VirtualMachine::SHUTDOWN ||
                 vm->get_lcm_state() == VirtualMachine::SHUTDOWN_POWEROFF ||
                 vm->get_lcm_state() == VirtualMachine::SHUTDOWN_UNDEPLOY )
     {
@@ -1233,7 +1230,7 @@ void  LifeCycleManager::monitor_poweron_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1303,7 +1300,7 @@ void LifeCycleManager::attach_success_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1344,7 +1341,7 @@ void LifeCycleManager::attach_failure_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1358,7 +1355,7 @@ void LifeCycleManager::attach_failure_action(int vid)
 
         vm = vmpool->get(vid);
 
-        if ( vm == 0 )
+        if ( vm == nullptr )
         {
             return;
         }
@@ -1394,7 +1391,7 @@ void LifeCycleManager::detach_success_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1408,7 +1405,7 @@ void LifeCycleManager::detach_success_action(int vid)
 
         vm = vmpool->get(vid);
 
-        if ( vm == 0 )
+        if ( vm == nullptr )
         {
             return;
         }
@@ -1445,7 +1442,7 @@ void LifeCycleManager::detach_failure_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1484,7 +1481,7 @@ void LifeCycleManager::snapshot_create_success(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1514,7 +1511,7 @@ void LifeCycleManager::snapshot_create_failure(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1547,7 +1544,7 @@ void LifeCycleManager::snapshot_revert_success(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1585,7 +1582,7 @@ void LifeCycleManager::snapshot_delete_success(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1615,7 +1612,7 @@ void LifeCycleManager::snapshot_delete_failure(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1645,7 +1642,7 @@ void LifeCycleManager::attach_nic_success_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1676,7 +1673,7 @@ void LifeCycleManager::attach_nic_failure_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1689,7 +1686,7 @@ void LifeCycleManager::attach_nic_failure_action(int vid)
 
         vm = vmpool->get(vid);
 
-        if ( vm == 0 )
+        if ( vm == nullptr )
         {
             return;
         }
@@ -1716,7 +1713,7 @@ void LifeCycleManager::detach_nic_success_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1729,7 +1726,7 @@ void LifeCycleManager::detach_nic_success_action(int vid)
 
         vm = vmpool->get(vid);
 
-        if ( vm == 0 )
+        if ( vm == nullptr )
         {
             return;
         }
@@ -1757,7 +1754,7 @@ void LifeCycleManager::detach_nic_failure_action(int vid)
 
     vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1792,7 +1789,7 @@ void LifeCycleManager::saveas_success_action(int vid)
 
     VirtualMachine * vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1823,7 +1820,7 @@ void LifeCycleManager::saveas_success_action(int vid)
 
     Image * image = ipool->get(image_id);
 
-    if (image == 0)
+    if (image == nullptr)
     {
         return;
     }
@@ -1849,7 +1846,7 @@ void LifeCycleManager::saveas_failure_action(int vid)
 
     VirtualMachine * vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1880,7 +1877,7 @@ void LifeCycleManager::saveas_failure_action(int vid)
 
     Image * image = ipool->get(image_id);
 
-    if (image == 0)
+    if (image == nullptr)
     {
         return;
     }
@@ -1901,8 +1898,8 @@ void LifeCycleManager::disk_snapshot_success(int vid)
     int disk_id, ds_id, snap_id;
     int img_id = -1;
 
-    Template *ds_quotas = 0;
-    Template *vm_quotas = 0;
+    Template *ds_quotas = nullptr;
+    Template *vm_quotas = nullptr;
 
     bool img_owner, vm_owner;
 
@@ -1913,7 +1910,7 @@ void LifeCycleManager::disk_snapshot_success(int vid)
 
     VirtualMachine * vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -1966,7 +1963,7 @@ void LifeCycleManager::disk_snapshot_success(int vid)
     vm->clear_snapshot_disk();
 
     tmp_snaps = vm->get_disk_snapshots(disk_id, error_str);
-    if (tmp_snaps != 0)
+    if (tmp_snaps != nullptr)
     {
         snaps = *tmp_snaps;
     }
@@ -1982,13 +1979,13 @@ void LifeCycleManager::disk_snapshot_success(int vid)
 
     vm->unlock();
 
-    if ( ds_quotas != 0 )
+    if ( ds_quotas != nullptr )
     {
         if ( img_owner )
         {
             Image* img = ipool->get_ro(img_id);
 
-            if(img != 0)
+            if (img != nullptr)
             {
                 int img_uid = img->get_uid();
                 int img_gid = img->get_gid();
@@ -2007,7 +2004,7 @@ void LifeCycleManager::disk_snapshot_success(int vid)
         delete ds_quotas;
     }
 
-    if ( vm_quotas != 0 )
+    if ( vm_quotas != nullptr )
     {
         Quotas::vm_del(vm_uid, vm_gid, vm_quotas);
 
@@ -2050,8 +2047,8 @@ void LifeCycleManager::disk_snapshot_failure(int vid)
     int disk_id, ds_id, snap_id;
     int img_id = -1;
 
-    Template *ds_quotas = 0;
-    Template *vm_quotas = 0;
+    Template *ds_quotas = nullptr;
+    Template *vm_quotas = nullptr;
 
     const VirtualMachineDisk* disk;
     Snapshots           snaps(-1, Snapshots::DENY);
@@ -2062,7 +2059,7 @@ void LifeCycleManager::disk_snapshot_failure(int vid)
 
     VirtualMachine * vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -2110,7 +2107,7 @@ void LifeCycleManager::disk_snapshot_failure(int vid)
     vm->clear_snapshot_disk();
 
     tmp_snaps = vm->get_disk_snapshots(disk_id, error_str);
-    if (tmp_snaps != 0)
+    if (tmp_snaps != nullptr)
     {
         snaps = *tmp_snaps;
     }
@@ -2126,13 +2123,13 @@ void LifeCycleManager::disk_snapshot_failure(int vid)
 
     vm->unlock();
 
-    if ( ds_quotas != 0 )
+    if ( ds_quotas != nullptr )
     {
         if ( img_owner )
         {
             Image* img = ipool->get_ro(img_id);
 
-            if(img != 0)
+            if (img != nullptr)
             {
                 int img_uid = img->get_uid();
                 int img_gid = img->get_gid();
@@ -2151,7 +2148,7 @@ void LifeCycleManager::disk_snapshot_failure(int vid)
         delete ds_quotas;
     }
 
-    if ( vm_quotas != 0 )
+    if ( vm_quotas != nullptr )
     {
         Quotas::vm_del(vm_uid, vm_gid, vm_quotas);
 
@@ -2192,7 +2189,7 @@ void LifeCycleManager::disk_lock_success(int vid)
     VirtualMachine * vm = vmpool->get_ro(vid);
     Image *          image;
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
@@ -2219,12 +2216,12 @@ void LifeCycleManager::disk_lock_success(int vid)
     {
         image = ipool->get_ro(*id);
 
-        if (image != 0)
+        if (image != nullptr)
         {
             switch (image->get_state()) {
                 case Image::USED:
                 case Image::USED_PERS:
-                    ready.push_back( make_pair(*id, image->get_source()) );
+                    ready.push_back(make_pair(*id, image->get_source()));
                     break;
 
                 case Image::ERROR:
@@ -2248,7 +2245,7 @@ void LifeCycleManager::disk_lock_success(int vid)
 
     vm = vmpool->get(vid);
 
-    if (vm == 0)
+    if (vm == nullptr)
     {
         return;
     }
@@ -2264,7 +2261,7 @@ void LifeCycleManager::disk_lock_success(int vid)
 
         vm->get_template_attribute("SUBMIT_ON_HOLD", on_hold);
 
-        if(on_hold)
+        if (on_hold)
         {
             vm->set_state(VirtualMachine::HOLD);
         }
@@ -2307,14 +2304,14 @@ void LifeCycleManager::disk_resize_success(int vid)
 
     VirtualMachine * vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
 
     VirtualMachineDisk * disk = vm->get_resize_disk();
 
-    if ( disk == 0 )
+    if ( disk == nullptr )
     {
         vm->unlock();
         return;
@@ -2375,6 +2372,7 @@ void LifeCycleManager::disk_resize_success(int vid)
 }
 
 /* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 
 void LifeCycleManager::disk_resize_failure(int vid)
 {
@@ -2386,14 +2384,14 @@ void LifeCycleManager::disk_resize_failure(int vid)
 
     VirtualMachine * vm = vmpool->get(vid);
 
-    if ( vm == 0 )
+    if ( vm == nullptr )
     {
         return;
     }
 
     VirtualMachineDisk * disk = vm->get_resize_disk();
 
-    if ( disk == 0 )
+    if ( disk == nullptr )
     {
         vm->unlock();
         return;
@@ -2439,7 +2437,7 @@ void LifeCycleManager::disk_resize_failure(int vid)
     {
         Image* img = ipool->get_ro(img_id);
 
-        if(img != 0)
+        if (img != nullptr)
         {
             int img_uid = img->get_uid();
             int img_gid = img->get_gid();
@@ -2478,4 +2476,56 @@ void LifeCycleManager::disk_resize_failure(int vid)
 }
 
 /* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 
+void LifeCycleManager::update_conf_success(int vid)
+{
+    VirtualMachine * vm = vmpool->get(vid);
+
+    if ( vm == nullptr )
+    {
+        return;
+    }
+
+    if ( vm->get_lcm_state() == VirtualMachine::HOTPLUG )
+    {
+        vm->set_state(VirtualMachine::RUNNING);
+
+        vmpool->update(vm);
+    }
+    else
+    {
+        vm->log("LCM",Log::ERROR,"update_conf_success, VM in a wrong state");
+    }
+
+    vm->unlock();
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+void LifeCycleManager::update_conf_failure(int vid)
+{
+    VirtualMachine * vm = vmpool->get(vid);
+
+    if ( vm == nullptr )
+    {
+        return;
+    }
+
+    if ( vm->get_lcm_state() == VirtualMachine::HOTPLUG )
+    {
+        vm->set_state(VirtualMachine::RUNNING);
+
+        vmpool->update(vm);
+
+        vm->unlock();
+    }
+    else
+    {
+        vm->log("LCM",Log::ERROR,"update_conf_failure, VM in a wrong state");
+        vm->unlock();
+    }
+}
+
+/* -------------------------------------------------------------------------- */

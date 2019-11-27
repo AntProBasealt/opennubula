@@ -1,8 +1,9 @@
 ---
 :ID:
   :desc: To which resource owner the rule applies to
-  :size: 5
+  :size: 4
   :right: true
+  :adjust: true
 
 :USER:
   :desc: To which resource owner the rule applies to
@@ -27,6 +28,11 @@
   :desc: Operation to which the rule applies
   :size: 8
   :right: true
+
+:STRING:
+  :desc: ACL rule in string format
+  :adjust: true
+  :left: true
 
 :default:
 - :ID

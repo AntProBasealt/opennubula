@@ -37,9 +37,14 @@ container = Container.get(vm_name, xml, client)
 # Stop vnc connection and container & unmap devices if not a wild container
 # ------------------------------------------------------------------------------
 container.vnc('stop')
-container.check_stop
+
+force = false
+force = true if ARGV[-1] == '-f'
+container.check_stop(force)
 
 exit 0 if container.wild?
+
+container.save_idmap
 
 raise 'Failed to dismantle container storage' unless \
 container.setup_storage('unmap')

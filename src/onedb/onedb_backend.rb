@@ -214,6 +214,7 @@ class BackEndMySQL < OneDBBacKEnd
         @user    = opts[:user]
         @passwd  = opts[:passwd]
         @db_name = opts[:db_name]
+        @encoding= opts[:encoding]
 
         # Check for errors:
         error   = false
@@ -226,8 +227,10 @@ class BackEndMySQL < OneDBBacKEnd
         end
 
         # Check for defaults:
-        @server = "localhost"   if @server.nil?
-        @port   = 0             if @port.nil?
+        @server = "localhost" if @server.nil?
+        @port   = 0           if @port.nil?
+
+        encoding if @encoding.nil?
 
         # Clean leading and trailing quotes, if any
         @server  = @server [1..-2] if @server [0] == ?"
@@ -252,9 +255,14 @@ class BackEndMySQL < OneDBBacKEnd
 
     def backup(bck_file, federated = false)
         cmd = "mysqldump -u #{@user} -p'#{@passwd}' -h #{@server} " <<
-              "-P #{@port} --add-drop-table #{@db_name} "
+              "-P #{@port} "
 
-        cmd << FEDERATED_TABLES.join(" ") if federated
+        if federated
+            cmd << " --add-drop-table #{@db_name} "
+            cmd << FEDERATED_TABLES.join(' ')
+        else
+            cmd << "--add-drop-database --databases --add-drop-table #{@db_name} "
+        end
 
         cmd << " > #{bck_file}"
 
@@ -280,6 +288,35 @@ class BackEndMySQL < OneDBBacKEnd
         puts "Use 'onedb restore' or restore the DB using the mysql command:"
         puts "mysql -u user -h server -P port db_name < backup_file"
         puts
+    end
+
+    def encoding
+        @encoding = ''
+
+        db_enc    = ''
+        table_enc = ''
+
+        connect_db
+
+        @db.fetch('select default_character_set_name FROM information_schema.SCHEMATA'\
+          " WHERE schema_name = \"#{@db_name}\"") do |row|
+            db_enc = row[:default_character_set_name]
+            db_enc ||= row[:DEFAULT_CHARACTER_SET_NAME]
+        end
+
+        @db.fetch('select CCSA.character_set_name FROM information_schema.`TABLES`'\
+        ' T, information_schema.`COLLATION_CHARACTER_SET_APPLICABILITY` CCSA '\
+        'WHERE CCSA.collation_name = T.table_collation AND T.table_schema = '\
+        "\"#{@db_name}\" AND T.table_name = \"system_attributes\"") do |row|
+            table_enc = row[:character_set_name]
+            table_enc ||= row[:CHARACTER_SET_NAME]
+        end
+
+        if db_enc != table_enc && !table_enc.empty?
+            raise "Table and database charset (#{db_enc}, #{table_enc}) differs"
+        end
+
+        @encoding = table_enc
     end
 
     def restore(bck_file, force=nil, federated=false)
@@ -323,7 +360,10 @@ class BackEndMySQL < OneDBBacKEnd
         endpoint = "mysql2://#{@user}:#{passwd}@#{@server}:#{@port}/#{@db_name}"
 
         begin
-            @db = Sequel.connect(endpoint)
+            options = {}
+            options[:encoding] = @encoding unless @encoding.empty?
+
+            @db = Sequel.connect(endpoint, options)
         rescue Exception => e
             raise "Error connecting to DB: " + e.message
         end

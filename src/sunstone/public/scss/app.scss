@@ -38,6 +38,7 @@
 @import './tooltips';
 @import './visjs';
 @import './flot';
+@import './login';
 
 
 
@@ -237,3 +238,6 @@ meter {
   width: 4em;
 }
 
+.superHide{
+  display: none !important;
+}

@@ -41,7 +41,7 @@ protected:
     /* -------------------------------------------------------------------- */
 
     void request_execute(xmlrpc_c::paramList const& _paramList,
-                         RequestAttributes& att);
+                         RequestAttributes& att) override;
 
     virtual int replace_template(PoolObjectSQL * object, const string & tmpl,
             const RequestAttributes &att, string &error_str);
@@ -110,13 +110,13 @@ public:
         Nebula& nd  = Nebula::instance();
         pool        = nd.get_vmpool();
         auth_object = PoolObjectSQL::VM;
+        vm_action   = VMActions::UPDATE_ACTION;
+    }
 
-        auth_op     = nd.get_vm_auth_op(History::UPDATE_ACTION);
-    };
+    ~VirtualMachineUpdateTemplate() = default;
 
-    ~VirtualMachineUpdateTemplate(){};
-
-    int extra_updates(PoolObjectSQL * obj)
+protected:
+    int extra_updates(PoolObjectSQL * obj) override
     {
         VirtualMachine * vm;
 
@@ -403,6 +403,24 @@ public:
     };
 
     ~VMGroupUpdateTemplate(){};
+};
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+class HookUpdateTemplate : public RequestManagerUpdateTemplate
+{
+public:
+    HookUpdateTemplate():
+        RequestManagerUpdateTemplate("one.hook.update",
+                                     "Updates a hook template")
+    {
+        Nebula& nd  = Nebula::instance();
+        pool        = nd.get_hkpool();
+        auth_object = PoolObjectSQL::HOOK;
+    };
+
+    ~HookUpdateTemplate(){};
 };
 
 #endif

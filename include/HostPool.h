@@ -36,9 +36,8 @@ using namespace std;
 class HostPool : public PoolSQL
 {
 public:
-    HostPool(SqlDB * db, vector<const VectorAttribute *> hook_mads,
-        const string& hook_location, const string& remotes_location,
-        time_t expire_time);
+    HostPool(SqlDB * db, time_t expire_time,
+        vector<const SingleAttribute *>& encrypted_attrs);
 
     ~HostPool(){};
 
@@ -55,6 +54,15 @@ public:
         int           cluster_id,
         const string& cluster_name,
         string& error_str);
+
+    /**
+     *  Updates a Host in the data base. It also updates the previous state 
+     *  after executing the hooks.
+     *    @param objsql a pointer to the Host
+     *
+     *    @return 0 on success.
+     */
+    virtual int update(PoolObjectSQL * objsql);
 
     /**
      *  Function to get a Host from the pool, if the object is not in memory
@@ -211,15 +219,14 @@ public:
      *
      *   @return 0 on success -1 in case of failure
      */
-    int add_capacity(int oid, int vm_id, int cpu, int mem, int disk,
-            vector<VectorAttribute *> pci)
+    int add_capacity(int oid, HostShareCapacity &sr)
     {
         int rc = 0;
         Host * host = get(oid);
 
         if ( host != 0 )
         {
-          host->add_capacity(vm_id, cpu, mem, disk, pci);
+          host->add_capacity(sr);
 
           update(host);
 
@@ -242,14 +249,13 @@ public:
      *   @param disk amount of disk
      *   @param pci devices requested by the VM
      */
-    void del_capacity(int oid, int vm_id, int cpu, int mem, int disk,
-            vector<VectorAttribute *> pci)
+    void del_capacity(int oid, HostShareCapacity &sr)
     {
         Host *  host = get(oid);
 
         if ( host != 0 )
         {
-            host->del_capacity(vm_id, cpu, mem, disk, pci);
+            host->del_capacity(sr);
 
             update(host);
 

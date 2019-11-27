@@ -184,7 +184,19 @@ int RaftReplicaThread::replicate()
 
     unsigned int term  = raftm->get_term();
 
-    int next_index = raftm->get_next_index(follower_id);
+    uint64_t next_index = raftm->get_next_index(follower_id);
+
+    if ( next_index == UINT64_MAX )
+    {
+        ostringstream ess;
+
+        ess << "Failed to get next replica index for follower: " << follower_id;
+
+        NebulaLog::log("RCM", Log::ERROR, ess);
+
+        return -1;
+    }
+
 
     if ( logdb->get_log_record(next_index, lr) != 0 )
     {
@@ -255,7 +267,7 @@ int FedReplicaThread::replicate()
 
     bool success = false;
 
-    int last;
+    uint64_t last;
 
     int rc = frm->xmlrpc_replicate_log(follower_id, success, last, error);
 
@@ -264,7 +276,7 @@ int FedReplicaThread::replicate()
         NebulaLog::log("FRM", Log::ERROR, error);
         return -1;
     }
-    else if ( rc == -2 ) //no new records to replicate
+    else if ( rc == -2 )
     {
         return 0;
     }
@@ -317,7 +329,7 @@ int HeartBeatThread::replicate()
 	lr.sql = "";
 
 	lr.timestamp = 0;
-    lr.fed_index = -1;
+    lr.fed_index = UINT64_MAX;
 
     rc = raftm->xmlrpc_replicate_log(follower_id, &lr, success, fterm, error);
 

@@ -57,10 +57,9 @@ protected:
 
 
     void request_execute(xmlrpc_c::paramList const& paramList,
-        RequestAttributes& att);
+        RequestAttributes& att) override;
 
-    ErrorCode delete_object(int oid, bool recursive,
-        RequestAttributes& att, AuthRequest::Operation auth);
+    ErrorCode delete_object(int oid, bool recursive, RequestAttributes& att);
 
     /* -------------------------------------------------------------------- */
 
@@ -105,12 +104,12 @@ public:
 
     ErrorCode request_execute(int oid, bool recursive, RequestAttributes& att)
     {
-        return delete_object(oid, recursive, att, auth_op);
+        return delete_object(oid, recursive, att);
     }
 
 protected:
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -133,7 +132,7 @@ public:
 
     ErrorCode request_execute(int oid, bool recursive, RequestAttributes& att)
     {
-        return delete_object(oid, false, att, auth_op);
+        return delete_object(oid, false, att);
     }
 
 };
@@ -157,17 +156,17 @@ public:
 
 protected:
 
-    set<int> get_cluster_ids(PoolObjectSQL * object)
+    set<int> get_cluster_ids(PoolObjectSQL * object) override
     {
         return static_cast<VirtualNetwork*>(object)->get_cluster_ids();
     };
 
-    int del_from_cluster(Cluster* cluster, int id, string& error_msg)
+    int del_from_cluster(Cluster* cluster, int id, string& error_msg) override
     {
         return clpool->del_from_cluster(PoolObjectSQL::NET, cluster, id, error_msg);
     };
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -188,15 +187,15 @@ public:
 
     ErrorCode request_execute(int oid, RequestAttributes& att)
     {
-        return delete_object(oid, false, att, auth_op);
+        return delete_object(oid, false, att);
     };
 
     void request_execute(xmlrpc_c::paramList const& paramList,
-        RequestAttributes& att);
+        RequestAttributes& att) override;
 
 protected:
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -218,7 +217,7 @@ public:
 
 protected:
 
-    set<int> get_cluster_ids(PoolObjectSQL * object)
+    set<int> get_cluster_ids(PoolObjectSQL * object) override
     {
         set<int> ids;
 
@@ -227,12 +226,12 @@ protected:
         return ids;
     };
 
-    int del_from_cluster(Cluster* cluster, int id, string& error_msg)
+    int del_from_cluster(Cluster* cluster, int id, string& error_msg) override
     {
         return clpool->del_from_cluster(PoolObjectSQL::HOST, cluster, id, error_msg);
     };
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -255,7 +254,7 @@ public:
 
 protected:
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -281,7 +280,7 @@ protected:
 
     GroupPool *  gpool;
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -303,15 +302,17 @@ public:
 
     /* -------------------------------------------------------------------- */
 
-    set<int> get_cluster_ids(PoolObjectSQL * object)
+    set<int> get_cluster_ids(PoolObjectSQL * object) override
     {
         return static_cast<Datastore*>(object)->get_cluster_ids();
     };
 
-    int del_from_cluster(Cluster* cluster, int id, string& error_msg)
+    int del_from_cluster(Cluster* cluster, int id, string& error_msg) override
     {
         return clpool->del_from_cluster(PoolObjectSQL::DATASTORE, cluster, id, error_msg);
     };
+
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -325,6 +326,7 @@ public:
     {
         Nebula& nd = Nebula::instance();
         pool       = nd.get_clpool();
+
         auth_object = PoolObjectSQL::CLUSTER;
         auth_op     = AuthRequest::ADMIN;
     };
@@ -333,7 +335,7 @@ public:
 
 protected:
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -373,7 +375,7 @@ public:
 
 protected:
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -395,7 +397,7 @@ public:
 
 protected:
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -434,7 +436,7 @@ public:
     ~VirtualRouterDelete(){};
 
 protected:
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -456,7 +458,7 @@ public:
 
 protected:
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -478,7 +480,7 @@ public:
 
 protected:
 
-    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att);
+    int drop(PoolObjectSQL * obj, bool resive, RequestAttributes& att) override;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -497,6 +499,24 @@ public:
     };
 
     ~VMGroupDelete(){};
+};
+
+/* ------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------- */
+
+class HookDelete : public RequestManagerDelete
+{
+public:
+    HookDelete():
+        RequestManagerDelete("one.hook.delete",
+                             "Deletes a hook")
+    {
+        Nebula& nd  = Nebula::instance();
+        pool        = nd.get_hkpool();
+        auth_object = PoolObjectSQL::HOOK;
+    };
+
+    ~HookDelete(){};
 };
 
 #endif

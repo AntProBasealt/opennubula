@@ -20,8 +20,14 @@ ONE_LOCATION = ENV['ONE_LOCATION'] unless defined?(ONE_LOCATION)
 
 if !ONE_LOCATION
     RUBY_LIB_LOCATION = '/usr/lib/one/ruby' unless defined?(RUBY_LIB_LOCATION)
+    GEMS_LOCATION     = '/usr/share/one/gems' unless defined?(GEMS_LOCATION)
 else
     RUBY_LIB_LOCATION = ONE_LOCATION + '/lib/ruby' unless defined?(RUBY_LIB_LOCATION)
+    GEMS_LOCATION     = ONE_LOCATION + '/share/gems' unless defined?(GEMS_LOCATION)
+end
+
+if File.directory?(GEMS_LOCATION)
+    Gem.use_paths(GEMS_LOCATION)
 end
 
 $LOAD_PATH << RUBY_LIB_LOCATION
@@ -43,7 +49,6 @@ begin
     vm        = VCenterDriver::VirtualMachine.new_without_id(vi_client, vm_ref)
 
     vm.poweron
-    vm.set_running(true)
 rescue StandardError => e
     message = "Restore of VM #{vm_ref} on vCenter cluster "\
               "#{vc_cluster_name} failed due to "\

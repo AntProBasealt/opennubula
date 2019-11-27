@@ -16,6 +16,9 @@
 
 module VCenterDriver
 
+    require 'json'
+    require 'nsx_driver'
+
 class HostFolder
     attr_accessor :item, :items
 
@@ -94,6 +97,146 @@ class ClusterComputeResource
         rp_array
     end
 
+    def get_nsx
+        nsx_info = ''
+        nsx_obj = {}
+        # In the future add more than one nsx manager
+        extension_list = []
+        extension_list = @vi_client.vim.serviceContent.extensionManager.extensionList
+        extension_list.each do |ext_list|
+            if ext_list.key == NSXDriver::NSXConstants::NSXV_EXTENSION_LIST
+                nsx_obj['type'] = NSXDriver::NSXConstants::NSXV
+                urlFull = ext_list.client[0].url
+                urlSplit = urlFull.split("/")
+                # protocol = "https://"
+                protocol = urlSplit[0] + "//"
+                # ipPort = ip:port
+                ipPort = urlSplit[2]
+                nsx_obj['url'] = protocol + ipPort
+                nsx_obj['version'] = ext_list.version
+                nsx_obj['label'] = ext_list.description.label
+            elsif ext_list.key == NSXDriver::NSXConstants::NSXT_EXTENSION_LIST
+                nsx_obj['type'] = NSXDriver::NSXConstants::NSXT
+                nsx_obj['url'] = ext_list.server[0].url
+                nsx_obj['version'] = ext_list.version
+                nsx_obj['label'] = ext_list.description.label
+            else
+                next
+            end
+        end
+        unless nsx_obj.empty?
+            nsx_info << "NSX_MANAGER=\"#{nsx_obj['url']}\"\n"
+            nsx_info << "NSX_TYPE=\"#{nsx_obj['type']}\"\n"
+            nsx_info << "NSX_VERSION=\"#{nsx_obj['version']}\"\n"
+            nsx_info << "NSX_LABEL=\"#{nsx_obj['label']}\"\n"
+        end
+        nsx_info
+    end
+
+    def nsx_ready?
+        @one_item = VCenterDriver::VIHelper
+                    .one_item(OpenNebula::Host,
+                              @vi_client.instance_variable_get(:@host_id).to_i)
+
+        # Check if NSX_MANAGER is into the host template
+        if [nil, ''].include?(@one_item['TEMPLATE/NSX_MANAGER'])
+            @nsx_status = "NSX_STATUS = \"Missing NSX_MANAGER\"\n"
+            return false
+        end
+
+        # Check if NSX_USER is into the host template
+        if [nil, ''].include?(@one_item['TEMPLATE/NSX_USER'])
+            @nsx_status = "NSX_STATUS = \"Missing NSX_USER\"\n"
+            return false
+        end
+
+        # Check if NSX_PASSWORD is into the host template
+        if [nil, ''].include?(@one_item['TEMPLATE/NSX_PASSWORD'])
+            @nsx_status = "NSX_STATUS = \"Missing NSX_PASSWORD\"\n"
+            return false
+        end
+
+        # Check if NSX_TYPE is into the host template
+        if [nil, ''].include?(@one_item['TEMPLATE/NSX_TYPE'])
+            @nsx_status = "NSX_STATUS = \"Missing NSX_TYPE\"\n"
+            return false
+        end
+
+        # Try a connection as part of NSX_STATUS
+        nsx_client = NSXDriver::NSXClient
+                     .new_from_id(@vi_client.instance_variable_get(:@host_id).to_i)
+
+        if @one_item['TEMPLATE/NSX_TYPE'] == NSXDriver::NSXConstants::NSXV
+            # URL to test a connection
+            url = '/api/2.0/vdn/scopes'
+            begin
+                if nsx_client.get(url)
+                    return true
+                else
+                    @nsx_status = "NSX_STATUS = \"Response code incorrect\"\n"
+                    return false
+                end
+            rescue StandardError => e
+                @nsx_status = 'NSX_STATUS = "Error connecting to ' \
+                              "NSX_MANAGER\"\n"
+                return false
+            end
+        end
+
+        if @one_item['TEMPLATE/NSX_TYPE'] == NSXDriver::NSXConstants::NSXT
+            # URL to test a connection
+            url = '/api/v1/transport-zones'
+            begin
+                if nsx_client.get(url)
+                    return true
+                else
+                    @nsx_status = "NSX_STATUS = \"Response code incorrect\"\n"
+                    return false
+                end
+            rescue StandardError => e
+                @nsx_status = 'NSX_STATUS = "Error connecting to '\
+                              "NSX_MANAGER\"\n"
+                return false
+            end
+        end
+    end
+
+    def get_tz
+        @nsx_status = ''
+        if !nsx_ready?
+            tz_info = @nsx_status
+        else
+            tz_info = "NSX_STATUS = OK\n"
+            tz_info << 'NSX_TRANSPORT_ZONES = ['
+
+            nsx_client = NSXDriver::NSXClient
+                         .new_from_id(@vi_client.instance_variable_get(:@host_id).to_i)
+            tz_object = NSXDriver::TransportZone.new_child(nsx_client)
+
+            # NSX request to get Transport Zones
+            if @one_item['TEMPLATE/NSX_TYPE'] == NSXDriver::NSXConstants::NSXV
+                tzs = tz_object.tzs
+                tzs.each do |tz|
+                    tz_info << tz.xpath('name').text << '="'
+                    tz_info << tz.xpath('objectId').text << '",'
+                end
+                tz_info.chomp!(',')
+            elsif @one_item['TEMPLATE/NSX_TYPE'] == NSXDriver::NSXConstants::NSXT
+                r = tz_object.tzs
+                r['results'].each do |tz|
+                    tz_info << tz['display_name'] << '="'
+                    tz_info << tz['id'] << '",'
+                end
+                tz_info.chomp!(',')
+            else
+                raise "Unknown Port Group type #{@one_item['TEMPLATE/NSX_TYPE']}"
+            end
+            tz_info << ']'
+            return tz_info
+        end
+        tz_info
+    end
+
     def monitor
         total_cpu,
         num_cpu_cores,
@@ -154,7 +297,13 @@ class ClusterComputeResource
         # HA enabled
         str_info << "VCENTER_HA="  << ha_enabled.to_s << "\n"
 
+        # NSX info
+        str_info << get_nsx
+        str_info << get_tz
+
         str_info << monitor_resource_pools(mhz_core)
+
+
     end
 
     def monitor_resource_pools(mhz_core)
@@ -537,7 +686,7 @@ class ClusterComputeResource
                 end
 
                 vm_info << "POLL=\"#{vm.info.gsub('"', "\\\"")}\"]"
-            rescue Exception => e
+            rescue StandardError => e
                 vm_info = error_monitoring(e, vm_ref, info)
             end
 
@@ -618,6 +767,8 @@ class ClusterComputeResource
                    "VCENTER_VERSION=\"#{cluster[:vcenter_version]}\"\n"\
 
         template << "VCENTER_RESOURCE_POOL=\"#{rp}\"" if rp
+
+        template << "VCENTER_PORT=\"#{con_ops[:port]}\"" if con_ops[:port]
 
         rc = one_host.update(template, false)
 
@@ -801,6 +952,24 @@ class ESXHost
         end
 
         return pnics_available
+    end
+
+    ########################################################################
+    # Get networks inside a host
+    ########################################################################
+    def get_pg_inside
+        pg_inside = {}
+
+        # Get pnics in use in standard switches
+        @item.config.network.vswitch.each do |vs|
+            pg_inside[vs.name] = []
+            vs.portgroup.each do |pg|
+                pg.slice!("key-vim.host.PortGroup-")
+                pg_inside[vs.name] << pg
+            end
+        end
+
+        pg_inside
     end
 
     ########################################################################

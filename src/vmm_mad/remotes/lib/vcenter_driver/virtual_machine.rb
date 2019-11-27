@@ -15,14 +15,28 @@
 #--------------------------------------------------------------------------- #
 module VCenterDriver
 
-    ONE_LOCATION = ENV['ONE_LOCATION']
+    ONE_LOCATION = ENV['ONE_LOCATION'] unless defined?(ONE_LOCATION)
 
     if !ONE_LOCATION
-        RUBY_LIB_LOCATION = '/usr/lib/one/ruby'
+        unless defined?(RUBY_LIB_LOCATION)
+            RUBY_LIB_LOCATION = '/usr/lib/one/ruby'
+        end
+        unless defined?(GEMS_LOCATION)
+            GEMS_LOCATION = '/usr/share/one/gems'
+        end
     else
-        RUBY_LIB_LOCATION = ONE_LOCATION + '/lib/ruby'
+        unless defined?(RUBY_LIB_LOCATION)
+            RUBY_LIB_LOCATION = ONE_LOCATION + '/lib/ruby'
+        end
+        unless defined?(GEMS_LOCATION)
+            GEMS_LOCATION = ONE_LOCATION + '/share/gems'
+        end
     end
-    
+
+    if File.directory?(GEMS_LOCATION)
+        Gem.use_paths(GEMS_LOCATION)
+    end
+
     $LOAD_PATH << RUBY_LIB_LOCATION
 
     require 'vm_device'
@@ -272,7 +286,6 @@ module VCenterDriver
 
         # @return RbVmomi::VIM::Datastore or nil
         def get_ds
-            ##req_ds = one_item['USER_TEMPLATE/VCENTER_DS_REF']
             current_ds_id  = one_item["HISTORY_RECORDS/HISTORY[last()]/DS_ID"]
             current_ds     = VCenterDriver::VIHelper.one_item(OpenNebula::Datastore, current_ds_id)
             current_ds_ref = current_ds['TEMPLATE/VCENTER_DS_REF']
@@ -410,7 +423,7 @@ module VCenterDriver
                         :spec   => clone_spec).wait_for_completion
                 rescue Exception => e
                     if !e.message.start_with?('DuplicateName')
-                        raise "Cannot clone VM Template: #{e.message}\n#{e.backtrace}"
+                        raise "Cannot clone VM Template: #{e.message}"
                     end
 
                     vm_folder = dc.vm_folder
@@ -429,7 +442,7 @@ module VCenterDriver
                             :name   => vcenter_name,
                             :spec   => clone_spec).wait_for_completion
                     else
-                        raise "Cannot clone VM Template"
+                        raise "Cannot clone VM Template: #{e.message}"
                     end
                 end
             end
@@ -665,15 +678,16 @@ module VCenterDriver
                 query = vc_disks.select {|dev| key == dev[:key]}
             else
                 if has_snapshots?
-                    error = 'disk metadata is corrupted and you have snapshots'
+                    error = 'Disk metadata not present and snapshots exist. ' \
+                            'OpenNebula cannot manage this VM.'
                     raise error
                 end
 
+                # Try to find the disk using the path known by OpenNebula
                 path = !cloned ? one_disk['SOURCE'] : disk_real_path(one_disk, index)
                 query = vc_disks.select {|dev| path == dev[:path_wo_ds]}
             end
 
-            #raise "opennebula disk #{index} not found in vCenter" unless query.size == 1
             return nil if query.size != 1
 
             query.first
@@ -723,9 +737,9 @@ module VCenterDriver
                     key = backing.port.portgroupKey
                 elsif backing.class == OPAQUE_CARD
                     # Select only Opaque Networks
-                    opaqueNetworks = @item.network.select{|net| 
+                    opaqueNetworks = @item.network.select{|net|
                         RbVmomi::VIM::OpaqueNetwork == net.class}
-                    opaqueNetwork = opaqueNetworks.find{|opn| 
+                    opaqueNetwork = opaqueNetworks.find{|opn|
                         backing.opaqueNetworkId == opn.summary.opaqueNetworkId}
                     key = opaqueNetwork._ref
                 else
@@ -829,6 +843,9 @@ module VCenterDriver
             end
         end
 
+        # Matches disks from the vCenter VM Template (or VM if it is coming
+        # from a Wild VM) with the disks represented in OpenNebula VM
+        # data model (ie, the XML)
         def reference_unmanaged_devices(template_ref, execute = true)
             extraconfig   = []
             device_change = []
@@ -838,42 +855,15 @@ module VCenterDriver
             xpath = "TEMPLATE/DISK[OPENNEBULA_MANAGED=\"NO\" or OPENNEBULA_MANAGED=\"no\"]"
             unmanaged_disks = one_item.retrieve_xmlelements(xpath)
 
-            # unmanaged disks:
-            if !unmanaged_disks.empty? && !instantiated_as_persistent?
-
-                # Get vcenter VM disks to know real path of cloned disk
-                vcenter_disks = get_vcenter_disks
-
-                # Create an array with the paths of the disks in vcenter template
-                template = VCenterDriver::Template.new_from_ref(template_ref, vi_client)
-                template_disks = template.get_vcenter_disks
-                template_disks_vector = []
-                template_disks.each do |d|
-                    template_disks_vector << d[:path_wo_ds]
-                end
-
-                # Try to find index of disks in template disks
-                unmanaged_disks.each do |unmanaged_disk|
-                    unmanaged_disk_source = VCenterDriver::FileHelper.unescape_path(unmanaged_disk["SOURCE"])
-                    template_disk = template_disks.select{|d| d[:path_wo_ds] == unmanaged_disk_source }.first
-
-                    if template_disk
-                        vcenter_disk  = vcenter_disks.select{|d| d[:key] == template_disk[:key] && d[:device].deviceInfo.summary == template_disk[:device].deviceInfo.summary}.first
-                    end
-
-                    raise "disk with path #{unmanaged_disk_source} not found in the vCenter VM" if !vcenter_disk
-
-                    reference = {}
-                    reference[:key]   = "opennebula.disk.#{unmanaged_disk["DISK_ID"]}"
-                    reference[:value] = "#{vcenter_disk[:key]}"
-                    extraconfig << reference
-                end
-            end
+            managed = false
+            extraconfig = reference_disks(template_ref, unmanaged_disks, managed)
 
             # Add info for existing nics in template in vm xml
             xpath = "TEMPLATE/NIC[OPENNEBULA_MANAGED=\"NO\" or OPENNEBULA_MANAGED=\"no\"]"
             unmanaged_nics = one_item.retrieve_xmlelements(xpath)
 
+            # Handle NIC changes (different model and/or set MAC address
+            # for unmanaged nics
             begin
                 if !unmanaged_nics.empty?
                     nics = get_vcenter_nics
@@ -923,7 +913,7 @@ module VCenterDriver
                     end
 
                 end
-            rescue Exception => e
+            rescue StandardError => e
                 raise "There is a problem with your vm NICS, make sure that they are working properly. Error: #{e.message}"
             end
 
@@ -938,6 +928,54 @@ module VCenterDriver
             end
 
             {}
+        end
+
+        # Build extraconfig section to reference disks
+        # by key and avoid problems with changing paths
+        # (mainly due to snapshots)
+        # Uses VM Templte if ref available, or the vCenter VM if not
+        # (latter case is if we are dealing with a Wild VM
+        def reference_disks(template_ref, disks, managed)
+            return [] if disks.empty? || instantiated_as_persistent?
+
+            extraconfig = []
+            key_prefix = managed ? "opennebula.mdisk" : "opennebula.disk"
+
+            # Get vcenter VM disks to know real path of cloned disk
+            vcenter_disks = get_vcenter_disks
+
+            # Create an array with the paths of the disks in vcenter template
+            if !template_ref.nil?
+              template = VCenterDriver::Template.new_from_ref(template_ref, vi_client)
+              template_disks = template.get_vcenter_disks
+            else
+              # If we are dealing with a Wild VM, we simply use
+              # what is available in the vCenter VM
+              template_disks = get_vcenter_disks
+            end
+            template_disks_vector = []
+            template_disks.each do |d|
+                template_disks_vector << d[:path_wo_ds]
+            end
+
+            # Try to find index of disks in template disks
+            disks.each do |disk|
+                disk_source = VCenterDriver::FileHelper.unescape_path(disk["SOURCE"])
+                template_disk = template_disks.select{|d| d[:path_wo_ds] == disk_source }.first
+
+                if template_disk
+                    vcenter_disk  = vcenter_disks.select{|d| d[:key] == template_disk[:key]}.first
+                end
+
+                raise "disk with path #{disk_source} not found in the vCenter VM" if !vcenter_disk
+
+                reference = {}
+                reference[:key]   = "#{key_prefix}.#{disk["DISK_ID"]}"
+                reference[:value] = "#{vcenter_disk[:key]}"
+                extraconfig << reference
+            end
+
+            extraconfig
         end
 
         # TODO: review storagedrs
@@ -1115,14 +1153,8 @@ module VCenterDriver
                 end
             end
 
-      # vnc configuration (for config_array hash)
-      extraconfig += extraconfig_vnc
-
             # vnc configuration (for config_array hash)
             extraconfig += extraconfig_vnc
-
-            # opennebula.running flag
-            extraconfig += set_running(true, false)
 
             # device_change hash (nics)
             device_change += sync_nics(:all, false)
@@ -1357,7 +1389,7 @@ module VCenterDriver
                 backing = RbVmomi::VIM.VirtualEthernetCardNetworkBackingInfo(
                             :deviceName => pg_name,
                             :network    => network)
-            else
+            elsif network.class == RbVmomi::VIM::DistributedVirtualPortgroup
                 port    = RbVmomi::VIM::DistributedVirtualSwitchPortConnection(
                             :switchUuid =>
                                     network.config.distributedVirtualSwitch.uuid,
@@ -1365,6 +1397,12 @@ module VCenterDriver
                 backing =
                   RbVmomi::VIM.VirtualEthernetCardDistributedVirtualPortBackingInfo(
                     :port => port)
+            elsif network.class == RbVmomi::VIM::OpaqueNetwork
+                backing = RbVmomi::VIM.VirtualEthernetCardOpaqueNetworkBackingInfo(
+                            :opaqueNetworkId => network.summary.opaqueNetworkId,
+                            :opaqueNetworkType => "nsx.LogicalSwitch")
+            else
+                raise "Unknown network class"
             end
 
             card_spec = {
@@ -1657,7 +1695,7 @@ module VCenterDriver
             vm.config.hardware.device.each do |disk|
                 if is_disk_or_cdrom?(disk)
                     # Let's try to find if disks is persistent
-                    source_unescaped = disk.backing.fileName.sub(/^\[(.*?)\] /, "")
+                    source_unescaped = disk.backing.fileName.sub(/^\[(.*?)\] /, "") rescue next
                     source = VCenterDriver::FileHelper.escape_path(source_unescaped)
 
                     persistent = VCenterDriver::VIHelper.find_persistent_image_by_source(source, ipool)
@@ -2239,13 +2277,16 @@ module VCenterDriver
             @item.RebootGuest
         end
 
-        def poweron
+        def poweron(set_running = false)
             begin
                 @item.PowerOnVM_Task.wait_for_completion
             rescue RbVmomi::Fault => e
                 error = e.message.split(':').first
                 raise e.message if error != 'InvalidPowerState'
             end
+            # opennebula.running flag
+            set_running(true, true) if set_running
+
             timeout = CONFIG[:vm_poweron_wait_default]
             wait_timeout(:is_powered_on?, timeout)
         end

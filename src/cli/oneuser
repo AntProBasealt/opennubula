@@ -20,8 +20,14 @@ ONE_LOCATION = ENV['ONE_LOCATION']
 
 if !ONE_LOCATION
     RUBY_LIB_LOCATION = '/usr/lib/one/ruby'
+    GEMS_LOCATION     = '/usr/share/one/gems'
 else
     RUBY_LIB_LOCATION = ONE_LOCATION + '/lib/ruby'
+    GEMS_LOCATION     = ONE_LOCATION + '/share/gems'
+end
+
+if File.directory?(GEMS_LOCATION)
+    Gem.use_paths(GEMS_LOCATION)
 end
 
 $LOAD_PATH << RUBY_LIB_LOCATION
@@ -72,11 +78,10 @@ CommandParser::CmdParser.new(ARGV) do
         :description => 'Read password from file'
     }
 
-    SHA1 = {
-        :name => 'sha1',
-        :large => '--sha1',
-        :description => "The password will be hashed using the sha1\n" \
-                        ' ' * 31 << 'algorithm'
+    SHA256 = {
+        :name => 'sha256',
+        :large => '--sha256',
+        :description => 'The password will be hashed using the sha256 algorithm'
     }
 
     SSH = {
@@ -203,7 +208,7 @@ CommandParser::CmdParser.new(ARGV) do
         :description => 'enable stdin password'
     }
 
-    auth_options = [READ_FILE, SHA1, SSH, X509, KEY, CERT, DRIVER]
+    auth_options = [READ_FILE, SHA256, SSH, X509, KEY, CERT, DRIVER]
 
     create_options = auth_options.clone.unshift(GROUP_CREATE)
 
@@ -703,12 +708,12 @@ CommandParser::CmdParser.new(ARGV) do
         auth_string = "#{user['NAME']}:#{token}"
         auth_file   = helper.auth_file(auth_string)
 
-        # rubocop:disable HandleExceptions
+        # rubocop:disable Lint/HandleExceptions
         begin
             FileUtils.mkdir_p(File.dirname(auth_file))
         rescue Errno::EEXIST
         end
-        # rubocop:enable HandleExceptions
+        # rubocop:enable Lint/HandleExceptions
 
         file = File.open(auth_file, 'w')
         file.write(auth_string)
@@ -771,13 +776,13 @@ CommandParser::CmdParser.new(ARGV) do
         auth_string = "#{user['NAME']}:#{token}"
         auth_file   = helper.auth_file(auth_string)
 
-        # rubocop:disable HandleExceptions
+        # rubocop:disable Lint/HandleExceptions
         begin
             File.unlink(auth_file)
             puts "Removing #{auth_file}"
         rescue Errno::ENOENT
         end
-        # rubocop:enable HandleExceptions
+        # rubocop:enable Lint/HandleExceptions
 
         0
     end

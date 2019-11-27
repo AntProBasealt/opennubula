@@ -64,6 +64,7 @@ define(function(require) {
     "vnets-topology-tab",
     "vnets-topology-tab",
     "support-tab",
+    "official-support-tab",
     "settings-tab",
     "upgrade-top-tab",
     "vmgroup-tab",
@@ -135,6 +136,9 @@ define(function(require) {
     $.each(Config.allTabs(), function(i, tabName){
       _addAction(i, tabName);
     });
+
+    //add actions official support
+    _addAction(null, 'official-support-tab');
   };
 
   var _addDialogs = function(dialogs) {
@@ -179,7 +183,6 @@ define(function(require) {
       _insertTab(tabName);
       _insertButtonsInTab(tabName);
       _setupDataTable(tabName);
-
       var hooks = SunstoneCfg["tabs"][tabName].initHooks;
 
       if (hooks) {
@@ -189,10 +192,10 @@ define(function(require) {
       }
     }
     var support_tab = "support-tab";
+    var official_support_tab = "official-support-tab";
     if(SunstoneCfg &&
       SunstoneCfg.tabs &&
-      !SunstoneCfg.tabs[support_tab] &&
-      Config.isTabEnabled(support_tab)
+      !SunstoneCfg.tabs[support_tab]
     ){
       SunstoneCfg.tabs[support_tab] = {
         actions: {
@@ -208,6 +211,11 @@ define(function(require) {
       _insertTab(support_tab);
       _setupDataTable(support_tab);
     }
+
+    //Separate the logic be supported with the banner
+    _addMainTab(official_support_tab);
+    _insertTab(official_support_tab);
+
     _setupTabs();
   };
 
@@ -244,29 +252,29 @@ define(function(require) {
       title += "<i class=\"fas fa-lg fa-fw " + tabInfo.icon + "\"></i> ";
     }
     title += tabInfo.title;
-
-    if (parent !== "") {
-      liItem = "<li id=\"li_" + tabName + "\" class=\"" + tabClass + "\">" + "<a href=\"#\">" + title + "</a>" + "</li>";
-      if ($("#menu ul#navigation #li_" + parent + " .menu").length > 0) {
-        $("#menu ul#navigation #li_" + parent + " .menu").append(liItem);
-      } else {
-        $("#menu ul#navigation #li_" + parent).append("<ul class=\"menu vertical nested\" data-submenu>" + liItem + "</ul>");
-      }
-    } else {
-      liItem = "<li id=\"li_" + tabName + "\" class=\"" + tabClass + "\">" + "<a href=\"#\">" + title + "</a>" + "</li>";
-      $("div#menu ul#navigation").append(liItem);
-      if(config && config.user_config){
-        if(tabName === "support-tab" && config.user_config.default_view === "cloud"){
-          _addAction(null, "support-tab");
-          $(".sunstone-header").addClass("support_place").append(title);
-          $("#support-tab").remove();
+    if(title !== "undefined"){
+      if (parent !== "") {
+        liItem = "<li id=\"li_" + tabName + "\" class=\"" + tabClass + "\">" + "<a href=\"#\">" + title + "</a>" + "</li>";
+        if ($("#menu ul#navigation #li_" + parent + " .menu").length > 0) {
+          $("#menu ul#navigation #li_" + parent + " .menu").append(liItem);
+        } else {
+          $("#menu ul#navigation #li_" + parent).append("<ul class=\"menu vertical nested\" data-submenu>" + liItem + "</ul>");
         }
-        if(config.user_config.default_view !== "admin"){
-          $("#support-tab").remove();
+      } else {
+        liItem = "<li id=\"li_" + tabName + "\" class=\"" + tabClass + "\">" + "<a href=\"#\">" + title + "</a>" + "</li>";
+        $("div#menu ul#navigation").append(liItem);
+        if(config && config.user_config){
+          if(tabName === "support-tab" && config.user_config.default_view === "cloud"){
+            _addAction(null, "official-support-tab");
+            $(".sunstone-header").addClass("support_place").append(title);
+            $("#support-tab").remove();
+          }
+          if(config.user_config.default_view !== "admin"){
+            $("#support-tab").remove();
+          }
         }
       }
     }
-
     //if this is a submenu...
     //if (parent.length) {
     //  var children = $('div#menu ul#navigation #li_' + parent);
@@ -457,7 +465,14 @@ define(function(require) {
           buttonContext = $("#" + customId + "main_buttons", buttonsRow);
           text = button.text;
           strClass.push("button");
-          buttonCode = "<button class=\"" + strClass.join(" ") + "\" href=\"" + buttonName + "\">" + text + "</button>";
+          options = {
+            class: strClass.join(" "),
+            href: buttonName,
+          }
+          if(button && button.tip){
+            options.title = button.tip;
+          }
+          buttonCode = $("<button>",options).append(text);
         }
 
         buttonContext.append(buttonCode);
@@ -602,7 +617,10 @@ define(function(require) {
 
     // Button to return to the list view from the detailed view
     $(document).on("click", "button[href='back']", function(e) {
-      window.history.back();
+      if(window.sunstoneNoMultipleRedirects){
+        window.history.back();
+        window.sunstoneNoMultipleRedirects = false;
+      }
       e.preventDefault();
     });
   };
@@ -640,11 +658,24 @@ define(function(require) {
     _setupButtons();
   };
 
+  var hideToggleButton = function(elements){
+    if(elements && elements.parents("ul.dropdown-pane.menu")){
+      var parent = elements.parents("ul.dropdown-pane.menu");
+      var id = parent.attr("id");
+      var anchors = parent.find("a.action_button:visible");
+      var button = parent.siblings("button[data-toggle|='"+id+"']");
+      if(anchors.length === 0){
+        button.addClass("superHide");
+      }else{
+        button.removeClass("superHide");
+      }
+    }
+  }
+
   var _showRighList = function(tabName) {
     var tab = $("#" + tabName);
     $(".tab").hide();
     tab.show();
-
     $(".sunstone-info", tab).hide();
     $(".sunstone-form", tab).hide();
     $(".sunstone-list", tab).fadeIn();
@@ -652,6 +683,8 @@ define(function(require) {
     $(".only-sunstone-form", tab).hide();
     $(".only-sunstone-list", tab).fadeIn();
     $(".action_blocks", tab).removeClass("large-12").addClass("large-9");
+
+    hideToggleButton($(".only-sunstone-list", tab));
   };
 
   var _showRighInfo = function(tabName) {
@@ -666,6 +699,8 @@ define(function(require) {
     $(".only-sunstone-form", tab).hide();
     $(".only-sunstone-info", tab).fadeIn();
     $(".action_blocks", tab).removeClass("large-9").addClass("large-12");
+
+    hideToggleButton($(".only-sunstone-list", tab));
   };
 
   var _showTab = function(tabName) {
@@ -1257,20 +1292,22 @@ define(function(require) {
 
   var _setupNavigoRoutes = function() {
     router =  new Navigo(null, true);
-
     for (var tabName in SunstoneCfg["tabs"]) {
       router.on(new RegExp("(?:#|/)"+tabName+"/form"), function(){
         if(_getTab() == undefined){
+          window.sunstoneNoMultipleRedirects = true;
           // This will happen if the user opens sunstone directly in a /form url
           _showTab(this);
         }
       }.bind(tabName));
 
       router.on(new RegExp("(?:#|/)"+tabName+"/(\\w+)"), function(id){
+        window.sunstoneNoMultipleRedirects = true;
         _routerShowElement(this, id);
       }.bind(tabName));
 
       router.on(new RegExp("(?:#|/)"+tabName), function(){
+        window.sunstoneNoMultipleRedirects = true;
         _routerShowTab(this);
       }.bind(tabName));
     }

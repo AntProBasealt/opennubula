@@ -1,21 +1,18 @@
 [Unit]
 Description=OpenNebula Cloud Scheduler Daemon
-After=syslog.target
-After=network.target
-After=remote-fs.target
+After=network.target remote-fs.target
 After=opennebula.service
-BindTo=opennebula.service
+AssertFileNotEmpty=/var/lib/one/.one/one_auth
 
 [Service]
 Type=simple
 Group=oneadmin
 User=oneadmin
-
 ExecStart=/usr/bin/mm_sched
-ExecStop=/bin/kill -TERM $MAINPID
-PIDFile=/var/run/one/sched.pid
+StartLimitInterval=60
+StartLimitBurst=3
 Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-

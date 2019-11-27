@@ -1,14 +1,13 @@
 [Unit]
-Description=OpenNebula econe Server
+Description=OpenNebula Hook Execution Service
 After=network.target
 After=opennebula.service
-AssertFileNotEmpty=/var/lib/one/.one/ec2_auth
 
 [Service]
 Type=simple
 Group=oneadmin
 User=oneadmin
-ExecStart=/usr/bin/ruby /usr/lib/one/ruby/cloud/econe/econe-server.rb
+ExecStart=/usr/bin/ruby /usr/lib/one/onehem/onehem-server.rb
 StartLimitInterval=60
 StartLimitBurst=3
 Restart=on-failure

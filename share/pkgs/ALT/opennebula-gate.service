@@ -1,16 +1,18 @@
 [Unit]
 Description=OpenNebula Gate Service
-After=syslog.target
 After=network.target
+After=opennebula.service
+AssertFileNotEmpty=/var/lib/one/.one/onegate_auth
 
 [Service]
 Type=simple
 Group=oneadmin
 User=oneadmin
-
 ExecStart=/usr/bin/ruby /usr/lib/one/onegate/onegate-server.rb
-PIDFile=/var/run/one/onegate.pid
+StartLimitInterval=60
+StartLimitBurst=3
 Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

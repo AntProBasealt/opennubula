@@ -1,24 +1,22 @@
 [Unit]
 Description=OpenNebula Cloud Controller Daemon
-After=network.target
-After=remote-fs.target
+After=network.target remote-fs.target
 After=mariadb.service mysqld.service
 Wants=mariadb.service mysqld.service
-Before=opennebula-scheduler.service
-BindTo=opennebula-scheduler.service
+Wants=opennebula-scheduler.service opennebula-hem.service
 
 [Service]
 Type=notify
 Group=oneadmin
 User=oneadmin
-
-# Start daemon in foreground mode, when starting as forking process the
-# daemon shuts down without obvious reason.
 ExecStart=/usr/bin/oned -f
 ExecStopPost=/bin/rm -f /var/lock/one/one
 ExecStopPost=/usr/share/one/follower_cleanup
 PIDFile=/var/run/one/oned.pid
+StartLimitInterval=60
+StartLimitBurst=3
 Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

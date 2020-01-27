@@ -6,7 +6,6 @@
     "grunt-cli": "^1.2.0",
     "grunt-contrib-requirejs": "^1.0.0",
     "grunt-contrib-watch": "^1.0.0",
-    "grunt-sass": "^1.2.1",
-    "node-sass": "^3.10.1"
+    "grunt-sass": "^1.2.1"
   }
 }

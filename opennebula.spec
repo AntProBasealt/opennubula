@@ -16,7 +16,7 @@ Url: https://opennebula.org
 
 Source0: %name-%version.tar
 
-BuildRequires(pre): rpm-build-ruby rpm-build-python3
+BuildRequires(pre): rpm-build-ruby rpm-build-python3 rpm-macros-nodejs
 BuildRequires: gcc-c++
 BuildRequires: libcurl-devel
 BuildRequires: libxml2-devel libxmlrpc-devel liblzma-devel
@@ -33,7 +33,7 @@ BuildRequires: gem(nokogiri)
 BuildRequires: scons
 BuildRequires: java-1.8.0-openjdk-devel rpm-build-java ws-commons-util xmlrpc-common xmlrpc-client
 BuildRequires: zlib-devel
-BuildRequires: node node-gyp npm node-devel
+BuildRequires: node node-gyp npm node-devel node-sass libsass
 BuildRequires: ronn
 BuildRequires: groff-base
 
@@ -247,17 +247,14 @@ OpenNebula provisioning tool
 %prep
 %setup
 
-# add symlink to node headers
-node_ver=$(node -v | sed -e "s/v//")
-mkdir -p src/sunstone/public/node_modules/.node-gyp/$node_ver/include
-ln -s %_includedir/node src/sunstone/public/node_modules/.node-gyp/$node_ver/include/node
-echo "9" > src/sunstone/public/node_modules/.node-gyp/$node_ver/installVersion
+ln -sf %nodejs_sitelib/node-gyp src/sunstone/public/node_modules/node-gyp
+ln -sf %nodejs_sitelib/node-sass src/sunstone/public/node_modules/node-sass
 
 find . -type f -exec subst 's,^#!/usr/bin/env ruby,#!%__ruby,' {} \;
 
+
 %build
 export PATH="$PATH:$PWD/src/sunstone/public/node_modules/.bin"
-export npm_config_devdir="$PWD/src/sunstone/public/node_modules/.node-gyp"
 
 pushd src/sunstone/public
 npm rebuild

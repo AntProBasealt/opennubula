@@ -1,5 +1,5 @@
 
-%global commit 8bd6804c4cebf455dc1a383574a4bf35a86fdbc8
+%global commit 45f6d6dfeefafeec04300edfc19f2771de7bcb5c
 %global shortcommit %(c=%{commit}; echo ${c:0:7})
 
 %define oneadmin_home /var/lib/one
@@ -8,7 +8,7 @@
 
 Name: opennebula
 Summary: Cloud computing solution for Data Center Virtualization
-Version: 5.10.0
+Version: 5.10.1
 Release: alt1
 License: Apache-2.0
 Group: System/Servers
@@ -689,6 +689,10 @@ fi
 %exclude %_man1dir/oneprovision.1*
 
 %changelog
+* Mon Jan 27 2020 Alexey Shabalin <shaba@altlinux.org> 5.10.1-alt1
+- 5.10.1
+- use system node-gyp and node-sass for build
+
 * Wed Nov 27 2019 Alexey Shabalin <shaba@altlinux.org> 5.10.0-alt1
 - 5.10.0
 

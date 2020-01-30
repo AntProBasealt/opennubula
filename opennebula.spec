@@ -38,6 +38,8 @@ BuildRequires: ronn
 BuildRequires: groff-base
 
 %gem_replace_version highline ~> 2.0
+%gem_replace_version i18n ~> 1.0
+%gem_replace_version activesupport ~> 5.2
 %add_findreq_skiplist %ruby_gemslibdir/**/*
 
 %description

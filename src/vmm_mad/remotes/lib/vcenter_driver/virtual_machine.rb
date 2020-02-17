@@ -930,6 +930,25 @@ module VCenterDriver
             {}
         end
 
+        def reference_all_disks
+            extraconfig = []
+            disks_each(:synced?) do |disk|
+                begin
+                    key_prefix = disk.managed? ? "opennebula.mdisk." : "opennebula.disk."
+                    k = "#{key_prefix}#{disk.id}"
+                    v = "#{disk.key}"
+
+                    extraconfig << {key: k, value: v}
+                rescue StandardError => e
+                    next
+                end
+            end
+
+            spec_hash = {:extraConfig => extraconfig}
+            spec = RbVmomi::VIM.VirtualMachineConfigSpec(spec_hash)
+            @item.ReconfigVM_Task(:spec => spec).wait_for_completion
+        end
+
         # Build extraconfig section to reference disks
         # by key and avoid problems with changing paths
         # (mainly due to snapshots)
@@ -1172,6 +1191,7 @@ module VCenterDriver
             spec = RbVmomi::VIM.VirtualMachineConfigSpec(spec_hash)
 
             @item.ReconfigVM_Task(:spec => spec).wait_for_completion
+            sync_extraconfig_disk(spec_hash)
         end
 
         def extraconfig_file(file, id)
@@ -1557,6 +1577,37 @@ module VCenterDriver
             return detach_disk_array, extra_config
         end
 
+        def different_key?(change_disk, vc_disk)
+            change_disk[:device].controllerKey == vc_disk.controllerKey &&
+            change_disk[:device].unitNumber == vc_disk.unitNumber &&
+            change_disk[:device].key != vc_disk.key
+        end
+
+        def sync_extraconfig_disk(spec_hash)
+            return if spec_hash[:deviceChange].empty?
+            extraconfig_new = []
+            # vCenter mob disks
+            vc_disks = @item["config.hardware.device"].select do |vc_device|
+                is_disk?(vc_device)
+            end
+            return unless vc_disks
+            # For each changed disk, compare with vcenter mob disk
+            spec_hash[:deviceChange].each_with_index do |device, index|
+                change_disk = spec_hash[:deviceChange][index]
+                vc_disks.each do |vc_disk|
+                    if different_key?(change_disk, vc_disk)
+                        extraconfig_new << {key: spec_hash[:extraConfig][index][:key],
+                                            value: vc_disk.key.to_s}
+                    end
+                end
+            end
+            unless extraconfig_new.empty?
+                spec_hash = {:extraConfig => extraconfig_new}
+                spec = RbVmomi::VIM.VirtualMachineConfigSpec(spec_hash)
+                @item.ReconfigVM_Task(:spec => spec).wait_for_completion
+            end
+        end
+
         # sync OpenNebula disk model with vCenter
         #
         # @param option  [symbol]  if :all is provided the method will try to sync
@@ -1593,7 +1644,6 @@ module VCenterDriver
 
             spec = RbVmomi::VIM.VirtualMachineConfigSpec(spec_hash)
             @item.ReconfigVM_Task(:spec => spec).wait_for_completion
-
             info_disks
         end
 
@@ -1678,6 +1728,8 @@ module VCenterDriver
                 else
                     @item.ReconfigVM_Task(:spec => spec).wait_for_completion
                 end
+                # Modify extraConfig if disks has a bad key
+                sync_extraconfig_disk(spec_hash)
             rescue Exception => e
                 raise "Cannot attach DISK to VM: #{e.message}\n#{e.backtrace.join("\n")}"
             end

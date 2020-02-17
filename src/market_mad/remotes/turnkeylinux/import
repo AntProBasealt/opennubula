@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # -------------------------------------------------------------------------- #
 # Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
@@ -12,31 +14,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   #
 # See the License for the specific language governing permissions and        #
 # limitations under the License.                                             #
-#--------------------------------------------------------------------------- #
+# -------------------------------------------------------------------------- #
 
-module VNMMAD
-    class NoVLANDriver< VNMMAD::VLANDriver
-        def initialize(vm, xpath_filter, deploy_id = nil)
-            @locking = true
+if [ -z "${ONE_LOCATION}" ]; then
+    LIB_LOCATION=/usr/lib/one
+else
+    LIB_LOCATION=$ONE_LOCATION/lib
+fi
 
-            super(vm, xpath_filter, deploy_id)
-        end
+. $LIB_LOCATION/sh/scripts_common.sh
 
-        def create_vlan_dev
-            true
-        end
+error_message "Cannot import app into turnkey linux marketplace"
 
-        def delete_vlan_dev
-            true
-        end
-
-    private
-        def gen_vlan_dev_name
-            @nic[:vlan_dev] = @nic[:phydev] if @nic[:phydev]
-        end
-
-        def validate_vlan_id
-            true
-        end
-    end
-end
+exit -1

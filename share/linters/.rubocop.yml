@@ -28,7 +28,6 @@ AllCops:
     - share/rubygems/generate
     - share/hooks/raft/follower_cleanup
     - share/esx-fw-vnc/Vagrantfile
-    - share/vendor/ruby/gems/rbvmomi/Rakefile
     - share/vendor/ruby/gems/packethost/Rakefile
     - share/vendor/ruby/gems/packethost/Gemfile
     - share/vendor/ruby/gems/packethost/packethost.gemspec
@@ -62,13 +61,6 @@ AllCops:
     - src/pm_mad/remotes/ec2/reset
     - src/pm_mad/remotes/ec2/poll
     - src/onegate/config.ru
-    - src/datastore_mad/remotes/vcenter/monitor
-    - src/datastore_mad/remotes/vcenter/mkfs
-    - src/datastore_mad/remotes/vcenter/stat
-    - src/datastore_mad/remotes/vcenter/clone
-    - src/datastore_mad/remotes/vcenter/cp
-    - src/datastore_mad/remotes/vcenter/export
-    - src/datastore_mad/remotes/vcenter/rm
     - src/im_mad/remotes/lxd-probes.d/pci.rb
     - src/im_mad/remotes/kvm-probes.d/pci.rb
     - src/im_mad/remotes/kvm.d/collectd-client.rb
@@ -163,18 +155,9 @@ AllCops:
     - src/cloud/ec2/bin/econe-disassociate-address
     - src/cloud/ec2/bin/econe-create-keypair
     - src/cloud/ec2/bin/econe-describe-volumes
-    - src/onedb/onedb
     - src/market_mad/remotes/s3/monitor
     - src/market_mad/remotes/s3/delete
     - src/market_mad/remotes/s3/import
-    - src/tm_mad/vcenter/monitor
-    - src/tm_mad/vcenter/delete
-    - src/tm_mad/vcenter/mvds
-    - src/tm_mad/vcenter/mkimage
-    - src/tm_mad/vcenter/cpds
-    - src/tm_mad/vcenter/clone
-    - src/tm_mad/vcenter/mv
-    - src/tm_mad/vcenter/resize
     - src/flow/config.ru
     - src/flow/Gemfile
     - src/cli/oneprovision
@@ -185,44 +168,7 @@ AllCops:
     - share/hooks/ft/host_error.rb
     - share/instance_types/ec2-instance-types.rb
     - share/instance_types/az-instance-types.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/Datastore.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/DynamicTypeMgrDataTypeInfo.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/HostSystem.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/ManagedObject.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/DynamicTypeMgrManagedTypeInfo.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/ServiceInstance.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/PropertyCollector.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/DynamicTypeMgrAllTypeInfo.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/ObjectUpdate.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/ManagedEntity.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/Folder.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/ReflectManagedMethodExecuter.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/ResourcePool.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/OvfManager.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/Datacenter.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/ObjectContent.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/VirtualMachine.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/ComputeResource.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/PerfCounterInfo.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/PerformanceManager.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim/Task.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/sms.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/fault.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/trivial_soap.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/sms/SmsStorageManager.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/deserialization.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/vim.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/connection.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/basic_types.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/utils/perfdump.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/utils/admission_control.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/utils/deploy.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/utils/leases.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/trollop.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/version.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/pbm.rb
-    - share/vendor/ruby/gems/rbvmomi/lib/rbvmomi/type_loader.rb
+    - share/vendor/ruby/gems/rbvmomi/**/*
     - share/vendor/ruby/gems/packethost/spec/spec_helper.rb
     - share/vendor/ruby/gems/packethost/spec/support/webmock.rb
     - share/vendor/ruby/gems/packethost/spec/support/fake_packet.rb
@@ -557,7 +503,6 @@ AllCops:
     - src/onedb/local/5.8.0_to_5.9.80.rb
     - src/onedb/local/5.8.0_to_5.10.0.rb
     - src/onedb/local/5.6.0_to_5.10.0.rb
-    - src/onedb/onedb_live.rb
     - src/onedb/onedb_backend.rb
     - src/onedb/sqlite2mysql.rb
     - src/market_mad/remotes/s3/S3.rb
@@ -581,6 +526,10 @@ AllCops:
 ########
 # LAYOUT
 ########
+
+# Line Length config:
+Layout/LineLength:
+    Max: 80
 
 # Check indendation
 Layout/IndentationWidth:
@@ -758,10 +707,6 @@ Lint/Debugger:
 
 Metrics/BlockLength:
     Enabled: False
-
-# Line Length config:
-Metrics/LineLength:
-    Max: 80
 
 Metrics/ModuleLength:
     Enabled: False

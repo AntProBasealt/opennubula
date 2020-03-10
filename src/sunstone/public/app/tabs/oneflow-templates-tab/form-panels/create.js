@@ -119,14 +119,14 @@ define(function(require) {
     $(".add_service_network", context).trigger("click");
 
     context.on("change", ".service_network_name", function(){
-      _redo_service_networks_selector(context);
+      _redo_service_networks_selector(context, that);
     });
 
     context.on("click", ".service_networks i.remove-tab", function(){
       var tr = $(this).closest('tr');
       tr.remove();
 
-      _redo_service_networks_selector(context);
+      _redo_service_networks_selector(context, that);
     });
 
     $("#tf_btn_roles", context).bind("click", function(){
@@ -357,53 +357,69 @@ define(function(require) {
 
   //----------------------------------------------------------------------------
 
-  function _redo_service_networks_selector(dialog){
+  function _redo_service_networks_selector(dialog, template){
     $('#roles_tabs_content .role_content', dialog).each(function(){
       var role_section = this;
-      _redo_service_networks_selector_role(dialog, role_section);
+      _redo_service_networks_selector_role(dialog, role_section, template);
     });
   }
 
-  function _redo_service_networks_selector_role(dialog, role_section){
-    $('#roles_tabs_content .role_content', dialog).each(function(){
-      var role_section = this;
+  function _redo_service_networks_selector_role(dialog, role_section, template){
+    var selected_networks = [];
+    $(".service_network_checkbox:checked", role_section).each(function(){
+      selected_networks.push($(this).val());
+    });
 
-      var selected_networks = [];
-      $(".service_network_checkbox:checked", role_section).each(function(){
-        selected_networks.push($(this).val());
-      });
+    $(".networks_role", role_section).hide();
+    $(".networks_role_rdp", role_section).hide();
+    var service_networks = false;
 
-      $(".networks_role", role_section).hide();
-      var service_networks = false;
+    var role_tab_id = $(role_section).attr('id');
 
-      var role_tab_id = $(role_section).attr('id');
+    var str = "";
+    $(".service_networks .service_network_name", dialog).each(function(index, input){
+      var othersNames = $("input.service_network_name").not(input).map(function(_, v) {
+        return $(v).val();
+      }).get().join("|");
 
-      var str = "";
-      $(".service_networks .service_network_name", dialog).each(function(){
-        if ($(this).val()) {
-          service_networks = true;
-          str += "<tr>\
+      $(this).attr("pattern", "^(?!"+othersNames+")(\\w+)$");
+      
+      var name = $(this).val();
+      var regexp = new RegExp("^(?!"+othersNames+")(\\w+)$", "gi");
+
+      if (name && othersNames === "" || name.match(regexp)) {
+        service_networks = true;
+        var idNetwork = role_tab_id + "_" + index;
+        var idName = idNetwork + "_name";
+
+        str += "<tr id='"+idNetwork+"'>\
             <td style='width:10%'>\
-              <input class='service_network_checkbox check_item' type='checkbox' value='"+$(this).val()+"' id='"+role_tab_id+"_"+$(this).val()+"'/>\
+              <input class='service_network_checkbox check_item'\
+                type='checkbox' value='"+name+"' id='"+idName+"' data-index='"+index+"'/>\
             </td>\
             <td>\
-              <label for='"+role_tab_id+"_"+$(this).val()+"'>"+$(this).val()+"</label>\
+              <label for='"+idName+"'>"+name+"</label>\
             </td>\
           </tr>";
-        }
-      });
-
-      $(".networks_role_body", role_section).html(str);
-
-      if (service_networks) {
-        $(".networks_role", role_section).show();
       }
-
-
-      $.each(selected_networks, function(){
-        $(".service_network_checkbox[value='"+this+"']", role_section).attr('checked', true).change();
-      });
     });
+
+    $(".networks_role_body", role_section).html(str);
+
+    if (service_networks) {
+      $(".networks_role", role_section).show();
+      $(".networks_role_rdp", role_section).show();
+    }
+
+    $.each(selected_networks, function(){
+      $(".service_network_checkbox[value='"+this+"']", role_section).attr('checked', true);
+    });
+
+    if (template && template.roleTabObjects) {
+      $(Object.values(template.roleTabObjects)).each(function(_, section) {
+        section && section.refresh(role_section);
+      });
+    }
   }
 
   function _add_role_tab(role_id, dialog) {
@@ -418,7 +434,7 @@ define(function(require) {
         role_tab.html() +
     '</div>').appendTo($("#roles_tabs_content", dialog));
 
-    _redo_service_networks_selector_role(dialog, role_section);
+    _redo_service_networks_selector_role(dialog, role_section, that);
 
     Tips.setup(role_section);
 

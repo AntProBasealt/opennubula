@@ -208,12 +208,7 @@ class Container
     def start(options = {})
         OpenNebula.log '--- Starting container ---'
 
-        operation = change_state(__method__, options)
-
-        transition_end
-        update
-
-        operation
+        change_state(__method__, options)
     end
 
     def stop(options = { :timeout => 120 })
@@ -232,8 +227,8 @@ class Container
 
         begin
             stop(:force => force)
-        rescue => exception
-            OpenNebula.log_error "LXD Error: #{exception}"
+        rescue => e
+            OpenNebula.log_error "LXD Error: #{e}"
 
             real_status = 'Unknown'
 
@@ -248,8 +243,8 @@ class Container
 
             begin
                 stop(:force => true) if real_status == 'Running'
-            rescue => exception
-                error = "LXD Error: Cannot shut down container #{exception}"
+            rescue => e
+                error = "LXD Error: Cannot shut down container #{e}"
 
                 OpenNebula.log_error error
             end
@@ -258,20 +253,17 @@ class Container
 
     # Extended reboot required for OpenNebula execution flow
     def reboot(force)
-        case config['user.reboot_state']
-        when 'STOPPED'
+        if transient?
             start
 
-            config['user.reboot_state'] = 'RUNNING'
-            transition_start
+            transition_end # container reached the final state of rebooting
+            update
         else
+            transition_start # container will be started later
+            update
+
             check_stop(force)
-
-            config['user.reboot_state'] = 'STOPPED'
-            transition_end
         end
-
-        update
     end
 
     def restart(options = {})
@@ -503,6 +495,11 @@ class Container
         @lxc['config'].delete('user.one_status')
     end
 
+    # Helper method for querying transition phase
+    def transient?
+        @lxc['config']['user.one_status'] == '0'
+    end
+
     private
 
     def idmaps_file
@@ -555,8 +552,9 @@ class Container
         when 'FILE', 'BLOCK'
 
             ds = @one.disk_source(disk)
+            cmd = "#{Mapper::COMMANDS[:file]} #{ds}"
 
-            rc, out, err = Command.execute("#{Mapper::COMMANDS[:file]} #{ds}", false)
+            rc, out, err = Command.execute(cmd, false)
 
             unless rc.zero?
                 OpenNebula.log_error("#{__method__} #{err}")

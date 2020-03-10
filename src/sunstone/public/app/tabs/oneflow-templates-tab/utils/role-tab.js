@@ -27,6 +27,8 @@ define(function(require) {
 
   function RoleTab(html_role_id) {
     this.html_role_id = html_role_id;
+    this.global_template = {};
+    this.refresh = _refreshVMTemplate;
 
     return this;
   }
@@ -99,21 +101,99 @@ define(function(require) {
     $("#tf_btn_sche_policies", role_section).trigger("click");
 
     role_section.on("change", ".service_network_checkbox", role_section, function(){
-      var vm_template_contents = {};
-      vm_template_contents["NIC"] = [];
-      var old_template = $(".vm_template_contents", role_section).val();
+      // Network values
+      var index = $(this).data("index");
+      var name = $(this).val();
 
-      $(".service_network_checkbox:checked", role_section).each(function(){
-        vm_template_contents["NIC"].push({"NETWORK_ID":"$"+$(this).val()});
+      updateOptionsRDP(that.global_template, role_section);
+      
+      (this.checked)
+        ? that.global_template[index] = { "NETWORK_ID": "$"+name }
+        : delete that.global_template[index];
+
+      updateTextareaTemplate(role_section, that.global_template);
+    });
+
+    role_section.on("change", ".vm_template_contents", role_section, function(){
+      var value = $(this).val();
+
+      var diff = diffWithTemplate(value, that.global_template);
+      
+      updateExtraTemplate(role_section, that.global_template, diff)
+      updateTextareaTemplate(role_section, that.global_template);
+    });
+
+    role_section.on("change", ".networks_role_rdp select#rdp", role_section, function(){
+      var valueSelected = this.value;
+
+      // delete RDP in global template when is 
+      $.each(Object.entries(that.global_template), function(_, network) {
+        var nicIndex = network[0];
+        var nicTemplate = network[1];
+
+        (nicIndex !== valueSelected && nicTemplate["RDP"])
+          && delete that.global_template[nicIndex]["RDP"];
       });
       
-      if(old_template != ""){
-        var template = TemplateUtils.stringToTemplate(old_template);
-        template["NIC"] = vm_template_contents["NIC"];
-        $(".vm_template_contents", role_section).val(TemplateUtils.templateToString(template));
-        return false;
+      if (valueSelected !== "" && that.global_template[valueSelected]) {
+          that.global_template[valueSelected]["RDP"] = "yes";
       }
-      $(".vm_template_contents", role_section).val(TemplateUtils.templateToString(vm_template_contents));
+      updateTextareaTemplate(role_section, that.global_template);
+    });
+  }
+
+  function updateExtraTemplate(roleSection, currentTemplate, extraValue) {
+    var checkboxes = $(".service_network_checkbox", roleSection);
+    var lastIndex = checkboxes.length > 100 ? checkboxes.length : 100;
+
+    currentTemplate[lastIndex] = String(extraValue);
+  }
+
+  function diffWithTemplate(newValue, currentTemplate) {
+    // map template with index checkbox
+    var sortedTemplate = TemplateUtils.templateToString({
+      NIC: Object.values(currentTemplate).filter(function(nic)  {
+        return typeof nic === "object"
+      })
+    })//.concat(Object.values(currentTemplate).filter(rest => typeof rest !== "object"));
+
+    var sortedValue = TemplateUtils.templateToString(TemplateUtils.stringToTemplate(newValue))
+
+    return sortedValue.split("").filter(function(c, i) {
+      return sortedTemplate.split("")[i] !== c
+    }).join("");
+  }
+
+  function updateTextareaTemplate(roleContext, currentTemplate) {
+
+    var newTemplate = TemplateUtils.templateToString({
+      NIC: Object.values(currentTemplate).filter(nic => typeof nic === "object")
+    }).concat(Object.values(currentTemplate).filter(rest => typeof rest !== "object"));
+
+    var textareaTemplate = $(".vm_template_contents", roleContext);
+    textareaTemplate.val(newTemplate);
+  }
+
+  function updateOptionsRDP(currentTemplate, context) {
+    var selectRDP = $(".networks_role_rdp select#rdp", context);
+    // empty all options in select rdp
+    selectRDP.empty();
+    selectRDP.append("<option value=''></option>")
+
+    $(".service_network_checkbox:checked", context).each(function () {
+      var index = $(this).data("index");
+      var name = $(this).val();
+      selectRDP.append("<option value='"+index+"'>"+name+"</option>")
+    });
+
+    // if some nic has RDP, update selector
+    $.each(Object.entries(currentTemplate), function(_, nic) {
+      var nicIndex = nic[0];
+      var nicTemplate = nic[1];
+
+      if (nicTemplate["RDP"] && nicTemplate["RDP"] === "yes") {
+        selectRDP.val(nicIndex);
+      }
     });
   }
 
@@ -192,23 +272,48 @@ define(function(require) {
   }
 
   function _fill(context, value, network_names) {
+    var that = this;
     $("#role_name", context).val(value.name);
     $("#role_name", context).change();
 
     $("#cardinality", context).val(value.cardinality);
 
-    this.templatesTable.selectResourceTableSelect({ids : value.vm_template});
+    that.templatesTable.selectResourceTableSelect({ids : value.vm_template});
 
     if (value.vm_template_contents){
-      $(".vm_template_contents", context).val(value.vm_template_contents);
-
+      // check all networks appear in vm template
       $(network_names).each(function(){
         var reg = new RegExp("\\$"+this+"\\b");
-
+        
         if(reg.exec(value.vm_template_contents) != null){
           $(".service_network_checkbox[value='"+this+"']", context).attr('checked', true).change();
         }
       });
+
+      // map template with index checkbox
+      var nics = TemplateUtils.stringToTemplate(value.vm_template_contents)["NIC"];
+      if (nics && Array.isArray(nics)) {
+        $(network_names).each(function(index, name) {
+          var nicTemplate = $.grep(nics, function(nic) {
+            return (nic["NETWORK_ID"] === "$"+name) && nic;
+          })
+          
+          if (nicTemplate && nicTemplate[0]) {
+            that.global_template[String(index)] = nicTemplate[0];
+          }
+        });
+      }
+      
+      // add extra of strings at the end of template
+      var extraTemplate = diffWithTemplate(value.vm_template_contents, that.global_template);
+
+      updateExtraTemplate(context, that.global_template, extraTemplate);
+
+      // update textarea template content
+      updateTextareaTemplate(context, that.global_template);
+
+      // update options for RDP
+      updateOptionsRDP(that.global_template, context);
     }
 
     $("select[name='shutdown_action_role']", context).val(value.shutdown_action);
@@ -258,6 +363,31 @@ define(function(require) {
         }
       });
     }
+  }
+
+  function _refreshVMTemplate(role_section) {
+    var selected_networks = [];
+    $(".service_network_checkbox:checked", role_section).each(function(){
+      selected_networks.push($(this).val());
+    });
+
+    Object.values(this.global_template)
+      .filter(function(nic) { return typeof nic === "object" })
+      .reduce(function(acc, nic, indexKey) {
+        if (!selected_networks.find(
+          function(net) {
+            return nic && nic.NETWORK_ID && nic.NETWORK_ID === "$"+net
+          })
+        ) {
+          acc.push(indexKey);
+        }
+        return acc;
+      }, [])
+      .forEach(function(index) {
+        delete this.global_template[index];
+      }, this);
+
+    updateTextareaTemplate(role_section, this.global_template);
   }
 
   //----------------------------------------------------------------------------

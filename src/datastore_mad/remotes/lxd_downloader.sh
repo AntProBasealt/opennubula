@@ -36,6 +36,7 @@ MARKET_URL=$1
 CONTEXT_API="https://api.github.com/repos/OpenNebula/addon-context-linux/releases"
 CONTEXT_URL="https://github.com/OpenNebula/addon-context-linux/releases/download"
 
+PKG_ALT="curl openssh-server opennebula-context"
 PKG_APK="curl openssh"
 PKG_DEB="curl dbus openssh-server"
 PKG_RPM="openssh-server"
@@ -294,6 +295,22 @@ rm /dev/random /dev/urandom
 EOC
 )
     ;;
+*alt*)
+    terminal="/bin/bash"
+    commands=$(cat <<EOC
+export PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+rm -f /etc/resolv.conf >> /var/log/chroot.log 2>&1
+echo "nameserver $DNS_SERVER" > /etc/resolv.conf
+
+[ ! -e /dev/random ] && mknod -m 666 /dev/random c 1 8  >> /var/log/chroot.log 2>&1
+[ ! -e /dev/urandom ] && mknod -m 666 /dev/urandom c 1 9  >> /var/log/chroot.log 2>&1
+
+apt-get update >> /var/log/chroot.log 2>&1
+apt-get install $PKG_ALT -y >> /var/log/chroot.log 2>&1
+
+rm /dev/random /dev/urandom
+EOC
 *)
     terminal="/bin/sh"
     commands=$(cat <<EOC

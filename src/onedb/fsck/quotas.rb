@@ -463,12 +463,12 @@ module OneDBFsck
         @db.fetch(queries[2]) do |vnet_row|
             vnet_doc = nokogiri_doc(vnet_row[:body])
 
+            parent_id = vnet_doc.root.xpath('PARENT_NETWORK_ID')
+            parent_id = parent_id.text unless parent_id.nil?
+
+            next if parent_id.nil? || parent_id.empty?
+
             vnet_doc.xpath('VNET/AR_POOL').each do |ar|
-                parent_id = ar.xpath('AR/PARENT_NETWORK_AR_ID')
-                parent_id = parent_id.text unless parent_id.nil?
-
-                next if parent_id.nil? || parent_id.empty?
-
                 vnet_usage[parent_id] = 0 if vnet_usage[parent_id].nil?
 
                 ar.xpath('AR/SIZE').each do |size|
@@ -485,6 +485,10 @@ module OneDBFsck
         end
 
         net_quota.xpath('NETWORK').each do |net_elem|
+            # The ID should exists, just in case it's missing it doesn't make
+            # sense to check this LEASES
+            next unless net_elem.at_xpath('ID')
+
             vnet_id = net_elem.at_xpath('ID').text
 
             leases_used = vnet_usage.delete(vnet_id)

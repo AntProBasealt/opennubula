@@ -892,18 +892,22 @@ module VCenterDriver
                             break
                         end
 
-                        raise 'Problem with your unmanaged nics!' unless device
-
-                        nics.delete(device)
+                        if device
+                            nics.delete(device)
+                        else
+                            nil
+                        end
                     }
 
                     unmanaged_nics.each do |unic|
                         vnic      = select_net.call(unic['VCENTER_NET_REF'])
-                        nic_class = vnic.class
+                        nic_class = vnic.class if vnic
                         new_model = Nic.nic_model_class(unic['MODEL']) if unic['MODEL']
 
+                        if vnic.nil?
+                                device_change << calculate_add_nic_spec(unic)
                         # delete actual nic and update the new one.
-                        if new_model && new_model != nic_class
+                        elsif new_model && new_model != nic_class
                                 device_change << { :device => vnic, :operation => :remove }
                                 device_change << calculate_add_nic_spec(unic, vnic.unitNumber)
                         else
@@ -1986,6 +1990,9 @@ module VCenterDriver
 
                 # Update the template reference
                 new_template.update("VCENTER_TEMPLATE_REF=#{@item._ref}", true)
+
+                # Add vCenter template name
+                new_template.update("VCENTER_TEMPLATE_NAME=#{@item.name}", true)
         end
 
         def resize_unmanaged_disks
@@ -2493,7 +2500,7 @@ module VCenterDriver
         # this function is used to instantiate vcenter vms
         #
         # @param vi_client [vi_client] the vcenterdriver client that allows the connection
-        # @param drv_action [xmleleent] driver_action that contains the info
+        # @param drv_action [xmlelement] driver_action that contains the info
         # @param id [int] the if of the opennebula virtual machine
         #
         # @return [vcenterdriver::vm] the virtual machine

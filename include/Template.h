@@ -42,9 +42,9 @@ class Template
 {
 public:
 
-    Template(bool         _replace_mode = false,
-             const char   _separator    = '=',
-             const char * _xml_root     = "TEMPLATE"):
+    explicit Template(bool         _replace_mode = false,
+                      const char   _separator    = '=',
+                      const char * _xml_root     = "TEMPLATE"):
                  replace_mode(_replace_mode),
                  separator(_separator),
                  xml_root(_xml_root){}
@@ -73,7 +73,7 @@ public:
             separator    = t.separator;
             xml_root     = t.xml_root;
 
-            attributes.clear();
+            clear();
 
             for (it = t.attributes.begin() ; it != t.attributes.end() ; it++)
             {

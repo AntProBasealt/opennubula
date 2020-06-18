@@ -16,6 +16,7 @@ Url: https://opennebula.org
 
 Source0: %name-%version.tar
 
+ExcludeArch: %arm
 BuildRequires(pre): rpm-build-ruby rpm-build-python3 rpm-macros-nodejs
 BuildRequires: gcc-c++
 BuildRequires: libcurl-devel
@@ -235,7 +236,7 @@ Configures an OpenNebula node providing lxd.
 %package provision
 Summary: OpenNebula provisioning tool
 Group: System/Servers
-BuildArch: noarch
+# BuildArch: noarch
 Requires: %name-common = %EVR
 Requires: %name-server = %EVR
 

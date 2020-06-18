@@ -9,7 +9,7 @@
 Name: opennebula
 Summary: Cloud computing solution for Data Center Virtualization
 Version: 5.10.5
-Release: alt1
+Release: alt2
 License: Apache-2.0
 Group: System/Servers
 Url: https://opennebula.org
@@ -221,9 +221,10 @@ Group: System/Servers
 #Requires: ruby ruby-stdlibs
 Requires: %name-common = %EVR
 Requires: %name-node-kvm = %EVR
-Requires: libvirt-lxc
+Requires: libvirt-lxc lxcfs
 Requires: kpartx
-Requires: lxd >= 3.0
+Requires: lxd3.0 >= 3.0
+Conflicts: lxd >= 3.1.0
 %ifarch aarch64 ppc64 ppc64le x86_64
 Requires: rbd-nbd
 %endif
@@ -686,6 +687,11 @@ fi
 %exclude %_man1dir/oneprovision.1*
 
 %changelog
+* Thu Jun 18 2020 Alexey Shabalin <shaba@altlinux.org> 5.10.5-alt2
+- backport patches from upstream/one-5.10 branch
+- fixed requires on lxd3.0 (lxd-4 not supported)
+- add requires lxcfs to node-lxd package
+
 * Mon May 11 2020 Alexey Shabalin <shaba@altlinux.org> 5.10.5-alt1
 - 5.10.5
 - add requires libvirt-client and polkit to opennebula-node-kvm package

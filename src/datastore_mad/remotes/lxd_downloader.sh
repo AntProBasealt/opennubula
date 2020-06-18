@@ -311,6 +311,8 @@ apt-get install $PKG_ALT -y >> /var/log/chroot.log 2>&1
 
 rm /dev/random /dev/urandom
 EOC
+)
+    ;;
 *)
     terminal="/bin/sh"
     commands=$(cat <<EOC

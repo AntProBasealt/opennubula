@@ -1,7 +1,6 @@
 [Unit]
 Description=OpenNebula noVNC Server
 After=network.target
-Before=opennebula-sunstone.service
 
 [Service]
 Type=forking

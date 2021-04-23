@@ -1,0 +1,46 @@
+{
+  "name": "@github/webauthn-json",
+  "version": "0.4.1",
+  "description": "A wrapper for the webauthn API that adapts input/output values to plain JSON with base64url.",
+  "author": "GitHub, Inc. <opensource+webauthn-json@github.com>",
+  "license": "MIT",
+  "repository": "github:github/webauthn-json",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "umd": "dist/webauthn-json.umd.js",
+  "types": "dist/src/index.d.ts",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/jest": "^24.0.15",
+    "jest": "^24.8.0",
+    "rollup": "^1.16.3",
+    "rollup-plugin-terser": "^5.0.0",
+    "rollup-plugin-tslint": "^0.2.2",
+    "rollup-plugin-typescript2": "^0.21.2",
+    "ts-jest": "^24.0.2",
+    "tslint": "^5.18.0",
+    "typescript": "^3.6.2"
+  },
+  "scripts": {
+    "build": "npm run copy-flow && rollup -c",
+    "dev": "npm run link-flow && rollup -cw",
+    "clean": "rm -rf dist",
+    "test": "jest && npm run lint",
+    "setup": "npm install",
+    "lint": "tslint --fix --project . && tslint --fix rollup.config.js",
+    "prepack": "npm run clean && npm run build",
+    "copy-flow": "mkdir -p dist/ && rm -f dist/index.js.flow dist/index.esm.js.flow && cp    src/index.js.flow dist/ && cp    src/index.js.flow dist/index.esm.js.flow",
+    "link-flow": "mkdir -p dist/ && rm -f dist/index.js.flow dist/index.esm.js.flow && ln -s src/index.js.flow dist/ && ln -s src/index.js.flow dist/index.esm.js.flow",
+    "postpublish": "npm publish --ignore-scripts --@github:registry='https://npm.pkg.github.com'"
+  },
+  "bin": {
+    "webauthn-json": "./dist/bin/webauthn-json.js"
+  },
+  "keywords": [
+    "webauthn",
+    "auth",
+    "u2f",
+    "security",
+    "credentials"
+  ]
+}

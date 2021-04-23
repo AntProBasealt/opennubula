@@ -128,6 +128,10 @@
 
                 uri = scheme + host + ":" + port;
 
+                if (path) {
+                  uri += path[0] == '/' ? path : ('/' + path);
+                }
+
                 try
                 {
                     sc = new SpiceMainConn({uri: uri, screen_id: "spice-screen", dump_id: "debug-div",
@@ -168,6 +172,7 @@
                 {
                     var spice_xfer_area = document.createElement("div");
                     spice_xfer_area.setAttribute('id', 'spice-xfer-area');
+                    document.getElementById('spice-area').appendChild(spice_xfer_area);
                     document.getElementById('spice-area').addEventListener('dragover', handle_file_dragover, false);
                     document.getElementById('spice-area').addEventListener('drop', handle_file_drop, false);
                 }

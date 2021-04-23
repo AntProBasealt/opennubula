@@ -25,12 +25,12 @@
     "jquery": ">= 1.9.0"
   },
   "private": false,
-  "_release": "dd2cce3",
+  "_release": "9398b3f",
   "_resolution": {
     "type": "commit",
-    "commit": "dd2cce3"
+    "commit": "9398b3f"
   },
-  "_source": "https://github.com/ericjgagnon/wickedpicker.git",
-  "_target": "dd2cce3",
-  "_originalSource": "https://github.com/ericjgagnon/wickedpicker.git"
+  "_source": "https://github.com/OpenNebula/sunstone-deps.git",
+  "_target": "9398b3f",
+  "_originalSource": "https://github.com/OpenNebula/sunstone-deps.git"
 }

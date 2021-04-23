@@ -1,0 +1,13 @@
+{
+  "name": "webauthn-json",
+  "_cacheHeaders": {
+    "ETag": "\"e5e3612bf27a428880395fba213b32a4\"",
+    "Last-Modified": "Thu, 14 Nov 2019 11:26:07 GMT",
+    "Content-Length": "62571",
+    "Content-Type": "application/octet-stream"
+  },
+  "_release": "e-tag:e5e3612bf",
+  "_source": "https://registry.npmjs.org/@github/webauthn-json/-/webauthn-json-0.4.1.tgz",
+  "_target": "*",
+  "_originalSource": "https://registry.npmjs.org/@github/webauthn-json/-/webauthn-json-0.4.1.tgz"
+}

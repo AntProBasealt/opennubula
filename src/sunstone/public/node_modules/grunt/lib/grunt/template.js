@@ -10,11 +10,7 @@ template.date = require('dateformat');
 
 // Format today's date.
 template.today = function(format) {
-  var now = new Date();
-  if (process.env.SOURCE_DATE_EPOCH) {
-    now = new Date((process.env.SOURCE_DATE_EPOCH * 1000) + (now.getTimezoneOffset() * 60000));
-  }
-  return template.date(now, format);
+  return template.date(new Date(), format);
 };
 
 // Template delimiters.

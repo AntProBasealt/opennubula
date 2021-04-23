@@ -62,6 +62,12 @@ function SpiceDisplayConn()
 SpiceDisplayConn.prototype = Object.create(SpiceConn.prototype);
 SpiceDisplayConn.prototype.process_channel_message = function(msg)
 {
+    if (msg.type == SPICE_MSG_DISPLAY_MODE)
+    {
+        this.known_unimplemented(msg.type, "Display Mode");
+        return true;
+    }
+
     if (msg.type == SPICE_MSG_DISPLAY_MARK)
     {
         // FIXME - DISPLAY_MARK not implemented (may be hard or impossible)
@@ -171,8 +177,6 @@ SpiceDisplayConn.prototype.process_channel_message = function(msg)
                       has_alpha: this.surfaces[draw_copy.data.src_bitmap.surface_id].format == SPICE_SURFACE_FMT_32_xRGB ? false : true,
                       descriptor : draw_copy.data.src_bitmap.descriptor
                     });
-
-                return true;
             }
             else if (draw_copy.data.src_bitmap.descriptor.type == SPICE_IMAGE_TYPE_JPEG)
             {
@@ -366,6 +370,60 @@ SpiceDisplayConn.prototype.process_channel_message = function(msg)
         return true;
     }
 
+    if (msg.type == SPICE_MSG_DISPLAY_DRAW_OPAQUE)
+    {
+        this.known_unimplemented(msg.type, "Display Draw Opaque");
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_DRAW_BLEND)
+    {
+        this.known_unimplemented(msg.type, "Display Draw Blend");
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_DRAW_BLACKNESS)
+    {
+        this.known_unimplemented(msg.type, "Display Draw Blackness");
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_DRAW_WHITENESS)
+    {
+        this.known_unimplemented(msg.type, "Display Draw Whiteness");
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_DRAW_INVERS)
+    {
+        this.known_unimplemented(msg.type, "Display Draw Invers");
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_DRAW_ROP3)
+    {
+        this.known_unimplemented(msg.type, "Display Draw ROP3");
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_DRAW_STROKE)
+    {
+        this.known_unimplemented(msg.type, "Display Draw Stroke");
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_DRAW_TRANSPARENT)
+    {
+        this.known_unimplemented(msg.type, "Display Draw Transparent");
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_DRAW_ALPHA_BLEND)
+    {
+        this.known_unimplemented(msg.type, "Display Draw Alpha Blend");
+        return true;
+    }
+
     if (msg.type == SPICE_MSG_DISPLAY_COPY_BITS)
     {
         var copy_bits = new SpiceMsgDisplayCopyBits(msg.data);
@@ -399,6 +457,18 @@ SpiceDisplayConn.prototype.process_channel_message = function(msg)
 
 
         this.surfaces[copy_bits.base.surface_id].draw_count++;
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_INVAL_ALL_PIXMAPS)
+    {
+        this.known_unimplemented(msg.type, "Display Inval All Pixmaps");
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_INVAL_PALETTE)
+    {
+        this.known_unimplemented(msg.type, "Display Inval Palette");
         return true;
     }
 
@@ -469,47 +539,84 @@ SpiceDisplayConn.prototype.process_channel_message = function(msg)
         if (!this.streams)
             this.streams = new Array();
         if (this.streams[m.id])
-            console.log("Stream already exists");
+            console.log("Stream " + m.id + " already exists");
         else
             this.streams[m.id] = m;
-        if (m.codec_type != SPICE_VIDEO_CODEC_TYPE_MJPEG)
+
+        if (m.codec_type == SPICE_VIDEO_CODEC_TYPE_VP8)
+        {
+            var media = new MediaSource();
+            var v = document.createElement("video");
+            v.src = window.URL.createObjectURL(media);
+
+            v.setAttribute('autoplay', true);
+            v.setAttribute('width', m.stream_width);
+            v.setAttribute('height', m.stream_height);
+
+            var left = m.dest.left;
+            var top = m.dest.top;
+            if (this.surfaces[m.surface_id] !== undefined)
+            {
+                left += this.surfaces[m.surface_id].canvas.offsetLeft;
+                top += this.surfaces[m.surface_id].canvas.offsetTop;
+            }
+            document.getElementById(this.parent.screen_id).appendChild(v);
+            v.setAttribute('style', "position: absolute; top:" + top + "px; left:" + left + "px;");
+
+            media.addEventListener('sourceopen', handle_video_source_open, false);
+            media.addEventListener('sourceended', handle_video_source_ended, false);
+            media.addEventListener('sourceclosed', handle_video_source_closed, false);
+
+            this.streams[m.id].video = v;
+            this.streams[m.id].media = media;
+
+            media.stream = this.streams[m.id];
+            media.spiceconn = this;
+            v.spice_stream = this.streams[m.id];
+        }
+        else if (m.codec_type != SPICE_VIDEO_CODEC_TYPE_MJPEG)
             console.log("Unhandled stream codec: "+m.codec_type);
         return true;
     }
 
-    if (msg.type == SPICE_MSG_DISPLAY_STREAM_DATA)
+    if (msg.type == SPICE_MSG_DISPLAY_STREAM_DATA ||
+        msg.type == SPICE_MSG_DISPLAY_STREAM_DATA_SIZED)
     {
-        var m = new SpiceMsgDisplayStreamData(msg.data);
+        var m;
+        if (msg.type == SPICE_MSG_DISPLAY_STREAM_DATA_SIZED)
+            m = new SpiceMsgDisplayStreamDataSized(msg.data);
+        else
+            m = new SpiceMsgDisplayStreamData(msg.data);
+
         if (!this.streams[m.base.id])
         {
             console.log("no stream for data");
             return false;
         }
+
+        var time_until_due = m.base.multi_media_time - this.parent.relative_now();
+
         if (this.streams[m.base.id].codec_type === SPICE_VIDEO_CODEC_TYPE_MJPEG)
+            process_mjpeg_stream_data(this, m, time_until_due);
+
+        if (this.streams[m.base.id].codec_type === SPICE_VIDEO_CODEC_TYPE_VP8)
+            process_video_stream_data(this.streams[m.base.id], m);
+
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_STREAM_ACTIVATE_REPORT)
+    {
+        var m = new SpiceMsgDisplayStreamActivateReport(msg.data);
+
+        var report = new SpiceMsgcDisplayStreamReport(m.stream_id, m.unique_id);
+        if (this.streams[m.stream_id])
         {
-            var tmpstr = "data:image/jpeg,";
-            var img = new Image;
-            var i;
-            for (i = 0; i < m.data.length; i++)
-            {
-                tmpstr +=  '%';
-                if (m.data[i] < 16)
-                tmpstr += '0';
-                tmpstr += m.data[i].toString(16);
-            }
-            var strm_base = new SpiceMsgDisplayBase();
-            strm_base.surface_id = this.streams[m.base.id].surface_id;
-            strm_base.box = this.streams[m.base.id].dest;
-            strm_base.clip = this.streams[m.base.id].clip;
-            img.o =
-                { base: strm_base,
-                  tag: "mjpeg." + m.base.id,
-                  descriptor: null,
-                  sc : this,
-                };
-            img.onload = handle_draw_jpeg_onload;
-            img.src = tmpstr;
+            this.streams[m.stream_id].report = report;
+            this.streams[m.stream_id].max_window_size = m.max_window_size;
+            this.streams[m.stream_id].timeout_ms = m.timeout_ms
         }
+
         return true;
     }
 
@@ -525,9 +632,24 @@ SpiceDisplayConn.prototype.process_channel_message = function(msg)
     {
         var m = new SpiceMsgDisplayStreamDestroy(msg.data);
         DEBUG > 1 && console.log(this.type + ": MsgStreamDestroy id" + m.id);
+
+        if (this.streams[m.id].codec_type == SPICE_VIDEO_CODEC_TYPE_VP8)
+        {
+            document.getElementById(this.parent.screen_id).removeChild(this.streams[m.id].video);
+            this.streams[m.id].source_buffer = null;
+            this.streams[m.id].media = null;
+            this.streams[m.id].video = null;
+        }
         this.streams[m.id] = undefined;
         return true;
     }
+
+    if (msg.type == SPICE_MSG_DISPLAY_STREAM_DESTROY_ALL)
+    {
+        this.known_unimplemented(msg.type, "Display Stream Destroy All");
+        return true;
+    }
+
     if (msg.type == SPICE_MSG_DISPLAY_INVAL_LIST)
     {
         var m = new SpiceMsgDisplayInvalList(msg.data);
@@ -536,6 +658,18 @@ SpiceDisplayConn.prototype.process_channel_message = function(msg)
         for (i = 0; i < m.count; i++)
             if (this.cache[m.resources[i].id] != undefined)
                 delete this.cache[m.resources[i].id];
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_MONITORS_CONFIG)
+    {
+        this.known_unimplemented(msg.type, "Display Monitors Config");
+        return true;
+    }
+
+    if (msg.type == SPICE_MSG_DISPLAY_DRAW_COMPOSITE)
+    {
+        this.known_unimplemented(msg.type, "Display Draw Composite");
         return true;
     }
 
@@ -820,4 +954,267 @@ function handle_draw_jpeg_onload()
 
         this.o.sc.surfaces[this.o.base.surface_id].draw_count++;
     }
+
+    if ("report" in this.o.sc.streams[this.o.id])
+            process_stream_data_report(this.o.sc, this.o.id, this.o.msg_mmtime, this.o.msg_mmtime - this.o.sc.parent.relative_now())
+}
+
+function process_mjpeg_stream_data(sc, m, time_until_due)
+{
+    if (time_until_due < 0)
+    {
+        if ("report" in sc.streams[m.base.id])
+            sc.streams[m.base.id].report.num_drops++;
+        return;
+    }
+
+    var tmpstr = "data:image/jpeg,";
+    var img = new Image;
+    var i;
+    for (i = 0; i < m.data.length; i++)
+    {
+        tmpstr +=  '%';
+        if (m.data[i] < 16)
+        tmpstr += '0';
+        tmpstr += m.data[i].toString(16);
+    }
+    var strm_base = new SpiceMsgDisplayBase();
+    strm_base.surface_id = sc.streams[m.base.id].surface_id;
+    strm_base.box = m.dest || sc.streams[m.base.id].dest;
+    strm_base.clip = sc.streams[m.base.id].clip;
+    img.o =
+        { base: strm_base,
+          tag: "mjpeg." + m.base.id,
+          descriptor: null,
+          sc : sc,
+          id : m.base.id,
+          msg_mmtime : m.base.multi_media_time,
+        };
+    img.onload = handle_draw_jpeg_onload;
+    img.src = tmpstr;
+}
+
+function process_stream_data_report(sc, id, msg_mmtime, time_until_due)
+{
+    sc.streams[id].report.num_frames++;
+    if (sc.streams[id].report.start_frame_mm_time == 0)
+        sc.streams[id].report.start_frame_mm_time = msg_mmtime;
+
+    if (sc.streams[id].report.num_frames > sc.streams[id].max_window_size ||
+        (msg_mmtime - sc.streams[id].report.start_frame_mm_time) > sc.streams[id].timeout_ms)
+    {
+        sc.streams[id].report.end_frame_mm_time = msg_mmtime;
+        sc.streams[id].report.last_frame_delay = time_until_due;
+
+        var msg = new SpiceMiniData();
+        msg.build_msg(SPICE_MSGC_DISPLAY_STREAM_REPORT, sc.streams[id].report);
+        sc.send_msg(msg);
+
+        sc.streams[id].report.start_frame_mm_time = 0;
+        sc.streams[id].report.num_frames = 0;
+        sc.streams[id].report.num_drops = 0;
+    }
+}
+
+function handle_video_source_open(e)
+{
+    var stream = this.stream;
+    var p = this.spiceconn;
+
+    if (stream.source_buffer)
+        return;
+
+    var s = this.addSourceBuffer(SPICE_VP8_CODEC);
+    if (! s)
+    {
+        p.log_err('Codec ' + SPICE_VP8_CODEC + ' not available.');
+        return;
+    }
+
+    stream.source_buffer = s;
+    s.spiceconn = p;
+    s.stream = stream;
+
+    stream.queue = new Array();
+    stream.start_time = 0;
+    stream.cluster_time = 0;
+
+    listen_for_video_events(stream);
+
+    var h = new webm_Header();
+    var te = new webm_VideoTrackEntry(this.stream.stream_width, this.stream.stream_height);
+    var t = new webm_Tracks(te);
+
+    var mb = new ArrayBuffer(h.buffer_size() + t.buffer_size())
+
+    var b = h.to_buffer(mb);
+    t.to_buffer(mb, b);
+
+    s.addEventListener('error', handle_video_buffer_error, false);
+    s.addEventListener('updateend', handle_append_video_buffer_done, false);
+
+    append_video_buffer(s, mb);
+}
+
+function handle_video_source_ended(e)
+{
+    var p = this.spiceconn;
+    p.log_err('Video source unexpectedly ended.');
+}
+
+function handle_video_source_closed(e)
+{
+    var p = this.spiceconn;
+    p.log_err('Video source unexpectedly closed.');
+}
+
+function append_video_buffer(sb, mb)
+{
+    try
+    {
+        sb.stream.append_okay = false;
+        sb.appendBuffer(mb);
+    }
+    catch (e)
+    {
+        var p = sb.spiceconn;
+        p.log_err("Error invoking appendBuffer: " + e.message);
+    }
+}
+
+function handle_append_video_buffer_done(e)
+{
+    var stream = this.stream;
+
+    if (stream.current_frame && "report" in stream)
+    {
+        var sc = this.stream.media.spiceconn;
+        var t = this.stream.current_frame.msg_mmtime;
+        process_stream_data_report(sc, stream.id, t, t - sc.parent.relative_now());
+    }
+
+    if (stream.queue.length > 0)
+    {
+        stream.current_frame = stream.queue.shift();
+        append_video_buffer(stream.source_buffer, stream.current_frame.mb);
+    }
+    else
+    {
+        stream.append_okay = true;
+    }
+}
+
+function handle_video_buffer_error(e)
+{
+    var p = this.spiceconn;
+    p.log_err('source_buffer error ' + e.message);
+}
+
+function push_or_queue(stream, msg, mb)
+{
+    var frame =
+    {
+        msg_mmtime : msg.base.multi_media_time,
+    };
+
+    if (stream.append_okay)
+    {
+        stream.current_frame = frame;
+        append_video_buffer(stream.source_buffer, mb);
+    }
+    else
+    {
+        frame.mb = mb;
+        stream.queue.push(frame);
+    }
+}
+
+function video_simple_block(stream, msg, keyframe)
+{
+    var simple = new webm_SimpleBlock(msg.base.multi_media_time - stream.cluster_time, msg.data, keyframe);
+    var mb = new ArrayBuffer(simple.buffer_size());
+    simple.to_buffer(mb);
+
+    push_or_queue(stream, msg, mb);
+}
+
+function new_video_cluster(stream, msg)
+{
+    stream.cluster_time = msg.base.multi_media_time;
+    var c = new webm_Cluster(stream.cluster_time - stream.start_time, msg.data);
+
+    var mb = new ArrayBuffer(c.buffer_size());
+    c.to_buffer(mb);
+
+    push_or_queue(stream, msg, mb);
+
+    video_simple_block(stream, msg, true);
+}
+
+function process_video_stream_data(stream, msg)
+{
+    if (! stream.source_buffer)
+        return true;
+
+    if (stream.start_time == 0)
+    {
+        stream.start_time = msg.base.multi_media_time;
+        stream.video.play();
+        new_video_cluster(stream, msg);
+    }
+
+    else if (msg.base.multi_media_time - stream.cluster_time >= MAX_CLUSTER_TIME)
+        new_video_cluster(stream, msg);
+    else
+        video_simple_block(stream, msg, false);
+}
+
+function video_handle_event_debug(e)
+{
+    var s = this.spice_stream;
+    if (s.video)
+    {
+        if (STREAM_DEBUG > 0 || s.video.buffered.len > 1)
+            console.log(s.video.currentTime + ":id " +  s.id + " event " + e.type +
+                dump_media_element(s.video));
+    }
+
+    if (STREAM_DEBUG > 1 && s.media)
+        console.log("  media_source " + dump_media_source(s.media));
+
+    if (STREAM_DEBUG > 1 && s.source_buffer)
+        console.log("  source_buffer " + dump_source_buffer(s.source_buffer));
+
+    if (STREAM_DEBUG > 0 || s.queue.length > 1)
+        console.log('  queue len ' + s.queue.length + '; append_okay: ' + s.append_okay);
+}
+
+function video_debug_listen_for_one_event(name)
+{
+    this.addEventListener(name, video_handle_event_debug);
+}
+
+function listen_for_video_events(stream)
+{
+    var video_0_events = [
+        "abort", "error"
+    ];
+
+    var video_1_events = [
+        "loadstart", "suspend", "emptied", "stalled", "loadedmetadata", "loadeddata", "canplay",
+        "canplaythrough", "playing", "waiting", "seeking", "seeked", "ended", "durationchange",
+        "timeupdate", "play", "pause", "ratechange"
+    ];
+
+    var video_2_events = [
+        "progress",
+        "resize",
+        "volumechange"
+    ];
+
+    video_0_events.forEach(video_debug_listen_for_one_event, stream.video);
+    if (STREAM_DEBUG > 0)
+        video_1_events.forEach(video_debug_listen_for_one_event, stream.video);
+    if (STREAM_DEBUG > 1)
+        video_2_events.forEach(video_debug_listen_for_one_event, stream.video);
 }

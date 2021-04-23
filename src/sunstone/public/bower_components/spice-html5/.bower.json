@@ -1,13 +1,13 @@
 {
   "name": "spice-html5",
   "homepage": "https://github.com/freedesktop/spice-html5",
-  "_release": "spice-html5-0.1.6",
+  "_release": "spice-html5-0.1.7",
   "_resolution": {
     "type": "tag",
-    "tag": "spice-html5-0.1.6",
-    "commit": "18b1b878b41c15205e12cb3aeee3820b5c4a539e"
+    "tag": "spice-html5-0.1.7",
+    "commit": "52ae32ff14b48b17e50ba0f9ce19c931e646bd31"
   },
   "_source": "https://github.com/freedesktop/spice-html5.git",
-  "_target": "spice-html5-0.1.6",
+  "_target": "spice-html5-0.1.7",
   "_originalSource": "https://github.com/freedesktop/spice-html5.git"
 }

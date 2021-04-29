@@ -553,7 +553,7 @@ class Container
             end
 
             case out
-            when /.*QEMU QCOW.*/
+            when /(:i)qemu.*qcow/
                 OpenNebula.log "Using qcow2 mapper for #{ds}"
                 Qcow2Mapper.new
             when /.*filesystem.*/

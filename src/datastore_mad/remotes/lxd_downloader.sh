@@ -134,7 +134,7 @@ output_qcow="$TMP_DIR/$id.qcow2"
 #-------------------------------------------------------------------------------
 $CURL $rootfs_url --output $output --silent
 
-qemu-img create -f raw $output_raw ${size}M  > /dev/null 2>&1
+qemu-img create -f raw $output_raw $(($size + 300))M  > /dev/null 2>&1
 
 case $filesystem in
     "ext4")

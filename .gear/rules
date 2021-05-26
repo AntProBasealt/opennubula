@@ -1,2 +1,3 @@
 tar: .
+copy: lxd-init.sh
 

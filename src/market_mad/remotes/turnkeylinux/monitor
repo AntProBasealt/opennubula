@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -27,7 +27,9 @@ else
 end
 
 if File.directory?(GEMS_LOCATION)
-    Gem.use_paths(GEMS_LOCATION)
+    $LOAD_PATH.reject! {|l| l =~ /vendor_ruby/ }
+    require 'rubygems'
+    Gem.use_paths(File.realpath(GEMS_LOCATION))
 end
 
 $LOAD_PATH << RUBY_LIB_LOCATION
@@ -40,11 +42,7 @@ require 'rexml/document'
 require 'nokogiri'
 require 'digest/md5'
 
-def unindent(str)
-    m = str.match(/^(\s*)/)
-    spaces = m[1].size
-    str.gsub!(/^ {#{spaces}}/, '')
-end
+require_relative '../common/lxd'
 
 #-------------------------------------------------------------------------------
 #  This class is used to query the TurnkeyLinux repository
@@ -62,22 +60,6 @@ class TurnkeyLinux
         :format   => 'raw',
         :agent    => 'OpenNebula'
     }
-
-    TEMPLATE = unindent(<<-EOS)
-        HYPERVISOR = \"lxd\"
-        CPU = \"1\"
-        MEMORY = \"768\"
-        LXD_SECURITY_PRIVILEGED = \"true\"
-        GRAPHICS = [
-            LISTEN  =\"0.0.0.0\",
-            TYPE  =\"vnc\"
-        ]
-        CONTEXT = [
-            NETWORK  =\"YES\",
-            SSH_PUBLIC_KEY  =\"$USER[SSH_PUBLIC_KEY]\",
-            SET_HOSTNAME  =\"$NAME\"
-        ]"
-    EOS
 
     #---------------------------------------------------------------------------
     # Configuration varibales
@@ -151,7 +133,7 @@ class TurnkeyLinux
 
         # Line example
         # debian-9-turnkey-zurmo_15.2-1_amd64.tar.gz.hash 2018-11-29 09:45  2.2K
-        apps[1..-1].each do |l|
+        apps[0..-1].each do |l|
             f = l.split
 
             next if f[0] =~ /\.hash$/
@@ -175,7 +157,8 @@ class TurnkeyLinux
                 'TAGS'        => '',
                 'REGTIME'     => regt,
                 'SIZE'        => @options[:sizemb],
-                'DESCRIPTION' => "Based on #{image[0]}-#{image[1]}"
+                'DESCRIPTION' => "Based on #{image[0]}-#{image[1]}",
+                'LINK'        => "#{@options[:url]}/#{@options[:platform]}"
             }
 
             tmpl = ''
@@ -184,7 +167,8 @@ class TurnkeyLinux
             tmpl64 = ''
             print_var(tmpl64, 'DRIVER', 'raw')
 
-            data = { 'APPTEMPLATE64' => tmpl64, 'VMTEMPLATE64' => TEMPLATE }
+            data = { 'APPTEMPLATE64' => tmpl64,
+                     'VMTEMPLATE64' => LXDMarket.template }
             data.each do |key, val|
                 print_var(tmpl, key, Base64.strict_encode64(val))
             end

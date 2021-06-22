@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -17,6 +17,12 @@
 #include "LibVirtDriver.h"
 
 #include "Nebula.h"
+#include "HostPool.h"
+#include "ClusterPool.h"
+#include "VirtualNetwork.h"
+#include "ObjectXML.h"
+#include "Nebula.h"
+
 #include <sstream>
 #include <fstream>
 #include <libgen.h>
@@ -29,6 +35,8 @@ const int LibVirtDriver::CEPH_DEFAULT_PORT = 6789;
 const int LibVirtDriver::GLUSTER_DEFAULT_PORT = 24007;
 
 const int LibVirtDriver::ISCSI_DEFAULT_PORT = 3260;
+
+const char * LibVirtDriver::XML_DOMAIN_RNG_PATH = "/schemas/libvirt/domain.rng";
 
 #define set_sec_default(v, dv) if (v.empty() && !dv.empty()){v = dv;}
 
@@ -366,6 +374,30 @@ static string get_disk_bus(std::string &machine, std::string &target,
     }
 
     return "ide";
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+int LibVirtDriver::validate_raw(const string& raw_section, string& error) const
+{
+    ostringstream oss;
+
+    string path = Nebula::instance().get_share_location() + XML_DOMAIN_RNG_PATH;
+
+    oss << "<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>"
+        << "<name>aux</name>"
+        << raw_section << "</domain>";
+
+    int rc = ObjectXML::validate_rng(oss.str(), path);
+
+    if ( rc != 0 )
+    {
+        error = "Invalid RAW section: cannot validate DATA with domain.rng schema";
+        return -1;
+    }
+
+    return 0;
 }
 
 /* -------------------------------------------------------------------------- */

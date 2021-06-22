@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -19,6 +19,7 @@
 #include "NebulaUtil.h"
 #include "Nebula.h"
 #include "Clusterable.h"
+#include "ClusterableSingle.h"
 
 const string PoolObjectSQL::INVALID_NAME_CHARS = "&|:\\\";/'#{}$<>";
 
@@ -96,7 +97,11 @@ int PoolObjectSQL::select_oid(SqlDB *db, const char * _table,
 
     ostringstream oss;
 
-    oss << "SELECT oid FROM " << _table << " WHERE name = '" << sql_name << "'";
+    oss << "SELECT oid FROM " << _table << " WHERE ";
+
+    db->add_binary(oss);
+
+    oss << "name = '" << sql_name << "'";
 
     if ( _uid != -1 )
     {
@@ -175,7 +180,11 @@ int PoolObjectSQL::select(SqlDB *db, const string& _name, int _uid)
     set_callback(
             static_cast<Callbackable::Callback>(&PoolObjectSQL::select_cb));
 
-    oss << "SELECT body FROM " << table << " WHERE name = '" << sql_name << "'";
+    oss << "SELECT body FROM " << table << " WHERE ";
+
+    db->add_binary(oss);
+
+    oss << "name = '" << sql_name << "'";
 
     if ( _uid != -1 )
     {

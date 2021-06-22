@@ -1,6 +1,6 @@
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -96,6 +96,7 @@ class OneVcenterHelper < OpenNebulaHelper::OneHelper
     end
 
     def host(arg)
+        return arg
     end
 
     ########################
@@ -236,11 +237,11 @@ class OneVcenterHelper < OpenNebulaHelper::OneHelper
                 d[:import_id]
             end
 
-            column :REF, "ref", :left, :size=>config[:REF] || 15 do |d|
+            column :REF, "ref", :left, :adjust, :size=>config[:REF] || 15 do |d|
                 d[:ref]
             end
 
-            column :NAME, "Name", :left, :size=>config[:NAME] || 20 do |d|
+            column :NAME, "Name", :left, :expand, :size=>config[:NAME] || 20 do |d|
                 d[:name] || d[:simple_name]
             end
 
@@ -249,7 +250,7 @@ class OneVcenterHelper < OpenNebulaHelper::OneHelper
                 d[:one_ids] || d[:cluster].to_s
             end
 
-            column :PATH, "PATH", :left, :size=>config[:PATH] || 10 do |d|
+            column :PATH, "PATH", :left, :expand, :size=>config[:PATH] || 10 do |d|
                 d[:path]
             end
 

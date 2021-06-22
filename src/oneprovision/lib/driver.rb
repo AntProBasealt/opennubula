@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -40,12 +40,15 @@ module OneProvision
                     STDERR.puts "ERROR: #{text}\n#{e.text}"
 
                     retries += 1
+                    choice   = Mode.fail_choice
+                    seconds  = Mode.fail_sleep
 
                     if retries > Mode.max_retries && Mode.mode == :batch
-                        exit(-1)
-                    end
+                        retries = 0
+                        choice  = Mode.next_fail_choice
 
-                    choice = Mode.fail_choice
+                        sleep(seconds) if seconds && choice
+                    end
 
                     if Mode.mode == :interactive
                         begin
@@ -66,13 +69,16 @@ module OneProvision
                         end
                     end
 
-                    if choice == :retry
+                    case choice
+                    when :retry
+                        sleep(seconds) if seconds
+
                         retry
-                    elsif choice == :quit
+                    when :quit
                         exit(-1)
-                    elsif choice == :skip
-                        return
-                    elsif choice == :cleanup
+                    when :skip
+                        return :skip
+                    when :cleanup
                         raise OneProvisionCleanupException if cleanup
 
                         Utils.fail('Cleanup unsupported for this operation')

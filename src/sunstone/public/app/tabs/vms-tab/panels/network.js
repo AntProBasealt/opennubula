@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -42,6 +42,23 @@ define(function(require) {
   var RESOURCE = "VM";
   var XML_ROOT = "VM";
 
+  var isFirecracker = function(context) {
+    return context && 
+    context.element && 
+    context.element.USER_TEMPLATE && 
+    context.element.USER_TEMPLATE.HYPERVISOR && 
+    String(context.element.USER_TEMPLATE.HYPERVISOR).toLowerCase() === "firecracker"
+  }
+
+  var validateAction = function(context, action) {
+    return (action && context && context.element && context.element.STATE && context.element.LCM_STATE)
+      ? StateActions.enabledStateAction(action, context.element.STATE, context.element.LCM_STATE) : false;
+  }
+
+  var isPowerOff = function(context) {
+    return (context && context.element && context.element.STATE == OpenNebulaVM.STATES.POWEROFF) ? true : false
+  }
+
   /*
     CONSTRUCTOR
    */
@@ -50,7 +67,6 @@ define(function(require) {
     this.panelId = PANEL_ID;
     this.title = Locale.tr("Network");
     this.icon = "fa-globe";
-
     this.element = info[XML_ROOT];
 
     return this;
@@ -62,7 +78,6 @@ define(function(require) {
   Panel.prototype.onShow = _onShow;
   Panel.prototype.getState = _getState;
   Panel.prototype.setState = _setState;
-
   return Panel;
 
   /*
@@ -74,7 +89,7 @@ define(function(require) {
     var html = "<form id=\"tab_network_form\" vmid=\"" + that.element.ID + "\" >\
         <div class=\"row\">\
         <div class=\"large-12 columns\">\
-           <table class=\"nics_table no-hover info_table dataTable\">\
+           <table id=\"vm" + that.element.ID + "_networktab_datatable\" class=\"nics_table no-hover info_table dataTable\">\
              <thead>\
                <tr>\
                   <th></th>\
@@ -86,18 +101,18 @@ define(function(require) {
                   <th>" + Locale.tr("IPv6 ULA") + "</th>\
                   <th>" + Locale.tr("IPv6 Global") + "</th>\
                   <th colspan=\"\">" + Locale.tr("Actions") + "</th>\
-                  <th>"                 ;
+                  <th>";
 
     if (Config.isTabActionEnabled("vms-tab", "VM.attachnic")) {
-      if (StateActions.enabledStateAction("VM.attachnic",
-            that.element.STATE,
-            that.element.LCM_STATE) &&
-          OpenNebulaVM.isNICAttachSupported(that.element)) {
-        html += "\
-             <button id=\"attach_nic\" class=\"button small success right radius\" >" + Locale.tr("Attach nic") + "</button>";
+      var attachButton = function(enable){
+        var isDisabled = enable ?  "" : "disabled='disabled'";
+        return "<button id='attach_nic' class='button small success right radius' "+isDisabled+">" + Locale.tr("Attach nic") + "</button>";
+      }
+
+      if (validateAction(that, "VM.attachnic") && OpenNebulaVM.isNICAttachSupported(that.element)) {
+        html += (isFirecracker(that)) ? attachButton(isPowerOff(that)) : attachButton(true);
       } else {
-        html += "\
-             <button id=\"attach_nic\" class=\"button small success right radius\" disabled=\"disabled\">" + Locale.tr("Attach nic") + "</button>";
+        html += attachButton(false);
       }
     }
 
@@ -285,19 +300,24 @@ define(function(require) {
         // Attach / Detach
         if (!is_pci){
           if ( 
-            that.element.STATE == OpenNebulaVM.STATES.ACTIVE &&
-            that.element.LCM_STATE == OpenNebulaVM.LCM_STATES.HOTPLUG_NIC
+            that.element.STATE == OpenNebulaVM.STATES.ACTIVE && (
+              that.element.LCM_STATE == OpenNebulaVM.LCM_STATES.HOTPLUG_NIC ||
+              that.element.LCM_STATE == OpenNebulaVM.LCM_STATES.HOTPLUG_NIC_POWEROFF
+            )
           ) {
             actions = Locale.tr("attach/detach in progress");
           } else {
-            if ( 
-              Config.isTabActionEnabled("vms-tab", "VM.detachnic") &&
-              StateActions.enabledStateAction("VM.detachnic", that.element.STATE, that.element.LCM_STATE)
-            ) {
+
+            if(Config.isTabActionEnabled("vms-tab", "VM.detachnic")){
               var icon = $("<i/>",{class:"fas fa-times"});
-              var anchorAttributes = {class: "detachnic"}
-              var anchor = $("<a/>",anchorAttributes).append(icon);
-              actions += anchor.get(0).outerHTML; //"<a href=\"VM.detachnic\" class=\"detachnic PEPE\" ><i class=\"fas fa-times\"/></a>";
+              var anchorAttributes = {class: "detachnic", href: "VM.detachnic"};
+              var anchor = $("<a/>",anchorAttributes).append(icon); //"<a href=\"VM.detachnic\" class=\"detachnic\" ><i class=\"fas fa-times\"/></a>";
+              actions +=  (validateAction(that,"VM.detachnic"))
+                ? (isFirecracker(that)
+                  ? (isPowerOff(that) ? anchor.get(0).outerHTML : "")
+                  : anchor.get(0).outerHTML
+                  )
+                : "";
             }
           }
         }
@@ -362,6 +382,7 @@ define(function(require) {
     }
 
     var nics_table = $("#tab_network_form .nics_table", context).DataTable({
+      "stateSave": true,
       "bDeferRender": true,
       "data": nic_dt_data,
       "columns": [
@@ -409,29 +430,29 @@ define(function(require) {
             var html = "";
 
             $.each(row.data().NIC_ALIAS, function(index, elem) {
-              var new_div = "<div id=alias_" + this.NIC_ID + " style=\"margin-left: 40px; margin-bottom: 5px\"><b> - Alias-" + this.ALIAS_ID + ":</b>";
+                var new_div = "<div id=alias_" + this.NIC_ID + " style=\"margin-left: 40px; margin-bottom: 5px\">" +
+                              "<b>" + "- Alias-" + this.ALIAS_ID + ":" + "</b>";
+                if(this.IP !== undefined) {
+                    new_div += "&nbsp;&nbsp;&nbsp;" + this.IP;
+                }
+                if(this.IP6 !== undefined) {
+                    new_div += "&nbsp;&nbsp;&nbsp;" + this.IP6;
+                }
+                new_div += "&nbsp;&nbsp;&nbsp;" + this.MAC;
+                if(this.IP6_ULA !== undefined) {
+                    new_div += "&nbsp;&nbsp;&nbsp;<b>ULA</b>&nbsp;" + this.IP6_ULA;
+                }
+                if(this.IP6_GLOBAL !== undefined) {
+                    new_div += "&nbsp;&nbsp;&nbsp;<b>Global</b>&nbsp;" + this.IP6_GLOBAL;
+                }
+                new_div += "&nbsp;&nbsp;&nbsp;" + this.ACTIONS + "</div>";
 
-              if(!!this.IP) {
-                new_div += "&nbsp;&nbsp;&nbsp;" + this.IP;
-              }
-              if(!!this.IP6) {
-                new_div += "&nbsp;&nbsp;&nbsp;" + this.IP6;
-              }
-              new_div += "&nbsp;&nbsp;&nbsp;" + this.MAC;
-              if(!!this.IP6_ULA) {
-                new_div += "&nbsp;&nbsp;&nbsp;<b>ULA:</b>&nbsp;" + this.IP6_ULA;
-              }
-              if(!!this.IP6_GLOBAL) {
-                new_div += "&nbsp;&nbsp;&nbsp;<b>Global:</b>&nbsp;" + this.IP6_GLOBAL;
-              }
-              new_div += "&nbsp;&nbsp;&nbsp;" + this.ACTIONS + "</div>";
+                html += new_div;
 
-              html += new_div;
-
-              if (Config.isTabActionEnabled("vms-tab", "VM.detachnic")) {
-                context.off("click", ".detachnic");
-                context.on("click", ".detachnic", {element_id: that.element.ID}, detach_alias);
-              }
+                if (Config.isTabActionEnabled("vms-tab", "VM.detachnic")) {
+                    context.off("click", ".detachnic");
+                    context.on("click", ".detachnic", {element_id: that.element.ID}, detach_alias);
+                }
             });
           } else {
               html = "";
@@ -542,28 +563,28 @@ define(function(require) {
         data: {
           id: that.element.ID,
           monitor: {
-            monitor_resources : "MONITORING/NETTX,MONITORING/NETRX"
+            monitor_resources : "NETTX,NETRX"
           }
         },
         success: function(req, response) {
           var vmGraphs = [
             {
               labels : Locale.tr("Network reception"),
-              monitor_resources : "MONITORING/NETRX",
+              monitor_resources : "NETRX",
               humanize_figures : true,
               convert_from_bytes : true,
               div_graph : $("#vm_net_rx_graph")
             },
             {
               labels : Locale.tr("Network transmission"),
-              monitor_resources : "MONITORING/NETTX",
+              monitor_resources : "NETTX",
               humanize_figures : true,
               convert_from_bytes : true,
               div_graph : $("#vm_net_tx_graph")
             },
             {
               labels : Locale.tr("Network reception speed"),
-              monitor_resources : "MONITORING/NETRX",
+              monitor_resources : "NETRX",
               humanize_figures : true,
               convert_from_bytes : true,
               y_sufix : "B/s",
@@ -572,7 +593,7 @@ define(function(require) {
             },
             {
               labels : Locale.tr("Network transmission speed"),
-              monitor_resources : "MONITORING/NETTX",
+              monitor_resources : "NETTX",
               humanize_figures : true,
               convert_from_bytes : true,
               y_sufix : "B/s",

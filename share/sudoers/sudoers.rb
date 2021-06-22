@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -24,7 +24,14 @@ class Sudoers
     def initialize(lib_location)
         # Commands required to be used as root, without password, by oneadmin
         @cmds = {
-            :NET    => %w[ebtables iptables ip6tables ip ipset],
+            :NET => [
+                'ebtables',
+                'iptables',
+                'ip6tables',
+                'ipset',
+                'ip link *',
+                'ip tuntap *'
+            ],
             :LVM    => %w[
                 lvcreate lvremove lvs vgdisplay lvchange lvscan lvextend
             ],
@@ -42,6 +49,8 @@ class Sudoers
                 'systemctl stop opennebula-gate',
                 'systemctl start opennebula-hem',
                 'systemctl stop opennebula-hem',
+                'systemctl start opennebula-showback.timer',
+                'systemctl stop opennebula-showback.timer',
                 'service opennebula-flow start',
                 'service opennebula-flow stop',
                 'service opennebula-gate start',
@@ -49,9 +58,13 @@ class Sudoers
                 'service opennebula-hem start',
                 'service opennebula-hem stop',
                 'arping',
-                'ip'
+                'ip address *'
             ],
-            :MARKET => %W[#{lib_location}/sh/create_container_image.sh]
+            :MARKET => %W[#{lib_location}/sh/create_container_image.sh
+                          #{lib_location}/sh/create_docker_image.sh  ],
+            :FIRECRACKER => %w[/usr/bin/jailer
+                               /usr/sbin/one-clean-firecracker-domain
+                               /usr/sbin/one-prepare-firecracker-domain]
         }
     end
 

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -13,8 +13,6 @@
 /* See the License for the specific language governing permissions and        */
 /* limitations under the License.                                             */
 /* -------------------------------------------------------------------------- */
-
-
 #include "SqliteDB.h"
 
 using namespace std;
@@ -41,7 +39,7 @@ extern "C" int sqlite_callback (
 
 /* -------------------------------------------------------------------------- */
 
-SqliteDB::SqliteDB(const string& db_name)
+SqliteDB::SqliteDB(const string& db_name, int timeout)
 {
     pthread_mutex_init(&mutex,0);
 
@@ -52,14 +50,24 @@ SqliteDB::SqliteDB(const string& db_name)
         throw runtime_error("Could not open database.");
     }
 
-    enable_limit = sqlite3_compileoption_used("SQLITE_ENABLE_UPDATE_DELETE_LIMIT");
+    int enable_limit = sqlite3_compileoption_used("SQLITE_ENABLE_UPDATE_DELETE_LIMIT");
 
-    if (enable_limit)
+    if (enable_limit == 1)
     {
-        NebulaLog::log("ONE",Log::INFO , "sqlite has enabled: SQLITE_ENABLE_UPDATE_DELETE_LIMIT");
+        NebulaLog::log("ONE",Log::INFO ,
+                "sqlite has enabled: SQLITE_ENABLE_UPDATE_DELETE_LIMIT");
     }
 
     sqlite3_extended_result_codes(db, 1);
+
+    sqlite3_busy_timeout(db, timeout);
+
+    features = {
+        {SqlFeature::MULTIPLE_VALUE, false},
+        {SqlFeature::LIMIT, enable_limit == 1},
+        {SqlFeature::FTS, false},
+        {SqlFeature::COMPARE_BINARY, false}
+    };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -72,21 +80,6 @@ SqliteDB::~SqliteDB()
 }
 
 /* -------------------------------------------------------------------------- */
-
-bool SqliteDB::multiple_values_support()
-{
-    // Versions > 3.7.11 support multiple value inserts, but tests
-    // have ended in segfault. A transaction seems to perform better
-    //return SQLITE_VERSION_NUMBER >= 3007011;
-    return false;
-}
-
-/* -------------------------------------------------------------------------- */
-bool SqliteDB::limit_support()
-{
-    return enable_limit == 1;
-}
-
 /* -------------------------------------------------------------------------- */
 
 int SqliteDB::exec_ext(std::ostringstream& cmd, Callbackable *obj, bool quiet)
@@ -96,7 +89,6 @@ int SqliteDB::exec_ext(std::ostringstream& cmd, Callbackable *obj, bool quiet)
     const char * c_str;
     string       str;
 
-    int    counter = 0;
     char * err_msg = 0;
 
     int   (*callback)(void*,int,char**,char**);
@@ -119,22 +111,7 @@ int SqliteDB::exec_ext(std::ostringstream& cmd, Callbackable *obj, bool quiet)
 
     lock();
 
-    do
-    {
-        counter++;
-
-        rc = sqlite3_exec(db, c_str, callback, arg, &err_msg);
-
-        if (rc == SQLITE_BUSY || rc == SQLITE_IOERR)
-        {
-            struct timeval timeout;
-
-            timeout.tv_sec  = 0;
-            timeout.tv_usec = 250000;
-
-            select(0, NULL, NULL, NULL, &timeout);
-        }
-    }while((rc == SQLITE_BUSY || rc == SQLITE_IOERR) && (counter < 10));
+    rc = sqlite3_exec(db, c_str, callback, arg, &err_msg);
 
     if (obj != 0 && obj->get_affected_rows() == 0)
     {

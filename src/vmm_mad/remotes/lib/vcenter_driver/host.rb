@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -171,6 +171,7 @@ class ClusterComputeResource
             url = '/api/2.0/vdn/scopes'
             begin
                 if nsx_client.get(url)
+                    @nsx_status = "NSX_STATUS = \"OK\"\n"
                     return true
                 else
                     @nsx_status = "NSX_STATUS = \"Response code incorrect\"\n"
@@ -188,6 +189,7 @@ class ClusterComputeResource
             url = '/api/v1/transport-zones'
             begin
                 if nsx_client.get(url)
+                    @nsx_status = "NSX_STATUS = \"OK\"\n"
                     return true
                 else
                     @nsx_status = "NSX_STATUS = \"Response code incorrect\"\n"
@@ -380,7 +382,7 @@ class ClusterComputeResource
             mem_shares_level = info["config.memoryAllocation.shares.level"]
             mem_shares       = info["config.memoryAllocation.shares.shares"]
 
-            rp_name = rp_list.select { |item| item[:ref] == ref}.first[:name] rescue ""
+            rp_name = @rp_list.select { |item| item[:ref] == ref}.first[:name] rescue ""
 
             rp_name = "Resources" if rp_name.empty?
 
@@ -502,33 +504,23 @@ class ClusterComputeResource
         return host_info
     end
 
-    def monitor_vms(host_id)
-
+    def monitor_vms(host_id, vm_type)
         vc_uuid = @vi_client.vim.serviceContent.about.instanceUuid
         cluster_name = self["name"]
         cluster_ref = self["_ref"]
 
         # Get info of the host where the VM/template is located
-        one_host = VCenterDriver::VIHelper.one_item(OpenNebula::Host, host_id)
-        if !one_host
-            STDERR.puts "Failed to retieve host with id #{host.id}"
-            STDERR.puts e.inspect
-            STDERR.puts e.backtrace
-        end
+        one_host = VCenterDriver::VIHelper.one_item(OpenNebula::Host, host_id, false)
 
-        host_id = one_host["ID"] if one_host
-
-
-        # Extract CPU info and name for each esx host in cluster
         esx_hosts = {}
         @item.host.each do |esx_host|
-            info = {}
-            info[:name] = esx_host.name
-            info[:cpu]  = esx_host.summary.hardware.cpuMhz.to_f
-            esx_hosts[esx_host._ref] = info
+            esx_hosts[esx_host._ref] = {
+                :name => esx_host.name,
+                :cpu  => esx_host.summary.hardware.cpuMhz.to_f
+            }
         end
 
-        @monitored_vms = Set.new
+        monitored_vms = Set.new
         str_info = ""
 
         view = @vi_client.vim.serviceContent.viewManager.CreateContainerView({
@@ -624,18 +616,14 @@ class ClusterComputeResource
             last_mon_time = Time.now.to_i.to_s
         end
 
-        get_resource_pool_list if !@rp_list
+        @rp_list = get_resource_pool_list if !@rp_list
 
-        vm_pool = VCenterDriver::VIHelper.one_pool(OpenNebula::VirtualMachinePool)
-
-        # opts common to all vms
-        opts = {
-            pool: vm_pool,
-            vc_uuid: vc_uuid,
-        }
+        vm_pool = VCenterDriver::VIHelper.one_pool(OpenNebula::VirtualMachinePool, false)
+        # We filter to retrieve only those VMs running in the host that we are monitoring
+        host_vms = vm_pool.retrieve_xmlelements("/VM_POOL/VM[HISTORY_RECORDS/HISTORY/HID='#{host_id}']")
 
         vms.each do |vm_ref,info|
-            vm_info = ""
+            vm_info = ''
             begin
                 esx_host = esx_hosts[info["runtime.host"]._ref]
                 info[:esx_host_name] = esx_host[:name]
@@ -657,37 +645,42 @@ class ClusterComputeResource
 
                 next if running_flag == "no"
 
-                # retrieve vcenter driver machine
-                vm = VCenterDriver::VirtualMachine.new_from_ref(@vi_client, vm_ref, info["name"], opts)
-                id = vm.vm_id
+                id = -1
+                # Find the VM by its deploy_id, which in the vCenter driver is
+                # the vCenter managed object reference
+                found_vm = host_vms.select{|vm| vm["DEPLOY_ID"].eql? vm_ref }.first
+                id = found_vm["ID"] if found_vm
 
-                #skip if it's already monitored
-                if vm.one_exist?
-                    next if @monitored_vms.include? id
-                    @monitored_vms << id
-                end
+                # skip if it is a wild and we are looking for OpenNebula VMs
+                next if vm_type == 'ones' and id == -1
+                # skip if it is not a wild and we are looking for wilds
+                next if vm_type == 'wilds' and id != -1
+                # skip if already monitored
+                next if monitored_vms.include? vm_ref
 
+                monitored_vms << vm_ref
+
+                vm = VCenterDriver::VirtualMachine.new(@vi_client, vm_ref, id)
                 vm.vm_info = info
                 vm.monitor(stats)
 
                 vm_name = "#{info["name"]} - #{cluster_name}"
-                vm_info << %Q{
-                VM = [
-                    ID="#{id}",
-                    VM_NAME="#{vm_name}",
-                    DEPLOY_ID="#{vm_ref}",
-                }
+                vm_info << "VM = [ ID=\"#{id}\", "
+                vm_info << "VM_NAME=\"#{vm_name}\", "
+                vm_info << "DEPLOY_ID=\"#{vm_ref}\", "
 
                 # if the machine does not exist in opennebula it means that is a wild:
                 unless vm.one_exist?
                     vm_template_64 = Base64.encode64(vm.vm_to_one(vm_name)).gsub("\n","")
-                    vm_info << "VCENTER_TEMPLATE=\"YES\","
-                    vm_info << "IMPORT_TEMPLATE=\"#{vm_template_64}\","
+                    vm_info << 'VCENTER_TEMPLATE="YES",'
+                    vm_info << "IMPORT_TEMPLATE=\"#{vm_template_64}\"]\n"
+                else
+                    mon_s64 = Base64.strict_encode64(vm.info)
+                    vm_info << "MONITOR=\"#{mon_s64}\"]\n"
                 end
 
-                vm_info << "POLL=\"#{vm.info.gsub('"', "\\\"")}\"]"
             rescue StandardError => e
-                vm_info = error_monitoring(e, vm_ref, info)
+                vm_info = error_monitoring(e, id, vm_ref, vc_uuid, info)
             end
 
             str_info << vm_info
@@ -698,20 +691,16 @@ class ClusterComputeResource
         return str_info, last_mon_time
     end
 
-    def error_monitoring(e, vm_ref, info = {})
+    def error_monitoring(e, id, vm_ref, vc_uuid, info = {})
         error_info = ''
         vm_name = info['name'] || nil
         tmp_str = e.inspect
         tmp_str << e.backtrace.join("\n")
 
-        error_info << %Q{
-        VM = [
-            VM_NAME="#{vm_name}",
-            DEPLOY_ID="#{vm_ref}",
-        }
-
-        error_info << "ERROR=\"#{Base64.encode64(tmp_str).gsub("\n","")}\"]"
-
+        error_info << "VM = [ ID=\"#{id}\", "
+        error_info << "VM_NAME=\"#{vm_name}\", "
+        error_info << "DEPLOY_ID=\"#{vm_ref}\", "
+        error_info << "ERROR=\"#{Base64.encode64(tmp_str).gsub("\n", '')}\"]\n"
     end
 
     def monitor_customizations
@@ -780,6 +769,33 @@ class ClusterComputeResource
                       "and could not delete host: #{rc.message}"
             else
                 raise "Could not update host: #{rc.message}"
+            end
+        end
+
+        rc = one_host.offline
+
+        if OpenNebula.is_error?(rc)
+            update_error = rc.message
+            rc = one_host.delete
+            if OpenNebula.is_error?(rc)
+                raise "Could not offline host: #{update_error} "\
+                      "and could not delete host: #{rc.message}"
+            else
+                raise "Could not offline host: #{rc.message}"
+            end
+        end
+
+
+        rc = one_host.enable
+
+        if OpenNebula.is_error?(rc)
+            update_error = rc.message
+            rc = one_host.delete
+            if OpenNebula.is_error?(rc)
+                raise "Could not enable host: #{update_error} "\
+                      "and could not delete host: #{rc.message}"
+            else
+                raise "Could not enable host: #{rc.message}"
             end
         end
 
@@ -941,6 +957,8 @@ class ESXHost
         # Get pnics in use in standard switches
         @item.config.network.vswitch.each do |vs|
             vs.pnic.each do |pnic|
+                next unless pnic.instance_of?(String)
+
                 pnic.slice!("key-vim.host.PhysicalNic-")
                 pnics_in_use << pnic
             end

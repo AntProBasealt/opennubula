@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------ */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems              */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems              */
 /*                                                                          */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may  */
 /* not use this file except in compliance with the License. You may obtain  */
@@ -17,10 +17,9 @@
 #ifndef GROUP_H_
 #define GROUP_H_
 
-#include "PoolSQL.h"
+#include "PoolObjectSQL.h"
 #include "GroupTemplate.h"
 #include "ObjectCollection.h"
-#include "User.h"
 #include "QuotasSQL.h"
 #include "Template.h"
 #include "VMActions.h"
@@ -104,6 +103,17 @@ public:
      */
     int del_admin(int user_id, string& error_msg);
 
+    /**
+     * Retrun true if User is an admin member of the group
+     *
+     * @param user_id ID of the user
+     *
+     * @return true on success
+     */
+    bool is_admin(int user_id)
+    {
+        return admins.contains(user_id);
+    }
     /**
      *  Object quotas, provides set and check interface
      */

@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -30,7 +30,9 @@ module NSXDriver
     end
 
     if File.directory?(GEMS_LOCATION)
-        Gem.use_paths(GEMS_LOCATION)
+        $LOAD_PATH.reject! {|l| l =~ /vendor_ruby/ }
+        require 'rubygems'
+        Gem.use_paths(File.realpath(GEMS_LOCATION))
     end
 
     $LOAD_PATH << RUBY_LIB_LOCATION
@@ -53,6 +55,7 @@ module NSXDriver
         NSXT_TZS = NSXT_BASE + '/transport-zones'
         # VirtualWire
         NSXV_AUTH = NSXV_BASE + '/services/auth/token'
+        NSXV_LS_TYPE = 'NSX-V'
         NSXV_LS_NAME_XPATH = '//virtualWire/name'
         NSXV_LS_VNI_XPATH = '//virtualWire/vdnId'
         NSXV_LS_BACKING_XPATH = '//virtualWire/vdsContextWithBacking' \
@@ -65,6 +68,7 @@ module NSXDriver
         NSXV_TZ_XPATH = '//virtualWire/vdnScopeId'
         # OpaqueNetwork
         NSXT_AUTH = NSXT_BASE + '/aaa/registration-token'
+        NSXT_LS_TYPE = 'Opaque Network'
         NSXT_LS_SECTION = NSXT_BASE + '/logical-switches/'
         # DFW
         ONE_SECTION_NAME = 'OpenNebula'
@@ -74,6 +78,43 @@ module NSXDriver
         NSXV_DFW_SECTIONS = '/layer3sections'
         NSXV_DFW_SECTION_XPATH = '//section'
         NSXV_DFW_RULE_XPATH = '//rule'
+        # RULE
+        NSXT_RULE_BASE = NSXT_BASE + '/firewall/rules'
+        NSXT_RULE_PROTOCOL = {
+            'TCP' => {
+                :service => {
+                    :l4_protocol => 'TCP',
+                    :source_ports => [],
+                    :destination_ports => [],
+                    :resource_type => 'L4PortSetNSService'
+                }
+            },
+            'UDP' => {
+                :service => {
+                    :l4_protocol => 'UDP',
+                    :source_ports => [],
+                    :destination_ports => [],
+                    :resource_type => 'L4PortSetNSService'
+                }
+            },
+            'ICMP' => {
+                :service => {
+                    :protocol => 'ICMPv4',
+                    :resource_type => 'ICMPTypeNSService'
+                }
+            },
+            'ICMPv6' => {
+                :service => {
+                    :protocol => 'ICMPv6',
+                    :resource_type => 'ICMPTypeNSService'
+                }
+            }
+        }
+        NSXV_RULE_BASE = 'xxx'
+        NSX_RULE_IPSEC_PORTS = %w[500 4500]
+        # Logical Ports
+        NSXT_LP_BASE = NSXT_BASE + '/logical-ports/'
+        NSXV_LP_BASE = ''
         # Messages
         MSG_INCOMPLETE_REQ = 'Incomplete request, NSX_MANAGER, NSX_USER, \
                               NSX_PASSWORD and NSX_TYPE are needed'

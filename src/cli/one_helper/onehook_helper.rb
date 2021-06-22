@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -94,7 +94,7 @@ class OneHookHelper < OpenNebulaHelper::OneHelper
     def format_pool(_options)
         config_file = self.class.table_conf
 
-        table = CLIHelper::ShowTable.new(config_file, self) do
+        CLIHelper::ShowTable.new(config_file, self) do
             column :ID, 'ONE identifier for the Hook', :size => 5 do |d|
                 d['ID']
             end
@@ -109,8 +109,6 @@ class OneHookHelper < OpenNebulaHelper::OneHelper
 
             default :ID, :NAME, :TYPE
         end
-
-        table
     end
 
     # Function to print Execution Log records as sent by oned using:
@@ -163,7 +161,11 @@ class OneHookHelper < OpenNebulaHelper::OneHelper
                 end
             end
 
-            default :HOOK, :ID, :TIMESTAMP, :RC, :EXECUTION
+            if !header
+                default :HOOK, :ID, :TIMESTAMP, :RC, :EXECUTION
+            else
+                default :ID, :TIMESTAMP, :RC, :EXECUTION
+            end
         end
 
         table.show(execs, :stat_column => :EXECUTION)

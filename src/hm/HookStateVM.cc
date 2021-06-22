@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -30,7 +30,7 @@ string * HookStateVM::format_message(VirtualMachine * vm)
 {
     std::ostringstream oss;
     std::string vm_xml;
-    std::string state, lcm_state;
+    std::string state, lcm_state, service_id;
 
     oss << "<HOOK_MESSAGE>"
         << "<HOOK_TYPE>STATE</HOOK_TYPE>"
@@ -38,6 +38,13 @@ string * HookStateVM::format_message(VirtualMachine * vm)
         << "<STATE>" << VirtualMachine::vm_state_to_str(state, vm->get_state()) << "</STATE>"
         << "<LCM_STATE>" << VirtualMachine::lcm_state_to_str(lcm_state, vm->get_lcm_state()) << "</LCM_STATE>"
         << "<RESOURCE_ID>" << vm->get_oid() << "</RESOURCE_ID>";
+
+    vm->get_user_template_attribute("SERVICE_ID", service_id);
+
+    if ( !service_id.empty() )
+    {
+        oss << "<SERVICE_ID>" << service_id << "</SERVICE_ID>";
+    }
 
     if ( vm->hasHistory() )
     {

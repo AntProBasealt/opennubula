@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -100,7 +100,7 @@ stmt:   expr                { result = static_cast<int>($1);}
         |                   { result = 0; }
         ;
 
-expr:   STRING              { float val; oxml->search($1, val); $$ = val; }
+expr:   STRING              { float val = 0; oxml->search($1, val); $$ = val; }
         | FLOAT             { $$ = $1; }
         | INTEGER           { $$ = static_cast<float>($1); }
         | expr '+' expr     { $$ = $1 + $3;}

@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -57,6 +57,16 @@ module NSXDriver
         class DeleteError < NSXError
 
             def initialize(msg = 'Error deleting NSX object')
+                super(msg)
+            end
+
+        end
+
+        # Class DeleteError
+        class MissingParameter < NSXError
+
+            def initialize(parameter)
+                msg = "Missing NSX parameter #{parameter}"
                 super(msg)
             end
 

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -28,6 +28,7 @@
 #include "SchedulerPolicy.h"
 #include "ActionManager.h"
 #include "AclXML.h"
+#include "MonitorXML.h"
 
 using namespace std;
 
@@ -78,6 +79,7 @@ protected:
         vnetpool(0),
         vmgpool(0),
         vmapool(0),
+        hmonpool(0),
         timer(0),
         one_xmlrpc(""),
         machines_limit(0),
@@ -93,6 +95,7 @@ protected:
     {
         delete hpool;
         delete clpool;
+        delete hmonpool;
 
         delete vmpool;
         delete vm_roles_pool;
@@ -128,6 +131,8 @@ protected:
     VMGroupPoolXML * vmgpool;
 
     VirtualMachineActionsPoolXML* vmapool;
+
+    MonitorPoolXML * hmonpool;
 
     // ---------------------------------------------------------------
     // Scheduler Policies

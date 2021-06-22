@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -441,7 +441,7 @@ class Template
         vswitch = []
         vc_hosts = vc_pg.host
         vc_hosts.each do |vc_host|
-            host_pgs = vc_host.configManager.networkSystem.networkInfo.portgroup
+            host_pgs = vc_host.configManager.networkSystem.networkInfo.portgroup rescue []
             host_pgs.each do |pg|
                 if vc_pg.name == pg.spec.name
                     vswitch << pg.spec.vswitchName
@@ -453,7 +453,7 @@ class Template
         vswitch.join(" / ")
     end
 
-    def import_vcenter_nics(vc_uuid, npool, hpool, vcenter_instance_name,
+    def import_vcenter_nics(vi_client, vc_uuid, npool, hpool, vcenter_instance_name,
                             template_ref, vm_object, vm_id=nil, dc_name=nil)
         nic_info = ''
         error = ''
@@ -538,6 +538,9 @@ class Template
                         unmanaged = "template"
                     end
 
+                    net = VCenterDriver::Network.new_from_ref(nic[:net_ref], vi_client)
+                    vid = VCenterDriver::Network.retrieve_vlanid(net.item) if net
+
                     case nic[:pg_type]
                     # Distributed PortGroups
                     when VCenterDriver::Network::NETWORK_TYPE_DPG
@@ -550,6 +553,22 @@ class Template
                         # For NSX-V ( is the same as DistributedVirtualPortgroups )
                         # there is networks and uplinks
                         config[:uplink] = false
+
+                        host_id = vi_client.instance_variable_get '@host_id'
+
+                        begin
+                            nsx_client = NSXDriver::NSXClient.new_from_id(host_id)
+                        rescue
+                            nsx_client = nil
+                        end
+
+                        if nsx_client != nil
+                            nsx_net = NSXDriver::VirtualWire.new_from_name(nsx_client, nic[:net_name])
+
+                            config[:nsx_id] = nsx_net.ls_id
+                            config[:nsx_vni] = nsx_net.ls_vni
+                            config[:nsx_tz_id] = nsx_net.tz_id
+                        end
                     # Standard PortGroups
                     when VCenterDriver::Network::NETWORK_TYPE_PG
                         # There is no uplinks for standard portgroups, so all Standard
@@ -563,6 +582,22 @@ class Template
                         # There is no uplinks for NSX-T networks, so all NSX-T networks
                         # are networks and no uplinks
                         config[:uplink] = false
+
+                        host_id = vi_client.instance_variable_get '@host_id'
+
+                        begin
+                            nsx_client = NSXDriver::NSXClient.new_from_id(host_id)
+                        rescue
+                            nsx_client = nil
+                        end
+
+                        if nsx_client != nil
+                            nsx_net = NSXDriver::OpaqueNetwork.new_from_name(nsx_client, nic[:net_name])
+
+                            config[:nsx_id] = nsx_net.ls_id
+                            config[:nsx_vni] = nsx_net.ls_vni
+                            config[:nsx_tz_id] = nsx_net.tz_id
+                        end
                     else
                         raise "Unknown network type: #{nic[:pg_type]}"
                     end
@@ -582,6 +617,21 @@ class Template
                         :dc_ref=>                dc_ref,
                         :template_id=>           vm_id
                     }
+
+                    if nic[:pg_type] == VCenterDriver::Network::NETWORK_TYPE_NSXV || nic[:pg_type] == VCenterDriver::Network::NETWORK_TYPE_NSXT
+                        import_opts[:nsx_id] = config[:nsx_id] 
+                        import_opts[:nsx_vni] = config[:nsx_vni] 
+                        import_opts[:nsx_tz_id] = config[:nsx_tz_id] 
+                    end
+
+                    if vid
+                        vlanid = VCenterDriver::Network.vlanid(vid)
+
+                        # we have vlan id
+                        if /\A\d+\z/.match(vlanid)
+                            import_opts[:vlanid] = vlanid
+                        end
+                    end
 
                     # Prepare the Virtual Network template
                     one_vnet = VCenterDriver::Network.to_one_template(import_opts)
@@ -785,7 +835,7 @@ class Template
 
         res[:net_name]  = deviceNetwork.name
         res[:net_ref]   = deviceNetwork._ref
-        res[:pg_type]   = VCenterDriver::Network.get_network_type(deviceNetwork)
+        res[:pg_type]   = VCenterDriver::Network.get_network_type(deviceNetwork, res[:net_name])
         res[:network]   = deviceNetwork
 
         res
@@ -962,7 +1012,7 @@ class Template
               "VCENTER_INSTANCE_ID =\"#{@vm_info[:vc_uuid]}\"\n"\
               "VCENTER_CCR_REF =\"#{@vm_info[:cluster_ref]}\"\n"
 
-        str << "IMPORT_VM_ID =\"#{self["_ref"]}\"\n"
+        str << "DEPLOY_ID =\"#{self["_ref"]}\"\n"
         @state = 'POWEROFF' if @state == 'd'
         str << "IMPORT_STATE =\"#{@state}\"\n"
 
@@ -1319,7 +1369,8 @@ class VmImporter < VCenterDriver::VcImporter
 
             template_moref = template_copy_ref ? template_copy_ref : selected[:vcenter_ref]
 
-			error, template_nics, ar_ids, allocated_nets = template.import_vcenter_nics(vc_uuid,
+            error, template_nics, ar_ids, allocated_nets = template.import_vcenter_nics(@vi_client,
+                                                                            vc_uuid,
                                                                             npool,
                                                                             hpool,
                                                                             vcenter,

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -357,7 +357,7 @@ time_t SchedAction::next_action()
     /* ---------------------------------------------------------------------  */
     /* Check if action is already finished                                    */
     /* ---------------------------------------------------------------------  */
-    int end_value;
+    time_t end_value;
     int rc = vector_value("END_VALUE", end_value);
 
     if ( rc == -1 && eo != NEVER)
@@ -425,26 +425,26 @@ time_t SchedAction::next_action()
 
         case HOURLY:
         case NONE:
-            break;
+            return -1;
     }
-
-    std::set<int>::iterator it = _days.lower_bound(cday);
 
     int delta = 0;
 
-    if (it == _days.end()) //after last day in range
+    if (cday < *(_days.begin())) //before first day in range
+    {
+        delta = *(_days.begin()) - cday;
+    }
+    else if (cday >= *(_days.rbegin())) //after or last day in range
     {
         int pdays = days_in_period(r, current_tm.tm_mon, current_tm.tm_year);
 
         delta = pdays - cday + *(_days.begin()); //assume start day is 0
     }
-    else if (cday < *(_days.begin())) //before first day in range
+    else //day in range
     {
-        delta = *(_days.begin()) - cday;
-    }
-    else if (*it != cday ) //is not today
-    {
-        delta = *it - cday;
+        std::set<int>::iterator nday = _days.upper_bound(cday);
+
+        delta = *nday - cday;
     }
 
     action_time += delta * 24 * 3600;

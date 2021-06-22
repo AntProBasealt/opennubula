@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -20,6 +20,10 @@
 #include "Request.h"
 #include "RequestManagerVMTemplate.h"
 #include "Nebula.h"
+
+#include "DocumentPool.h"
+#include "SecurityGroupPool.h"
+#include "VNTemplatePool.h"
 
 using namespace std;
 
@@ -122,6 +126,8 @@ protected:
 
         return vm_instantiate.merge(tmpl, s_a, att);
     };
+
+    static const std::vector<const char*> REMOVE_DISK_ATTRS;
 };
 
 /* ------------------------------------------------------------------------- */

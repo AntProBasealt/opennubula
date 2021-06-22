@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -58,13 +58,6 @@ class VLANTagDriver < VNMMAD::VLANDriver
             ip_link_conf << "#{option} #{value} "
         end
 
-        # Delete vlan if it stuck in another bridge.
-        if nic_exist?(@nic[:vlan_dev])[0]
-            cmd = "#{command(:ip)} link delete #{@nic[:vlan_dev]}"
-            OpenNebula.exec_and_log(cmd)
-        end
-
-
         OpenNebula.exec_and_log("#{command(:ip)} link add link"\
             " #{@nic[:phydev]} name #{@nic[:vlan_dev]} #{mtu} type vlan id"\
             " #{@nic[:vlan_id]} #{ip_link_conf}")
@@ -78,9 +71,8 @@ class VLANTagDriver < VNMMAD::VLANDriver
 	end
 
     def list_interface_vlan(name)
-        text, status = nic_exist?(name)
-
-        return if status == false
+        text = %x(#{command(:ip_unpriv)} -d link show #{name})
+        return nil if $?.exitstatus != 0
 
         text.each_line do |line|
             m = line.match(/vlan protocol 802.1Q id (\d+)/)
@@ -90,5 +82,4 @@ class VLANTagDriver < VNMMAD::VLANDriver
 
         nil
     end
-
 end

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -83,7 +83,7 @@ define(function(require) {
       Locale.tr("ID"),
       Locale.tr("Name"),
       Locale.tr("Owner"),
-      Locale.tr("Group"),      
+      Locale.tr("Group"),
       Locale.tr("Capacity"),
       Locale.tr("Cluster"),
       Locale.tr("Basepath"),

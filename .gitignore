@@ -14,9 +14,11 @@ src/sunstone/locale/languages/*.js
 src/mad/utils/tty_expect
 src/nebula/.xmlrpc_test/
 src/nebula/oned
+src/monitor/src/monitor/onemonitord
 share/doc/one/html
-src/vmm_mad/remotes/lib/lxd/svncterm_server/genfont
-src/vmm_mad/remotes/lib/lxd/svncterm_server/svncterm_server
+src/svncterm_server/genfont
+src/svncterm_server/svncterm_server
+src/im_mad/remotes/status.db
 
 *.class
 src/oca/java/bin
@@ -45,7 +47,14 @@ src/sunstone/public/locale/languages/*.js
 src/sunstone/public/package-lock.json
 .tx/config
 
+src/onedb/local/
+src/onedb/shared/
+
 share/esx-fw-vnc/*.rpm
 share/esx-fw-vnc/.vagrant*
 
 *.vscode
+
+share/context/*
+!share/context/download_context.sh
+!share/context/SConstruct

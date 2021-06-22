@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -21,13 +21,10 @@
 #include "VirtualMachineDisk.h"
 #include "VirtualMachineNic.h"
 #include "VirtualMachineMonitorInfo.h"
-#include "PoolSQL.h"
+#include "PoolObjectSQL.h"
 #include "History.h"
 #include "Image.h"
-#include "Log.h"
 #include "NebulaLog.h"
-#include "NebulaUtil.h"
-#include "Quotas.h"
 
 #include <time.h>
 #include <set>
@@ -139,7 +136,8 @@ public:
         PROLOG_MIGRATE_UNKNOWN_FAILURE = 61,
         DISK_RESIZE = 62,
         DISK_RESIZE_POWEROFF = 63,
-        DISK_RESIZE_UNDEPLOYED = 64
+        DISK_RESIZE_UNDEPLOYED = 64,
+        HOTPLUG_NIC_POWEROFF   = 65
     };
 
     /**
@@ -241,7 +239,6 @@ public:
         resched = do_sched ? 1 : 0;
     };
 
-
     // -------------------------------------------------------------------------
     // Log & Print
     // -------------------------------------------------------------------------
@@ -300,33 +297,17 @@ public:
     };
 
     /**
-     *  Updates VM dynamic information (usage counters), and updates last_poll,
-     *  and copies it to history record for acct.
+     * @return monitor info
      */
-    int update_info(const string& monitor_data);
-
-    /**
-     *  Clears the VM monitor information usage counters (MEMORY, CPU),
-     *  last_poll, custom attributes, and copies it to the history record
-     *  for acct.
-     */
-    void reset_info()
-    {
-        last_poll = time(0);
-
-        monitoring.replace("CPU","0.0");
-
-        monitoring.replace("MEMORY","0");
-
-        set_vm_info();
-
-        clear_template_monitor_error();
-    }
-
     VirtualMachineMonitorInfo& get_info()
     {
         return monitoring;
     }
+
+    /**
+     *  Read monitoring from DB
+     */
+    void load_monitoring();
 
     /**
      *  Returns the deployment ID
@@ -653,7 +634,7 @@ public:
      *  function MUST be called before this one.
      *    @return the action that closed the current history record
      */
-    const VMActions::Action get_action() const
+    VMActions::Action get_action() const
     {
         return history->action;
     };
@@ -662,7 +643,7 @@ public:
      *  Returns the action that closed the history record in the previous host
      *    @return the action that closed the history record in the previous host
      */
-    const VMActions::Action get_previous_action() const
+    VMActions::Action get_previous_action() const
     {
         return previous_history->action;
     };
@@ -729,21 +710,26 @@ public:
     };
 
     /**
-     *  Sets end time of a VM.
+     *  Sets end time of a VM. It also sets the vm_info when the record is closed
      *    @param _etime time when the VM finished
      */
     void set_etime(time_t _etime)
     {
         history->etime = _etime;
+
+        to_xml_extended(history->vm_info, 0);
     };
 
     /**
-     *  Sets end time of a VM in the previous Host.
+     *  Sets end time of a VM in the previous Host. It also sets the vm_info 
+     *  when the record is closed
      *    @param _etime time when the VM finished
      */
     void set_previous_etime(time_t _etime)
     {
         previous_history->etime = _etime;
+
+        to_xml_extended(previous_history->vm_info, 0);
     };
 
     /**
@@ -860,6 +846,19 @@ public:
 
         previous_history->req_id = rid;
     };
+
+    /**
+     *  Release the previous VNC port when a VM is migrated to another cluster
+     *  (GRAPHICS/PREVIOUS_PORT present)
+     */
+    void release_previous_vnc_port();
+
+    /**
+     *  Frees current PORT from **current** cluster and sets it to PREVIOUS_PORT
+     *  (which is allocated in previous cluster). This function is called when
+     *  the migration fails.
+     */
+    void rollback_previous_vnc_port();
 
     // ------------------------------------------------------------------------
     // Template & Object Representation
@@ -994,24 +993,6 @@ public:
     };
 
     /**
-     *  Gets time from last information polling.
-     *    @return time of last poll (epoch) or 0 if never polled
-     */
-    time_t get_last_poll() const
-    {
-        return last_poll;
-    };
-
-    /**
-     *  Sets time of last information polling.
-     *    @param poll time in epoch, normally time(0)
-     */
-    void set_last_poll(time_t poll)
-    {
-        last_poll = poll;
-    };
-
-    /**
      *  Get the VM physical capacity requirements for the host.
      *    @param sr the HostShareCapacity to store the capacity request.
      */
@@ -1051,6 +1032,13 @@ public:
      *  @return true if the VM is being deployed with a pinned policy
      */
     bool is_pinned() const;
+
+    /**
+    * Fill a template only with the necessary attributes to update the quotas
+    *   @param qtmpl template that will be filled
+    *   @param only_running true to not add CPU, MEMORY and VMS counters
+    */
+    void get_quota_template(VirtualMachineTemplate& qtmpl, bool only_running);
 
     // ------------------------------------------------------------------------
     // Virtual Machine Disks
@@ -1447,22 +1435,7 @@ public:
     /**
      * Deletes the alias of the NIC that was in the process of being attached/detached
      */
-    void delete_attach_alias(VirtualMachineNic *nic)
-    {
-        std::set<int> a_ids;
-
-        one_util::split_unique(nic->vector_value("ALIAS_IDS"), ',', a_ids);
-
-        for (std::set<int>::iterator it = a_ids.begin(); it != a_ids.end(); it++)
-        {
-            VirtualMachineNic * nic_a = nics.delete_nic(*it);
-
-            if ( nic_a != 0)
-            {
-                obj_template->remove(nic_a->vector_attribute());
-            }
-        }
-    }
+    void delete_attach_alias(VirtualMachineNic *nic);
 
     // ------------------------------------------------------------------------
     // Disk Snapshot related functions
@@ -1686,14 +1659,6 @@ private:
     // *************************************************************************
 
     // -------------------------------------------------------------------------
-    // VM Scheduling & Managing Information
-    // -------------------------------------------------------------------------
-    /**
-     *  Last time (in epoch) that the VM was polled to get its status
-     */
-    time_t      last_poll;
-
-    // -------------------------------------------------------------------------
     // Virtual Machine Description
     // -------------------------------------------------------------------------
     /**
@@ -1820,16 +1785,6 @@ private:
     static int bootstrap(SqlDB * db);
 
     /**
-     *  Callback function to unmarshall a VirtualMachine object
-     *  (VirtualMachine::select)
-     *    @param num the number of columns read from the DB
-     *    @param names the column names
-     *    @param vaues the column values
-     *    @return 0 on success
-     */
-    int select_cb(void *nil, int num, char **names, char ** values);
-
-    /**
      *  Execute an INSERT or REPLACE Sql query.
      *    @param db The SQL DB
      *    @param replace Execute an INSERT or a REPLACE
@@ -1884,14 +1839,6 @@ private:
 
         return previous_history->update(db);
     };
-
-    /**
-     * Inserts the last monitoring, and deletes old monitoring entries.
-     *
-     * @param db pointer to the db
-     * @return 0 on success
-     */
-    int update_monitoring(SqlDB * db);
 
     /**
      * Updates the VM search information.
@@ -2212,24 +2159,6 @@ protected:
     // *************************************************************************
     // DataBase implementation
     // *************************************************************************
-
-    static const char * table;
-
-    static const char * db_names;
-
-    static const char * db_bootstrap;
-
-    static const char * monit_table;
-
-    static const char * monit_db_names;
-
-    static const char * monit_db_bootstrap;
-
-    static const char * showback_table;
-
-    static const char * showback_db_names;
-
-    static const char * showback_db_bootstrap;
 
     /**
      *  Reads the Virtual Machine (identified with its OID) from the database.

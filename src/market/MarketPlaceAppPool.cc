@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -209,7 +209,7 @@ int MarketPlaceAppPool::import(const std::string& t64, int mp_id,
 
     app->market_id   = mp_id;
     app->market_name = mp_name;
-	app->zone_id     = Nebula::instance().get_zone_id();
+    app->zone_id     = Nebula::instance().get_zone_id();
 
     if ( !PoolObjectSQL::name_is_valid(app->name, error_str) )
     {
@@ -234,7 +234,8 @@ int MarketPlaceAppPool::import(const std::string& t64, int mp_id,
     {
         app_id = mp_aux->oid;
 
-        if ( mp_aux->version != app->version || mp_aux->md5 != app->md5 )
+        if ( mp_aux->version != app->version || mp_aux->md5 != app->md5 ||
+                mp_aux->source != app->source )
         {
             mp_aux->from_template64(t64, error_str);
             update(mp_aux);

@@ -91,6 +91,10 @@ tabs:
             VM.save_as_template: true
             VM.lockU: true
             VM.unlock: true
+            VM.startvnc: true
+            VM.startspice: true
+            VM.save_rdp: true
+            VM.save_virt_viewer: true
         dashboard:
             # Connected user's quotas
             quotas: true
@@ -150,6 +154,7 @@ tabs:
             - 11        # #VMs
             #- 12       # Target
     vnets-tab:
+        # Allows to instantiate a service with vnets
         table_columns:
             - 0         # Checkbox
             - 1         # ID
@@ -161,6 +166,15 @@ tabs:
             #- 7        # Bridge
             #- 8        # Leases
             #- 9        # VLAN ID
+    vnets-templates-tab:
+        # Allows to instantiate a service with vnets templates
+        table_columns:
+            - 0         # Checkbox
+            - 1         # ID
+            - 2         # Name
+            #- 3        # Owner
+            - 4         # Group
+            #- 6        # Cluster
     secgroups-tab:
         table_columns:
             - 0         # Checkbox

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -19,19 +19,11 @@
 #include "NebulaLog.h"
 #include "Nebula.h"
 #include "HookStateVM.h"
+#include "HookManager.h"
+#include "ImageManager.h"
 
 #include <sstream>
 
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-
-const char * VirtualMachinePool::import_table = "vm_import";
-
-const char * VirtualMachinePool::import_db_names = "deploy_id, vmid";
-
-const char * VirtualMachinePool::import_db_bootstrap =
-    "CREATE TABLE IF NOT EXISTS vm_import "
-    "(deploy_id VARCHAR(128), vmid INTEGER, PRIMARY KEY(deploy_id))";
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -40,21 +32,15 @@ VirtualMachinePool::VirtualMachinePool(
         SqlDB * db,
         vector<const SingleAttribute *>& restricted_attrs,
         vector<const SingleAttribute *>& encrypted_attrs,
-        time_t  expire_time,
         bool    on_hold,
         float   default_cpu_cost,
         float   default_mem_cost,
         float   default_disk_cost)
-    : PoolSQL(db, VirtualMachine::table),
-    _monitor_expiration(expire_time), _submit_on_hold(on_hold),
+    : PoolSQL(db, one_db::vm_table),
+    _submit_on_hold(on_hold),
     _default_cpu_cost(default_cpu_cost), _default_mem_cost(default_mem_cost),
     _default_disk_cost(default_disk_cost)
 {
-    if ( _monitor_expiration == 0 )
-    {
-        clean_all_monitoring();
-    }
-
     // Set restricted attributes
     VirtualMachineTemplate::parse_restricted(restricted_attrs);
 
@@ -111,7 +97,8 @@ int VirtualMachinePool::insert_index(const string& deploy_id, int vmid,
         oss << "INSERT ";
     }
 
-    oss << "INTO " << import_table << " ("<< import_db_names <<") "
+    oss << "INTO " << one_db::vm_import_table
+        << " (" << one_db::vm_import_db_names << ") "
         << " VALUES ('" << deploy_name << "'," << vmid << ")";
 
     db->free_str(deploy_name);
@@ -131,7 +118,7 @@ void VirtualMachinePool::drop_index(const string& deploy_id)
         return;
     }
 
-    oss << "DELETE FROM " << import_table << " WHERE deploy_id='"
+    oss << "DELETE FROM " << one_db::vm_import_table << " WHERE deploy_id='"
         << deploy_name << "'";
 
     db->exec_wr(oss);
@@ -139,7 +126,7 @@ void VirtualMachinePool::drop_index(const string& deploy_id)
 
 /* -------------------------------------------------------------------------- */
 
-int VirtualMachinePool::allocate (
+int VirtualMachinePool::allocate(
     int            uid,
     int            gid,
     const string&  uname,
@@ -172,7 +159,7 @@ int VirtualMachinePool::allocate (
 
     vm->prev_state = vm->state;
 
-    vm->user_obj_template->get("IMPORT_VM_ID", deploy_id);
+    vm->user_obj_template->get("DEPLOY_ID", deploy_id);
 
     if (!deploy_id.empty())
     {
@@ -243,11 +230,11 @@ int VirtualMachinePool::get_running(
        << " state = " << VirtualMachine::ACTIVE
        << " and ( lcm_state = " << VirtualMachine::RUNNING
        << " or lcm_state = " << VirtualMachine::UNKNOWN << " )"
-       << " ORDER BY last_poll ASC LIMIT " << vm_limit;
+       << " ORDER BY last_poll ASC " << db->limit_string(vm_limit);
 
     where = os.str();
 
-    return PoolSQL::search(oids,VirtualMachine::table,where);
+    return PoolSQL::search(oids, one_db::vm_table, where);
 };
 
 /* -------------------------------------------------------------------------- */
@@ -263,7 +250,7 @@ int VirtualMachinePool::get_pending(
 
     where = os.str();
 
-    return PoolSQL::search(oids,VirtualMachine::table,where);
+    return PoolSQL::search(oids, one_db::vm_table, where);
 };
 
 /* -------------------------------------------------------------------------- */
@@ -275,8 +262,7 @@ int VirtualMachinePool::dump_acct(string& oss, const string&  where,
     ostringstream cmd;
 
     cmd << "SELECT " << History::table << ".body FROM " << History::table
-        << " INNER JOIN " << VirtualMachine::table
-        << " WHERE vid=oid";
+        << " INNER JOIN " << one_db::vm_table << " ON vid=oid";
 
     if ( !where.empty() )
     {
@@ -313,10 +299,9 @@ int VirtualMachinePool::dump_showback(string& oss,
 {
     ostringstream cmd;
 
-    cmd << "SELECT " << VirtualMachine::showback_table << ".body FROM "
-        << VirtualMachine::showback_table
-        << " INNER JOIN " << VirtualMachine::table
-        << " WHERE vmid=oid";
+    cmd << "SELECT " << one_db::vm_showback_table << ".body FROM "
+        << one_db::vm_showback_table
+        << " INNER JOIN " << one_db::vm_table << " ON vmid=oid";
 
     if ( !where.empty() )
     {
@@ -347,62 +332,74 @@ int VirtualMachinePool::dump_showback(string& oss,
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int VirtualMachinePool::clean_expired_monitoring()
-{
-    if ( _monitor_expiration == 0 )
-    {
-        return 0;
-    }
-
-    time_t          max_last_poll;
-    int             rc;
-    ostringstream   oss;
-
-    max_last_poll = time(0) - _monitor_expiration;
-
-    oss << "DELETE FROM " << VirtualMachine::monit_table
-        << " WHERE last_poll < " << max_last_poll;
-
-    rc = db->exec_local_wr(oss);
-
-    return rc;
-}
-
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-
-int VirtualMachinePool::clean_all_monitoring()
-{
-    ostringstream   oss;
-    int             rc;
-
-    oss << "DELETE FROM " << VirtualMachine::monit_table;
-
-    rc = db->exec_local_wr(oss);
-
-    return rc;
-}
-
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-
 int VirtualMachinePool::dump_monitoring(
         string& oss,
-        const string&  where)
+        const string&  where,
+        const int seconds)
 {
     ostringstream cmd;
 
-    cmd << "SELECT " << VirtualMachine::monit_table << ".body FROM "
-        << VirtualMachine::monit_table
-        << " INNER JOIN " << VirtualMachine::table
-        << " WHERE vmid = oid";
-
-    if ( !where.empty() )
+    switch (seconds)
     {
-        cmd << " AND " << where;
-    }
+        case 0: //Get last monitor value
+            /*
+            * SELECT vm_monitoring.body
+            * FROM vm_monitoring
+            *     INNER JOIN (
+            *         SELECT vmid, MAX(last_poll) as last_poll
+            *             FROM vm_monitoring
+            *             GROUP BY vmid
+            *     ) lpt on lpt.vmid = vm_monitoring.vmid AND lpt.last_poll = vm_monitoring.last_poll
+            *     INNER JOIN vm_pool ON vm_monitoring.vmid = oid
+            * ORDER BY oid;
+            */
+            cmd << "SELECT " << one_db::vm_monitor_table << ".body "
+                << "FROM " << one_db::vm_monitor_table << " INNER JOIN ("
+                << "SELECT vmid, MAX(last_poll) as last_poll FROM "
+                << one_db::vm_monitor_table << " GROUP BY vmid) as lpt "
+                << "ON lpt.vmid = " << one_db::vm_monitor_table << ".vmid "
+                << "AND lpt.last_poll = " << one_db::vm_monitor_table
+                << ".last_poll INNER JOIN " << one_db::vm_table
+                << " ON " << one_db::vm_monitor_table << ".vmid = oid";
 
-    cmd << " ORDER BY vmid, " << VirtualMachine::monit_table << ".last_poll;";
+            if ( !where.empty() )
+            {
+                cmd << " WHERE " << where;
+            }
+
+            cmd << " ORDER BY oid";
+
+            break;
+
+        case -1: //Get all monitoring
+            cmd << "SELECT " << one_db::vm_monitor_table << ".body FROM "
+                << one_db::vm_monitor_table << " INNER JOIN " << one_db::vm_table
+                << " ON vmid = oid";
+
+            if ( !where.empty() )
+            {
+                cmd << " WHERE " << where;
+            }
+
+            cmd << " ORDER BY vmid, " << one_db::vm_monitor_table << ".last_poll;";
+
+            break;
+
+        default: //Get monitor in last s seconds
+            cmd << "SELECT " << one_db::vm_monitor_table << ".body FROM "
+                << one_db::vm_monitor_table << " INNER JOIN " << one_db::vm_table
+                << " ON vmid = oid WHERE " << one_db::vm_monitor_table
+                << ".last_poll > " << time(nullptr) - seconds;
+
+            if ( !where.empty() )
+            {
+                cmd << " ANS " << where;
+            }
+
+            cmd << " ORDER BY vmid, " << one_db::vm_monitor_table << ".last_poll;";
+
+            break;
+    }
 
     return PoolSQL::dump(oss, "MONITORING_DATA", cmd);
 }
@@ -410,7 +407,32 @@ int VirtualMachinePool::dump_monitoring(
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int VirtualMachinePool::get_vmid (const string& deploy_id)
+VirtualMachineMonitorInfo VirtualMachinePool::get_monitoring(int vmid)
+{
+    ostringstream cmd;
+    string monitor_str;
+
+    cmd << "SELECT " << one_db::vm_monitor_table << ".body FROM "
+        << one_db::vm_monitor_table
+        << " WHERE vmid = " << vmid
+        << " AND last_poll=(SELECT MAX(last_poll) FROM "
+        << one_db::vm_monitor_table
+        << " WHERE vmid = " << vmid << ")";
+
+    VirtualMachineMonitorInfo info(vmid, 0);
+
+    if (PoolSQL::dump(monitor_str, "", cmd) == 0 && !monitor_str.empty())
+    {
+        info.from_xml(monitor_str);
+    }
+
+    return info;
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+int VirtualMachinePool::get_vmid(const string& deploy_id)
 {
     int rc;
     int vmid = -1;
@@ -422,7 +444,7 @@ int VirtualMachinePool::get_vmid (const string& deploy_id)
 
     cb.set_callback(&vmid);
 
-    oss << "SELECT vmid FROM " << import_table
+    oss << "SELECT vmid FROM " << one_db::vm_import_table
         << " WHERE deploy_id = '" << sql_id << "'";
 
     rc = db->exec_rd(oss, &cb);
@@ -746,12 +768,12 @@ int VirtualMachinePool::calculate_showback(
 
     // Write to DB
 
-    if (db->multiple_values_support())
+    if (db->supports(SqlDB::SqlFeature::MULTIPLE_VALUE))
     {
         oss.str("");
 
-        oss << "REPLACE INTO " << VirtualMachine::showback_table
-            << " ("<< VirtualMachine::showback_db_names <<") VALUES ";
+        oss << "REPLACE INTO " << one_db::vm_showback_table
+            << " ("<< one_db::vm_showback_db_names <<") VALUES ";
 
         sql_cmd_start = oss.str();
 
@@ -763,14 +785,14 @@ int VirtualMachinePool::calculate_showback(
     {
         oss.str("");
         oss << "BEGIN TRANSACTION; "
-            << "REPLACE INTO " << VirtualMachine::showback_table
-            << " ("<< VirtualMachine::showback_db_names <<") VALUES ";
+            << "REPLACE INTO " << one_db::vm_showback_table
+            << " ("<< one_db::vm_showback_db_names <<") VALUES ";
 
         sql_cmd_start = oss.str();
 
         oss.str("");
-        oss << "; REPLACE INTO " << VirtualMachine::showback_table
-            << " ("<< VirtualMachine::showback_db_names <<") VALUES ";
+        oss << "; REPLACE INTO " << one_db::vm_showback_table
+            << " ("<< one_db::vm_showback_db_names <<") VALUES ";
 
         sql_cmd_separator = oss.str();
 
@@ -995,7 +1017,7 @@ void VirtualMachinePool::delete_attach_disk(int vid)
 void VirtualMachinePool::delete_attach_nic(int vid)
 {
     VirtualMachine *  vm;
-    VirtualMachineNic * nic;
+    VirtualMachineNic * nic, * p_nic;
 
     int uid;
     int gid;
@@ -1039,6 +1061,18 @@ void VirtualMachinePool::delete_attach_nic(int vid)
         nic->vector_value("ALIAS_ID", alias_id);
 
         vm->clear_nic_alias_context(parent_id, alias_id);
+
+        p_nic = vm->get_nic(parent_id);
+
+        // As NIC is an alias, parent ALIAS_IDS array should be updated
+        // to remove the alias_id
+        std::set<int> p_a_ids;
+
+        one_util::split_unique(p_nic->vector_value("ALIAS_IDS"), ',', p_a_ids);
+
+        p_a_ids.erase(nic_id);
+
+        p_nic->replace("ALIAS_IDS", one_util::join(p_a_ids, ','));
     }
 
     uid  = vm->get_uid();

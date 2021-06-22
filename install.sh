@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -98,6 +98,7 @@ CONF_LOCATION="$HOME/.one"
 if [ -z "$ROOT" ] ; then
     BIN_LOCATION="/usr/bin"
     LIB_LOCATION="/usr/lib/one"
+    SBIN_LOCATION="/usr/sbin"
     ETC_LOCATION="/etc/one"
     LOG_LOCATION="/var/log/one"
     VAR_LOCATION="/var/lib/one"
@@ -113,7 +114,7 @@ if [ -z "$ROOT" ] ; then
     SHARE_LOCATION="/usr/share/one"
     MAN_LOCATION="/usr/share/man/man1"
     VM_LOCATION="/var/lib/one/vms"
-    DOCS_LOCATION="/usr/share/docs/one"
+    DOCS_LOCATION="/usr/share/doc/one"
     MAIN_JS_LOCATION="$VAR_LOCATION/sunstone"
     DOCKER_MACHINE_LOCATION="src/docker_machine/src/docker_machine/bin/docker-machine-driver-opennebula"
 
@@ -151,7 +152,7 @@ if [ -z "$ROOT" ] ; then
 
         CHOWN_DIRS=""
     else
-        MAKE_DIRS="$BIN_LOCATION $LIB_LOCATION $ETC_LOCATION $VAR_LOCATION \
+        MAKE_DIRS="$BIN_LOCATION $SBIN_LOCATION $LIB_LOCATION $ETC_LOCATION $VAR_LOCATION \
                    $INCLUDE_LOCATION $SHARE_LOCATION $DOCS_LOCATION \
                    $LOG_LOCATION $RUN_LOCATION $LOCK_LOCATION \
                    $SYSTEM_DS_LOCATION $DEFAULT_DS_LOCATION $MAN_LOCATION \
@@ -166,9 +167,12 @@ if [ -z "$ROOT" ] ; then
 
 else
     BIN_LOCATION="$ROOT/bin"
+    SBIN_LOCATION="$ROOT/sbin"
     LIB_LOCATION="$ROOT/lib"
     ETC_LOCATION="$ROOT/etc"
     VAR_LOCATION="$ROOT/var"
+    RUN_LOCATION="$VAR_LOCATION/run"
+    LOCK_LOCATION="$VAR_LOCATION/lock"
     ONEGATE_LOCATION="$LIB_LOCATION/onegate"
     SUNSTONE_LOCATION="$LIB_LOCATION/sunstone"
     ONEFLOW_LOCATION="$LIB_LOCATION/oneflow"
@@ -179,7 +183,7 @@ else
     SHARE_LOCATION="$ROOT/share"
     MAN_LOCATION="$ROOT/share/man/man1"
     VM_LOCATION="$VAR_LOCATION/vms"
-    DOCS_LOCATION="$ROOT/share/docs"
+    DOCS_LOCATION="$ROOT/share/doc"
     MAIN_JS_LOCATION="$VAR_LOCATION/sunstone"
     DOCKER_MACHINE_LOCATION="src/docker_machine/src/docker_machine/bin/docker-machine-driver-opennebula"
 
@@ -207,11 +211,11 @@ else
 
         DELETE_DIRS="$MAKE_DIRS"
     else
-        MAKE_DIRS="$BIN_LOCATION $LIB_LOCATION $ETC_LOCATION $VAR_LOCATION \
+        MAKE_DIRS="$BIN_LOCATION $SBIN_LOCATION $LIB_LOCATION $ETC_LOCATION $VAR_LOCATION \
                    $INCLUDE_LOCATION $SHARE_LOCATION $SYSTEM_DS_LOCATION \
                    $DEFAULT_DS_LOCATION $MAN_LOCATION $DOCS_LOCATION \
                    $VM_LOCATION $ONEGATE_LOCATION $ONEFLOW_LOCATION \
-                   $MAIN_JS_LOCATION $ONEHEM_LOCATION"
+                   $MAIN_JS_LOCATION $ONEHEM_LOCATION $LOCK_LOCATION $RUN_LOCATION"
 
         DELETE_DIRS="$MAKE_DIRS"
 
@@ -228,7 +232,13 @@ SHARE_DIRS="$SHARE_LOCATION/examples \
             $SHARE_LOCATION/websockify \
             $SHARE_LOCATION/websockify/websockify \
             $SHARE_LOCATION/esx-fw-vnc \
-            $SHARE_LOCATION/oneprovision"
+            $SHARE_LOCATION/oneprovision \
+            $SHARE_LOCATION/schemas \
+            $SHARE_LOCATION/schemas/libvirt \
+            $SHARE_LOCATION/ssh \
+            $SHARE_LOCATION/start-scripts \
+            $SHARE_LOCATION/conf \
+            $SHARE_LOCATION/context"
 
 ETC_DIRS="$ETC_LOCATION/vmm_exec \
           $ETC_LOCATION/hm \
@@ -254,11 +264,15 @@ LIB_DIRS="$LIB_LOCATION/ruby \
           $LIB_LOCATION/ruby/vendors \
           $LIB_LOCATION/mads \
           $LIB_LOCATION/sh \
+          $LIB_LOCATION/sh/override \
           $LIB_LOCATION/ruby/cli \
           $LIB_LOCATION/ruby/cli/one_helper \
           $LIB_LOCATION/ruby/vcenter_driver \
           $LIB_LOCATION/ruby/nsx_driver \
-          $LIB_LOCATION/oneprovision/lib"
+          $LIB_LOCATION/oneprovision/lib \
+          $LIB_LOCATION/oneprovision/lib/resources \
+          $LIB_LOCATION/oneprovision/lib/resources/virtual \
+          $LIB_LOCATION/oneprovision/lib/resources/physical"
 
 VAR_DIRS="$VAR_LOCATION/remotes \
           $VAR_LOCATION/remotes/etc \
@@ -267,21 +281,64 @@ VAR_DIRS="$VAR_LOCATION/remotes \
           $VAR_LOCATION/remotes/etc/datastore/ceph \
           $VAR_LOCATION/remotes/etc/im/kvm-probes.d \
           $VAR_LOCATION/remotes/etc/im/lxd-probes.d \
+          $VAR_LOCATION/remotes/etc/im/firecracker-probes.d \
           $VAR_LOCATION/remotes/etc/market/http \
           $VAR_LOCATION/remotes/etc/vmm/kvm \
           $VAR_LOCATION/remotes/etc/vmm/lxd \
+          $VAR_LOCATION/remotes/etc/vmm/firecracker \
           $VAR_LOCATION/remotes/etc/vmm/vcenter \
           $VAR_LOCATION/remotes/etc/vnm \
           $VAR_LOCATION/remotes/im \
+          $VAR_LOCATION/remotes/im/lib \
           $VAR_LOCATION/remotes/im/kvm.d \
-          $VAR_LOCATION/remotes/im/kvm-probes.d \
+          $VAR_LOCATION/remotes/im/kvm-probes.d/host/beacon \
+          $VAR_LOCATION/remotes/im/kvm-probes.d/host/monitor \
+          $VAR_LOCATION/remotes/im/kvm-probes.d/host/system \
+          $VAR_LOCATION/remotes/im/kvm-probes.d/vm/monitor \
+          $VAR_LOCATION/remotes/im/kvm-probes.d/vm/status \
+          $VAR_LOCATION/remotes/im/dummy.d \
+          $VAR_LOCATION/remotes/im/dummy-probes.d/host/beacon \
+          $VAR_LOCATION/remotes/im/dummy-probes.d/host/monitor \
+          $VAR_LOCATION/remotes/im/dummy-probes.d/host/system \
+          $VAR_LOCATION/remotes/im/dummy-probes.d/vm/monitor \
+          $VAR_LOCATION/remotes/im/dummy-probes.d/vm/status \
           $VAR_LOCATION/remotes/im/lxd.d \
-          $VAR_LOCATION/remotes/im/lxd-probes.d \
+          $VAR_LOCATION/remotes/im/lxd-probes.d/host/beacon \
+          $VAR_LOCATION/remotes/im/lxd-probes.d/host/monitor \
+          $VAR_LOCATION/remotes/im/lxd-probes.d/host/system \
+          $VAR_LOCATION/remotes/im/lxd-probes.d/vm/monitor \
+          $VAR_LOCATION/remotes/im/lxd-probes.d/vm/status \
+          $VAR_LOCATION/remotes/im/firecracker.d \
+          $VAR_LOCATION/remotes/im/firecracker-probes.d/host/beacon \
+          $VAR_LOCATION/remotes/im/firecracker-probes.d/host/monitor \
+          $VAR_LOCATION/remotes/im/firecracker-probes.d/host/system \
+          $VAR_LOCATION/remotes/im/firecracker-probes.d/vm/monitor \
+          $VAR_LOCATION/remotes/im/firecracker-probes.d/vm/status \
           $VAR_LOCATION/remotes/im/vcenter.d \
           $VAR_LOCATION/remotes/im/ec2.d \
+          $VAR_LOCATION/remotes/im/ec2-probes.d/host/beacon \
+          $VAR_LOCATION/remotes/im/ec2-probes.d/host/monitor \
+          $VAR_LOCATION/remotes/im/ec2-probes.d/host/system \
+          $VAR_LOCATION/remotes/im/ec2-probes.d/vm/monitor \
+          $VAR_LOCATION/remotes/im/ec2-probes.d/vm/status \
           $VAR_LOCATION/remotes/im/az.d \
+          $VAR_LOCATION/remotes/im/az-probes.d/host/beacon \
+          $VAR_LOCATION/remotes/im/az-probes.d/host/monitor \
+          $VAR_LOCATION/remotes/im/az-probes.d/host/system \
+          $VAR_LOCATION/remotes/im/az-probes.d/vm/monitor \
+          $VAR_LOCATION/remotes/im/az-probes.d/vm/status \
           $VAR_LOCATION/remotes/im/one.d \
+          $VAR_LOCATION/remotes/im/one-probes.d/host/beacon \
+          $VAR_LOCATION/remotes/im/one-probes.d/host/monitor \
+          $VAR_LOCATION/remotes/im/one-probes.d/host/system \
+          $VAR_LOCATION/remotes/im/one-probes.d/vm/monitor \
+          $VAR_LOCATION/remotes/im/one-probes.d/vm/status \
           $VAR_LOCATION/remotes/im/packet.d \
+          $VAR_LOCATION/remotes/im/packet-probes.d/host/beacon \
+          $VAR_LOCATION/remotes/im/packet-probes.d/host/monitor \
+          $VAR_LOCATION/remotes/im/packet-probes.d/host/system \
+          $VAR_LOCATION/remotes/im/packet-probes.d/vm/monitor \
+          $VAR_LOCATION/remotes/im/packet-probes.d/vm/status \
           $VAR_LOCATION/remotes/pm \
           $VAR_LOCATION/remotes/pm/ec2 \
           $VAR_LOCATION/remotes/pm/dummy \
@@ -295,6 +352,7 @@ VAR_DIRS="$VAR_LOCATION/remotes \
           $VAR_LOCATION/remotes/vmm/one \
           $VAR_LOCATION/remotes/vmm/lxd \
           $VAR_LOCATION/remotes/vmm/packet \
+          $VAR_LOCATION/remotes/vmm/firecracker \
           $VAR_LOCATION/remotes/vnm \
           $VAR_LOCATION/remotes/vnm/802.1Q \
           $VAR_LOCATION/remotes/vnm/802.1Q/pre.d \
@@ -333,6 +391,9 @@ VAR_DIRS="$VAR_LOCATION/remotes \
           $VAR_LOCATION/remotes/vnm/vcenter/post.d \
           $VAR_LOCATION/remotes/vnm/vcenter/clean.d \
           $VAR_LOCATION/remotes/vnm/alias_sdnat \
+          $VAR_LOCATION/remotes/vnm/hooks/pre \
+          $VAR_LOCATION/remotes/vnm/hooks/post \
+          $VAR_LOCATION/remotes/vnm/hooks/clean \
           $VAR_LOCATION/remotes/tm/ \
           $VAR_LOCATION/remotes/tm/dummy \
           $VAR_LOCATION/remotes/tm/shared \
@@ -363,8 +424,10 @@ VAR_DIRS="$VAR_LOCATION/remotes \
           $VAR_LOCATION/remotes/market/http \
           $VAR_LOCATION/remotes/market/one \
           $VAR_LOCATION/remotes/market/s3 \
+          $VAR_LOCATION/remotes/market/common \
           $VAR_LOCATION/remotes/market/linuxcontainers \
           $VAR_LOCATION/remotes/market/turnkeylinux \
+          $VAR_LOCATION/remotes/market/dockerhub \
           $VAR_LOCATION/remotes/datastore/iscsi_libvirt \
           $VAR_LOCATION/remotes/auth \
           $VAR_LOCATION/remotes/auth/plain \
@@ -440,6 +503,7 @@ fi
 #-------------------------------------------------------------------------------
 INSTALL_FILES=(
     BIN_FILES:$BIN_LOCATION
+    SBIN_FILES:$SBIN_LOCATION
     INCLUDE_FILES:$INCLUDE_LOCATION
     LIB_FILES:$LIB_LOCATION
     RUBY_LIB_FILES:$LIB_LOCATION/ruby
@@ -450,23 +514,66 @@ INSTALL_FILES=(
     MAD_SH_LIB_FILES:$LIB_LOCATION/sh
     MAD_SH_LIB_FILES:$VAR_LOCATION/remotes
     ONEDB_FILES:$LIB_LOCATION/ruby/onedb
+    ONEDB_PATCH_FILES:$LIB_LOCATION/ruby/onedb/patches
     ONEDB_SHARED_MIGRATOR_FILES:$LIB_LOCATION/ruby/onedb/shared
     ONEDB_LOCAL_MIGRATOR_FILES:$LIB_LOCATION/ruby/onedb/local
-    ONEDB_PATCH_FILES:$LIB_LOCATION/ruby/onedb/patches
     MADS_LIB_FILES:$LIB_LOCATION/mads
     IM_PROBES_FILES:$VAR_LOCATION/remotes/im
+    IM_PROBES_LIB_FILES:$VAR_LOCATION/remotes/im/lib
     IM_PROBES_KVM_FILES:$VAR_LOCATION/remotes/im/kvm.d
-    IM_PROBES_KVM_PROBES_FILES:$VAR_LOCATION/remotes/im/kvm-probes.d
-    IM_PROBES_ETC_KVM_PROBES_FILES:$VAR_LOCATION/remotes/etc/im/kvm-probes.d
+    IM_PROBES_FIRECRACKER_FILES:$VAR_LOCATION/remotes/im/firecracker.d
+    IM_PROBES_DUMMY_FILES:$VAR_LOCATION/remotes/im/dummy.d
     IM_PROBES_LXD_FILES:$VAR_LOCATION/remotes/im/lxd.d
-    IM_PROBES_LXD_PROBES_FILES:$VAR_LOCATION/remotes/im/lxd-probes.d
-    IM_PROBES_ETC_LXD_PROBES_FILES:$VAR_LOCATION/remotes/etc/im/lxd-probes.d
     IM_PROBES_VCENTER_FILES:$VAR_LOCATION/remotes/im/vcenter.d
     IM_PROBES_EC2_FILES:$VAR_LOCATION/remotes/im/ec2.d
     IM_PROBES_AZ_FILES:$VAR_LOCATION/remotes/im/az.d
     IM_PROBES_ONE_FILES:$VAR_LOCATION/remotes/im/one.d
     IM_PROBES_PACKET_FILES:$VAR_LOCATION/remotes/im/packet.d
+    IM_PROBES_KVM_HOST_BEACON_FILES:$VAR_LOCATION/remotes/im/kvm-probes.d/host/beacon
+    IM_PROBES_KVM_HOST_MONITOR_FILES:$VAR_LOCATION/remotes/im/kvm-probes.d/host/monitor
+    IM_PROBES_KVM_HOST_SYSTEM_FILES:$VAR_LOCATION/remotes/im/kvm-probes.d/host/system
+    IM_PROBES_KVM_VM_MONITOR_FILES:$VAR_LOCATION/remotes/im/kvm-probes.d/vm/monitor
+    IM_PROBES_KVM_VM_STATUS_FILES:$VAR_LOCATION/remotes/im/kvm-probes.d/vm/status
+    IM_PROBES_ETC_KVM_PROBES_FILES:$VAR_LOCATION/remotes/etc/im/kvm-probes.d
+    IM_PROBES_DUMMY_HOST_BEACON_FILES:$VAR_LOCATION/remotes/im/dummy-probes.d/host/beacon
+    IM_PROBES_DUMMY_HOST_MONITOR_FILES:$VAR_LOCATION/remotes/im/dummy-probes.d/host/monitor
+    IM_PROBES_DUMMY_HOST_SYSTEM_FILES:$VAR_LOCATION/remotes/im/dummy-probes.d/host/system
+    IM_PROBES_DUMMY_VM_MONITOR_FILES:$VAR_LOCATION/remotes/im/dummy-probes.d/vm/monitor
+    IM_PROBES_DUMMY_VM_STATUS_FILES:$VAR_LOCATION/remotes/im/dummy-probes.d/vm/status
+    IM_PROBES_LXD_HOST_BEACON_FILES:$VAR_LOCATION/remotes/im/lxd-probes.d/host/beacon
+    IM_PROBES_LXD_HOST_MONITOR_FILES:$VAR_LOCATION/remotes/im/lxd-probes.d/host/monitor
+    IM_PROBES_LXD_HOST_SYSTEM_FILES:$VAR_LOCATION/remotes/im/lxd-probes.d/host/system
+    IM_PROBES_LXD_VM_MONITOR_FILES:$VAR_LOCATION/remotes/im/lxd-probes.d/vm/monitor
+    IM_PROBES_LXD_VM_STATUS_FILES:$VAR_LOCATION/remotes/im/lxd-probes.d/vm/status
+    IM_PROBES_LXD_PROBES_FILES:$VAR_LOCATION/remotes/im/lxd-probes.d
+    IM_PROBES_ETC_LXD_PROBES_FILES:$VAR_LOCATION/remotes/etc/im/lxd-probes.d
+    IM_PROBES_AZ_HOST_BEACON_FILES:$VAR_LOCATION/remotes/im/az-probes.d/host/beacon
+    IM_PROBES_AZ_HOST_MONITOR_FILES:$VAR_LOCATION/remotes/im/az-probes.d/host/monitor
+    IM_PROBES_AZ_HOST_SYSTEM_FILES:$VAR_LOCATION/remotes/im/az-probes.d/host/system
+    IM_PROBES_AZ_VM_MONITOR_FILES:$VAR_LOCATION/remotes/im/az-probes.d/vm/monitor
+    IM_PROBES_AZ_VM_STATUS_FILES:$VAR_LOCATION/remotes/im/az-probes.d/vm/status
+    IM_PROBES_EC2_HOST_BEACON_FILES:$VAR_LOCATION/remotes/im/ec2-probes.d/host/beacon
+    IM_PROBES_EC2_HOST_MONITOR_FILES:$VAR_LOCATION/remotes/im/ec2-probes.d/host/monitor
+    IM_PROBES_EC2_HOST_SYSTEM_FILES:$VAR_LOCATION/remotes/im/ec2-probes.d/host/system
+    IM_PROBES_EC2_VM_MONITOR_FILES:$VAR_LOCATION/remotes/im/ec2-probes.d/vm/monitor
+    IM_PROBES_EC2_VM_STATUS_FILES:$VAR_LOCATION/remotes/im/ec2-probes.d/vm/status
+    IM_PROBES_ONE_HOST_BEACON_FILES:$VAR_LOCATION/remotes/im/one-probes.d/host/beacon
+    IM_PROBES_ONE_HOST_MONITOR_FILES:$VAR_LOCATION/remotes/im/one-probes.d/host/monitor
+    IM_PROBES_ONE_HOST_SYSTEM_FILES:$VAR_LOCATION/remotes/im/one-probes.d/host/system
+    IM_PROBES_ONE_VM_MONITOR_FILES:$VAR_LOCATION/remotes/im/one-probes.d/vm/monitor
+    IM_PROBES_ONE_VM_STATUS_FILES:$VAR_LOCATION/remotes/im/one-probes.d/vm/status
+    IM_PROBES_PACKET_HOST_BEACON_FILES:$VAR_LOCATION/remotes/im/packet-probes.d/host/beacon
+    IM_PROBES_PACKET_HOST_MONITOR_FILES:$VAR_LOCATION/remotes/im/packet-probes.d/host/monitor
+    IM_PROBES_PACKET_HOST_SYSTEM_FILES:$VAR_LOCATION/remotes/im/packet-probes.d/host/system
+    IM_PROBES_PACKET_VM_MONITOR_FILES:$VAR_LOCATION/remotes/im/packet-probes.d/vm/monitor
+    IM_PROBES_PACKET_VM_STATUS_FILES:$VAR_LOCATION/remotes/im/packet-probes.d/vm/status
     IM_PROBES_VERSION:$VAR_LOCATION/remotes
+    IM_PROBES_FIRECRACKER_HOST_BEACON_FILES:$VAR_LOCATION/remotes/im/firecracker-probes.d/host/beacon
+    IM_PROBES_FIRECRACKER_HOST_MONITOR_FILES:$VAR_LOCATION/remotes/im/firecracker-probes.d/host/monitor
+    IM_PROBES_FIRECRACKER_HOST_SYSTEM_FILES:$VAR_LOCATION/remotes/im/firecracker-probes.d/host/system
+    IM_PROBES_FIRECRACKER_VM_MONITOR_FILES:$VAR_LOCATION/remotes/im/firecracker-probes.d/vm/monitor
+    IM_PROBES_FIRECRACKER_VM_STATUS_FILES:$VAR_LOCATION/remotes/im/firecracker-probes.d/vm/status
+    IM_PROBES_ETC_FIRECRACKER_PROBES_FILES:$VAR_LOCATION/remotes/etc/im/firecracker-probes.d
     AUTH_SSH_FILES:$VAR_LOCATION/remotes/auth/ssh
     AUTH_X509_FILES:$VAR_LOCATION/remotes/auth/x509
     AUTH_LDAP_FILES:$VAR_LOCATION/remotes/auth/ldap
@@ -477,14 +584,17 @@ INSTALL_FILES=(
     PM_EXEC_EC2_SCRIPTS:$VAR_LOCATION/remotes/pm/ec2
     PM_EXEC_DUMMY_SCRIPTS:$VAR_LOCATION/remotes/pm/dummy
     PM_EXEC_PACKET_SCRIPTS:$VAR_LOCATION/remotes/pm/packet
-    VMM_EXEC_LIB_FILES:$VAR_LOCATION/remotes/vmm/lib
     VMM_EXEC_LIB_VCENTER_FILES:$LIB_LOCATION/ruby/vcenter_driver
     VMM_EXEC_LIB_NSX_FILES:$LIB_LOCATION/ruby/nsx_driver
+    VMM_EXEC_LIB:$VAR_LOCATION/remotes/vmm/lib
     VMM_EXEC_KVM_SCRIPTS:$VAR_LOCATION/remotes/vmm/kvm
     VMM_EXEC_LXD_SCRIPTS:$VAR_LOCATION/remotes/vmm/lxd
     VMM_EXEC_LXD_LIB:$VAR_LOCATION/remotes/vmm/lxd
+    VMM_EXEC_FIRECRACKER_SCRIPTS:$VAR_LOCATION/remotes/vmm/firecracker
+    VMM_EXEC_FIRECRACKER_LIB:$VAR_LOCATION/remotes/vmm/firecracker
     VMM_EXEC_ETC_KVM_SCRIPTS:$VAR_LOCATION/remotes/etc/vmm/kvm
     VMM_EXEC_ETC_LXD_SCRIPTS:$VAR_LOCATION/remotes/etc/vmm/lxd
+    VMM_EXEC_ETC_FIRECRACKER_SCRIPTS:$VAR_LOCATION/remotes/etc/vmm/firecracker
     VMM_EXEC_VCENTER_SCRIPTS:$VAR_LOCATION/remotes/vmm/vcenter
     VMM_EXEC_ETC_VCENTER_SCRIPTS:$VAR_LOCATION/remotes/etc/vmm/vcenter
     VMM_EXEC_EC2_SCRIPTS:$VAR_LOCATION/remotes/vmm/ec2
@@ -519,11 +629,15 @@ INSTALL_FILES=(
     MARKETPLACE_DRIVER_ETC_HTTP_SCRIPTS:$VAR_LOCATION/remotes/etc/market/http
     MARKETPLACE_DRIVER_ONE_SCRIPTS:$VAR_LOCATION/remotes/market/one
     MARKETPLACE_DRIVER_S3_SCRIPTS:$VAR_LOCATION/remotes/market/s3
+    MARKETPLACE_DRIVER_COMMON_SCRIPTS:$VAR_LOCATION/remotes/market/common
     MARKETPLACE_DRIVER_LXC_SCRIPTS:$VAR_LOCATION/remotes/market/linuxcontainers
     MARKETPLACE_DRIVER_TK_SCRIPTS:$VAR_LOCATION/remotes/market/turnkeylinux
+    MARKETPLACE_DRIVER_DH_SCRIPTS:$VAR_LOCATION/remotes/market/dockerhub
     IPAM_DRIVER_DUMMY_SCRIPTS:$VAR_LOCATION/remotes/ipam/dummy
     IPAM_DRIVER_PACKET_SCRIPTS:$VAR_LOCATION/remotes/ipam/packet
     NETWORK_FILES:$VAR_LOCATION/remotes/vnm
+    NETWORK_HOOKS_PRE_FILES:$VAR_LOCATION/remotes/vnm/hooks/pre
+    NETWORK_HOOKS_CLEAN_FILES:$VAR_LOCATION/remotes/vnm/hooks/clean
     NETWORK_ETC_FILES:$VAR_LOCATION/remotes/etc/vnm
     NETWORK_8021Q_FILES:$VAR_LOCATION/remotes/vnm/802.1Q
     NETWORK_VXLAN_FILES:$VAR_LOCATION/remotes/vnm/vxlan
@@ -560,6 +674,12 @@ INSTALL_FILES=(
     CLI_LIB_FILES:$LIB_LOCATION/ruby/cli
     ONE_CLI_LIB_FILES:$LIB_LOCATION/ruby/cli/one_helper
     VENDOR_DIRS:$LIB_LOCATION/ruby/vendors
+    START_SCRIPT_SHARE_FILES:$SHARE_LOCATION/start-scripts
+    LIBVIRT_RNG_SHARE_MODULE_FILES:$SHARE_LOCATION/schemas/libvirt
+    SSH_SH_LIB_FILES:$LIB_LOCATION/sh
+    SSH_SH_OVERRIDE_LIB_FILES:$LIB_LOCATION/sh/override
+    SSH_SHARE_FILES:$SHARE_LOCATION/ssh
+    CONTEXT_SHARE:$SHARE_LOCATION/context
 )
 
 INSTALL_CLIENT_FILES=(
@@ -582,7 +702,11 @@ INSTALL_ONEPROVISION_FILES=(
     ONEPROVISION_CONF_FILES:$ETC_LOCATION/cli
     ONEPROVISION_ANSIBLE_FILES:$SHARE_LOCATION/oneprovision
     ONEPROVISION_TEMPLATES_FILES:$SHARE_LOCATION/oneprovision
+    ONEPROVISION_EXAMPLES_FILES:$SHARE_LOCATION/oneprovision
     ONEPROVISION_LIB_FILES:$LIB_LOCATION/oneprovision/lib
+    ONEPROVISION_LIB_RESOURCES_FILES:$LIB_LOCATION/oneprovision/lib/resources
+    ONEPROVISION_LIB_PHYSICAL_R_FILES:$LIB_LOCATION/oneprovision/lib/resources/physical
+    ONEPROVISION_LIB_VIRTUAL_R_FILES:$LIB_LOCATION/oneprovision/lib/resources/virtual
 )
 
 INSTALL_SUNSTONE_RUBY_FILES=(
@@ -674,6 +798,7 @@ INSTALL_DOCKER_MACHINE_FILES=(
 
 INSTALL_ETC_FILES=(
     ETC_FILES:$ETC_LOCATION
+    ETC_FILES:$SHARE_LOCATION/conf
     EC2_ETC_FILES:$ETC_LOCATION
     VCENTER_ETC_FILES:$ETC_LOCATION
     AZ_ETC_FILES:$ETC_LOCATION
@@ -719,6 +844,12 @@ BIN_FILES="src/nebula/oned \
            share/scripts/one"
 
 #-------------------------------------------------------------------------------
+# Binary files, to be installed under $SBIN_LOCATION
+#-------------------------------------------------------------------------------
+
+SBIN_FILES="src/vmm_mad/remotes/lib/firecracker/install-firecracker"
+
+#-------------------------------------------------------------------------------
 # C/C++ OpenNebula API Library & Development files
 # Include files, to be installed under $INCLUDE_LOCATION
 # Library files, to be installed under $LIB_LOCATION
@@ -735,6 +866,7 @@ RUBY_LIB_FILES="src/mad/ruby/ActionManager.rb \
                 src/mad/ruby/CommandManager.rb \
                 src/mad/ruby/OpenNebulaDriver.rb \
                 src/mad/ruby/VirtualMachineDriver.rb \
+                src/mad/ruby/PublicCloudDriver.rb \
                 src/mad/ruby/DriverExecHelper.rb \
                 src/mad/ruby/ssh_stream.rb \
                 src/vnm_mad/one_vnm.rb \
@@ -764,7 +896,8 @@ RUBY_AUTH_LIB_FILES="src/authm_mad/remotes/ssh/ssh_auth.rb \
 #-----------------------------------------------------------------------------
 
 MAD_SH_LIB_FILES="src/mad/sh/scripts_common.sh \
-                src/mad/sh/create_container_image.sh"
+                src/mad/sh/create_container_image.sh \
+                src/mad/sh/create_docker_image.sh"
 
 MAD_RUBY_LIB_FILES="src/mad/ruby/scripts_common.rb"
 
@@ -783,9 +916,7 @@ MADS_LIB_FILES="src/mad/sh/madcommon.sh \
               src/im_mad/im_exec/one_im_exec \
               src/im_mad/im_exec/one_im_ssh \
               src/im_mad/im_exec/one_im_sh \
-              src/im_mad/dummy/one_im_dummy.rb \
-              src/im_mad/dummy/one_im_dummy \
-              src/im_mad/collectd/collectd \
+              src/monitor/src/monitor/onemonitord \
               src/tm_mad/one_tm \
               src/tm_mad/one_tm.rb \
               src/hm_mad/one_hm.rb \
@@ -833,11 +964,9 @@ PM_EXEC_PACKET_SCRIPTS="src/pm_mad/remotes/packet/cancel \
                         src/pm_mad/remotes/packet/shutdown"
 
 #-------------------------------------------------------------------------------
-# VMM Lib files, used by some VMM Drivers, to be installed in
-# $REMOTES_LOCATION/vmm/lib
+# Common library files for VMM drivers
 #-------------------------------------------------------------------------------
-
-VMM_EXEC_LIB_FILES="src/vmm_mad/remotes/lib/poll_common.rb"
+VMM_EXEC_LIB="src/vmm_mad/remotes/lib/command.rb"
 
 #-------------------------------------------------------------------------------
 # VMM Lib vcenter files, used by the vCenter Driver to be installed in
@@ -846,6 +975,7 @@ VMM_EXEC_LIB_FILES="src/vmm_mad/remotes/lib/poll_common.rb"
 
 VMM_EXEC_LIB_VCENTER_FILES="src/vmm_mad/remotes/lib/vcenter_driver/datastore.rb \
                     src/vmm_mad/remotes/lib/vcenter_driver/vi_client.rb \
+                    src/vmm_mad/remotes/lib/vcenter_driver/rest_client.rb \
                     src/vmm_mad/remotes/lib/vcenter_driver/vcenter_importer.rb \
                     src/vmm_mad/remotes/lib/vcenter_driver/file_helper.rb \
                     src/vmm_mad/remotes/lib/vcenter_driver/host.rb \
@@ -879,7 +1009,16 @@ VMM_EXEC_LIB_NSX_FILES="src/vmm_mad/remotes/lib/nsx_driver/logical_switch.rb \
                     src/vmm_mad/remotes/lib/nsx_driver/transport_zone.rb \
                     src/vmm_mad/remotes/lib/nsx_driver/nsxt_tz.rb \
                     src/vmm_mad/remotes/lib/nsx_driver/nsxv_tz.rb \
-                    src/vmm_mad/remotes/lib/nsx_driver/virtual_wire.rb"
+                    src/vmm_mad/remotes/lib/nsx_driver/virtual_wire.rb \
+                    src/vmm_mad/remotes/lib/nsx_driver/distributed_firewall.rb \
+                    src/vmm_mad/remotes/lib/nsx_driver/nsxt_dfw.rb \
+                    src/vmm_mad/remotes/lib/nsx_driver/nsxv_dfw.rb \
+                    src/vmm_mad/remotes/lib/nsx_driver/logical_port.rb \
+                    src/vmm_mad/remotes/lib/nsx_driver/nsxt_logical_port.rb \
+                    src/vmm_mad/remotes/lib/nsx_driver/nsxv_logical_port.rb \
+                    src/vmm_mad/remotes/lib/nsx_driver/nsx_rule.rb \
+                    src/vmm_mad/remotes/lib/nsx_driver/nsxt_rule.rb \
+                    src/vmm_mad/remotes/lib/nsx_driver/nsxv_rule.rb"
 
 #-------------------------------------------------------------------------------
 # VMM SH Driver LXD scripts, to be installed under $REMOTES_LOCATION/vmm/lxd
@@ -892,7 +1031,6 @@ VMM_EXEC_LXD_SCRIPTS="src/vmm_mad/remotes/lxd/cancel \
                     src/vmm_mad/remotes/lxd/reboot \
                     src/vmm_mad/remotes/lxd/reset \
                     src/vmm_mad/remotes/lxd/save \
-                    src/vmm_mad/remotes/lxd/poll \
                     src/vmm_mad/remotes/lxd/attach_disk \
                     src/vmm_mad/remotes/lxd/detach_disk \
                     src/vmm_mad/remotes/lxd/attach_nic \
@@ -915,10 +1053,28 @@ VMM_EXEC_LXD_LIB="src/vmm_mad/remotes/lib/lxd/opennebula_vm.rb \
                 src/vmm_mad/remotes/lib/lxd/container.rb"
 
 #-------------------------------------------------------------------------------
+# VMM SH Driver Firecracker scripts, to be installed under $REMOTES_LOCATION/vmm/firecracker
+#-------------------------------------------------------------------------------
+VMM_EXEC_FIRECRACKER_SCRIPTS="src/vmm_mad/remotes/firecracker/deploy \
+                            src/vmm_mad/remotes/firecracker/shutdown \
+                            src/vmm_mad/remotes/firecracker/cancel"
+
+VMM_EXEC_FIRECRACKER_LIB="src/vmm_mad/remotes/lib/firecracker/opennebula_vm.rb \
+                        src/vmm_mad/remotes/lib/firecracker/client.rb \
+                        src/vmm_mad/remotes/lib/firecracker/microvm.rb \
+                        src/vmm_mad/remotes/lib/firecracker/map_context \
+                        src/vmm_mad/remotes/lib/firecracker/command.rb"
+#-------------------------------------------------------------------------------
 # VMM configuration LXD scripts, to be installed under $REMOTES_LOCATION/etc/vmm/lxd
 #-------------------------------------------------------------------------------
 
 VMM_EXEC_ETC_LXD_SCRIPTS="src/vmm_mad/remotes/lxd/lxdrc"
+
+#-------------------------------------------------------------------------------
+# VMM configuration Firecracker scripts, to be installed under $REMOTES_LOCATION/etc/vmm/firecracker
+#-------------------------------------------------------------------------------
+
+VMM_EXEC_ETC_FIRECRACKER_SCRIPTS="src/vmm_mad/remotes/firecracker/firecrackerrc"
 
 #-------------------------------------------------------------------------------
 # VMM SH Driver KVM scripts, to be installed under $REMOTES_LOCATION/vmm/kvm
@@ -934,7 +1090,6 @@ VMM_EXEC_KVM_SCRIPTS="src/vmm_mad/remotes/kvm/cancel \
                     src/vmm_mad/remotes/kvm/reset \
                     src/vmm_mad/remotes/kvm/save \
                     src/vmm_mad/remotes/kvm/save.ceph \
-                    src/vmm_mad/remotes/kvm/poll \
                     src/vmm_mad/remotes/kvm/attach_disk \
                     src/vmm_mad/remotes/kvm/detach_disk \
                     src/vmm_mad/remotes/kvm/attach_nic \
@@ -971,6 +1126,7 @@ VMM_EXEC_VCENTER_SCRIPTS="src/vmm_mad/remotes/vcenter/cancel \
                          src/vmm_mad/remotes/vcenter/reboot \
                          src/vmm_mad/remotes/vcenter/reset \
                          src/vmm_mad/remotes/vcenter/save \
+                         src/vmm_mad/remotes/vcenter/resize_disk \
                          src/vmm_mad/remotes/vcenter/poll \
                          src/vmm_mad/remotes/vcenter/shutdown \
                          src/vmm_mad/remotes/vcenter/reconfigure \
@@ -1001,7 +1157,6 @@ VMM_EXEC_EC2_SCRIPTS="src/vmm_mad/remotes/ec2/cancel \
                       src/vmm_mad/remotes/ec2/reboot \
                       src/vmm_mad/remotes/ec2/reset \
                       src/vmm_mad/remotes/ec2/save \
-                      src/vmm_mad/remotes/ec2/poll \
                       src/vmm_mad/remotes/ec2/shutdown \
                       src/vmm_mad/remotes/ec2/reconfigure \
                       src/vmm_mad/remotes/ec2/prereconfigure \
@@ -1025,7 +1180,6 @@ VMM_EXEC_AZ_SCRIPTS="src/vmm_mad/remotes/az/cancel \
                      src/vmm_mad/remotes/az/reboot \
                      src/vmm_mad/remotes/az/reset \
                      src/vmm_mad/remotes/az/save \
-                     src/vmm_mad/remotes/az/poll \
                      src/vmm_mad/remotes/az/shutdown \
                      src/vmm_mad/remotes/az/reconfigure \
                      src/vmm_mad/remotes/az/prereconfigure \
@@ -1050,7 +1204,6 @@ VMM_EXEC_ONE_SCRIPTS="src/vmm_mad/remotes/one/cancel \
                      src/vmm_mad/remotes/one/reboot \
                      src/vmm_mad/remotes/one/reset \
                      src/vmm_mad/remotes/one/save \
-                     src/vmm_mad/remotes/one/poll \
                      src/vmm_mad/remotes/one/shutdown \
                      src/vmm_mad/remotes/one/reconfigure \
                      src/vmm_mad/remotes/one/prereconfigure"
@@ -1069,53 +1222,233 @@ VMM_EXEC_PACKET_SCRIPTS="src/vmm_mad/remotes/packet/cancel \
 #-------------------------------------------------------------------------------
 # Information Manager Probes, to be installed under $REMOTES_LOCATION/im
 #-------------------------------------------------------------------------------
+IM_PROBES_FILES="\
+    src/im_mad/remotes/run_monitord_client \
+    src/im_mad/remotes/stop_monitord_client"
 
-IM_PROBES_FILES="src/im_mad/remotes/run_probes \
-                 src/im_mad/remotes/stop_probes"
+IM_PROBES_LIB_FILES="\
+    src/im_mad/remotes/lib/kvm.rb \
+    src/im_mad/remotes/lib/lxd.rb \
+    src/im_mad/remotes/lib/linux.rb \
+    src/im_mad/remotes/lib/firecracker.rb\
+    src/im_mad/remotes/lib/numa_common.rb \
+    src/im_mad/remotes/lib/probe_db.rb \
+    src/im_mad/remotes/lib/vcenter_monitor.rb \
+    src/im_mad/remotes/lib/vcenter_cluster.rb \
+    src/im_mad/remotes/lib/monitord_client.rb \
+    src/im_mad/remotes/lib/domain.rb \
+    src/im_mad/remotes/lib/process_list.rb"
 
-IM_PROBES_KVM_FILES="src/im_mad/remotes/kvm.d/collectd-client_control.sh \
-                     src/im_mad/remotes/kvm.d/collectd-client.rb"
+# KVM PROBES
+IM_PROBES_KVM_FILES="\
+    src/im_mad/remotes/kvm.d/monitord-client_control.sh \
+    src/im_mad/remotes/kvm.d/monitord-client.rb"
 
-IM_PROBES_KVM_PROBES_FILES="src/im_mad/remotes/kvm-probes.d/kvm.rb \
-                     src/im_mad/remotes/kvm-probes.d/architecture.sh \
-                     src/im_mad/remotes/kvm-probes.d/cpu.sh \
-                     src/im_mad/remotes/kvm-probes.d/poll.sh \
-                     src/im_mad/remotes/kvm-probes.d/machines-models.rb \
-                     src/im_mad/remotes/kvm-probes.d/name.sh \
-                     src/im_mad/remotes/kvm-probes.d/pci.rb \
-                     src/im_mad/remotes/kvm-probes.d/numa.rb \
-                     src/im_mad/remotes/common.d/monitor_ds.sh \
-                     src/im_mad/remotes/common.d/version.sh \
-                     src/im_mad/remotes/common.d/collectd-client-shepherd.sh"
+IM_PROBES_KVM_HOST_BEACON_FILES="\
+     src/im_mad/remotes/kvm-probes.d/host/beacon/monitord-client-shepherd.sh \
+     src/im_mad/remotes/kvm-probes.d/host/beacon/date.sh"
 
-IM_PROBES_ETC_KVM_PROBES_FILES="src/im_mad/remotes/kvm-probes.d/pci.conf"
+IM_PROBES_KVM_HOST_MONITOR_FILES="\
+     src/im_mad/remotes/kvm-probes.d/host/monitor/linux_usage.rb \
+     src/im_mad/remotes/kvm-probes.d/host/monitor/numa_usage.rb"
 
-IM_PROBES_LXD_PROBES_FILES="src/im_mad/remotes/lxd-probes.d/lxd.rb \
-                     src/im_mad/remotes/lxd-probes.d/architecture.sh \
-                     src/im_mad/remotes/lxd-probes.d/cpu.sh \
-                     src/im_mad/remotes/lxd-probes.d/poll.sh \
-                     src/im_mad/remotes/lxd-probes.d/name.sh \
-                     src/im_mad/remotes/lxd-probes.d/pci.rb \
-                     src/im_mad/remotes/lxd-probes.d/numa.rb \
-                     src/im_mad/remotes/lxd-probes.d/monitor_ds.sh \
-                     src/im_mad/remotes/lxd-probes.d/version.sh \
-                     src/im_mad/remotes/lxd-probes.d/profiles.sh \
-                     src/im_mad/remotes/lxd-probes.d/collectd-client-shepherd.sh"
+IM_PROBES_KVM_HOST_SYSTEM_FILES="\
+     src/im_mad/remotes/kvm-probes.d/host/system/architecture.sh \
+     src/im_mad/remotes/kvm-probes.d/host/system/cpu.sh \
+     src/im_mad/remotes/kvm-probes.d/host/system/linux_host.rb \
+     src/im_mad/remotes/kvm-probes.d/host/system/machines_models.rb \
+     src/im_mad/remotes/kvm-probes.d/host/system/monitor_ds.rb \
+     src/im_mad/remotes/kvm-probes.d/host/system/name.sh \
+     src/im_mad/remotes/kvm-probes.d/host/system/numa_host.rb \
+     src/im_mad/remotes/kvm-probes.d/host/system/wild_vm.rb \
+     src/im_mad/remotes/kvm-probes.d/host/system/pci.rb \
+     src/im_mad/remotes/kvm-probes.d/host/system/version.sh"
 
-IM_PROBES_LXD_FILES="src/im_mad/remotes/lxd.d/collectd-client_control.sh \
-                     src/im_mad/remotes/lxd.d/collectd-client.rb"
+IM_PROBES_KVM_VM_MONITOR_FILES="\
+     src/im_mad/remotes/kvm-probes.d/vm/monitor/poll.rb \
+     src/im_mad/remotes/kvm-probes.d/vm/monitor/monitor_ds_vm.rb"
 
-IM_PROBES_ETC_LXD_PROBES_FILES="src/im_mad/remotes/lxd-probes.d/pci.conf"
+IM_PROBES_KVM_VM_STATUS_FILES="\
+     src/im_mad/remotes/kvm-probes.d/vm/status/state.rb"
 
-IM_PROBES_VCENTER_FILES="src/im_mad/remotes/vcenter.d/poll"
+IM_PROBES_ETC_KVM_PROBES_FILES="\
+    src/im_mad/remotes/kvm-probes.d/pci.conf \
+    src/im_mad/remotes/lib/probe_db.conf"
 
-IM_PROBES_EC2_FILES="src/im_mad/remotes/ec2.d/poll"
+# DUMMY PROBES
+IM_PROBES_DUMMY_FILES="\
+    src/im_mad/remotes/dummy.d/monitord-client_control.sh \
+    src/im_mad/remotes/dummy.d/monitord-client.rb"
 
-IM_PROBES_AZ_FILES="src/im_mad/remotes/az.d/poll"
+IM_PROBES_DUMMY_HOST_BEACON_FILES="\
+     src/im_mad/remotes/dummy-probes.d/host/beacon/monitord-client-shepherd_local.sh \
+     src/im_mad/remotes/dummy-probes.d/host/beacon/date.sh"
 
-IM_PROBES_ONE_FILES="src/im_mad/remotes/one.d/poll"
+IM_PROBES_DUMMY_HOST_MONITOR_FILES="\
+     src/im_mad/remotes/dummy-probes.d/host/monitor/monitor.rb"
+
+IM_PROBES_DUMMY_HOST_SYSTEM_FILES="\
+     src/im_mad/remotes/dummy-probes.d/host/system/system.rb"
+
+IM_PROBES_DUMMY_VM_MONITOR_FILES="\
+     src/im_mad/remotes/dummy-probes.d/vm/monitor/monitor.rb"
+
+IM_PROBES_DUMMY_VM_STATUS_FILES=""
+
+# LXD PROBES
+IM_PROBES_LXD_FILES="\
+    src/im_mad/remotes/lxd.d/monitord-client_control.sh \
+    src/im_mad/remotes/lxd.d/monitord-client.rb"
+
+IM_PROBES_LXD_HOST_BEACON_FILES="\
+     src/im_mad/remotes/lxd-probes.d/host/beacon/monitord-client-shepherd.sh \
+     src/im_mad/remotes/lxd-probes.d/host/beacon/date.sh"
+
+IM_PROBES_LXD_HOST_MONITOR_FILES="\
+     src/im_mad/remotes/lxd-probes.d/host/monitor/linux_usage.rb \
+     src/im_mad/remotes/lxd-probes.d/host/monitor/numa_usage.rb"
+
+IM_PROBES_LXD_HOST_SYSTEM_FILES="\
+     src/im_mad/remotes/lxd-probes.d/host/system/architecture.sh \
+     src/im_mad/remotes/lxd-probes.d/host/system/cpu.sh \
+     src/im_mad/remotes/lxd-probes.d/host/system/linux_host.rb \
+     src/im_mad/remotes/lxd-probes.d/host/system/monitor_ds.rb \
+     src/im_mad/remotes/lxd-probes.d/host/system/name.sh \
+     src/im_mad/remotes/lxd-probes.d/host/system/numa_host.rb \
+     src/im_mad/remotes/lxd-probes.d/host/system/wild_vm.rb \
+     src/im_mad/remotes/lxd-probes.d/host/system/pci.rb \
+     src/im_mad/remotes/lxd-probes.d/host/system/profiles.sh \
+     src/im_mad/remotes/lxd-probes.d/host/system/version.sh"
+
+IM_PROBES_LXD_VM_MONITOR_FILES="\
+     src/im_mad/remotes/lxd-probes.d/vm/monitor/poll.rb \
+     src/im_mad/remotes/lxd-probes.d/vm/monitor/monitor_ds_vm.rb"
+
+IM_PROBES_LXD_VM_STATUS_FILES="\
+     src/im_mad/remotes/lxd-probes.d/vm/status/state.rb"
+
+IM_PROBES_ETC_LXD_PROBES_FILES="\
+    src/im_mad/remotes/lxd-probes.d/pci.conf \
+    src/im_mad/remotes/lib/probe_db.conf"
+
+# Firecracker PROBES
+IM_PROBES_FIRECRACKER_FILES="\
+    src/im_mad/remotes/firecracker.d/monitord-client_control.sh \
+    src/im_mad/remotes/firecracker.d/monitord-client.rb"
+
+IM_PROBES_FIRECRACKER_HOST_BEACON_FILES="\
+     src/im_mad/remotes/firecracker-probes.d/host/beacon/monitord-client-shepherd.sh \
+     src/im_mad/remotes/firecracker-probes.d/host/beacon/date.sh"
+
+IM_PROBES_FIRECRACKER_HOST_MONITOR_FILES="\
+     src/im_mad/remotes/firecracker-probes.d/host/monitor/linux_usage.rb \
+     src/im_mad/remotes/firecracker-probes.d/host/monitor/numa_usage.rb"
+
+IM_PROBES_FIRECRACKER_HOST_SYSTEM_FILES="\
+     src/im_mad/remotes/firecracker-probes.d/host/system/architecture.sh \
+     src/im_mad/remotes/firecracker-probes.d/host/system/cpu.sh \
+     src/im_mad/remotes/firecracker-probes.d/host/system/linux_host.rb \
+     src/im_mad/remotes/firecracker-probes.d/host/system/monitor_ds.rb \
+     src/im_mad/remotes/firecracker-probes.d/host/system/name.sh \
+     src/im_mad/remotes/firecracker-probes.d/host/system/numa_host.rb \
+     src/im_mad/remotes/firecracker-probes.d/host/system/version.sh"
+
+IM_PROBES_FIRECRACKER_VM_MONITOR_FILES="\
+     src/im_mad/remotes/firecracker-probes.d/vm/monitor/poll.rb \
+     src/im_mad/remotes/firecracker-probes.d/vm/monitor/monitor_ds_vm.rb"
+
+IM_PROBES_FIRECRACKER_VM_STATUS_FILES="\
+     src/im_mad/remotes/firecracker-probes.d/vm/status/state.rb"
+
+IM_PROBES_ETC_FIRECRACKER_PROBES_FILES="src/im_mad/remotes/lib/probe_db.conf"
+
+IM_PROBES_VCENTER_FILES="src/im_mad/remotes/vcenter.d/monitord-client_control.sh"
+
+# EC2 monitord-client
+IM_PROBES_EC2_FILES="\
+    src/im_mad/remotes/ec2.d/monitord-client_control.sh \
+    src/im_mad/remotes/ec2.d/monitord-client.rb"
+
+# EC2 probes
+IM_PROBES_EC2_HOST_BEACON_FILES="\
+     src/im_mad/remotes/ec2-probes.d/host/beacon/monitord-client-shepherd_local.sh"
+
+IM_PROBES_EC2_HOST_MONITOR_FILES="\
+     src/im_mad/remotes/ec2-probes.d/host/monitor/probe_host_monitor.rb"
+
+IM_PROBES_EC2_HOST_SYSTEM_FILES="\
+     src/im_mad/remotes/ec2-probes.d/host/system/probe_host_system.rb"
+
+IM_PROBES_EC2_VM_MONITOR_FILES="\
+     src/im_mad/remotes/ec2-probes.d/vm/monitor/probe_vm_monitor.rb"
+
+IM_PROBES_EC2_VM_STATUS_FILES="\
+     src/im_mad/remotes/ec2-probes.d/vm/status/probe_vm_status.rb"
+
+# AZ monitord-client
+IM_PROBES_AZ_FILES="\
+    src/im_mad/remotes/az.d/monitord-client_control.sh \
+    src/im_mad/remotes/az.d/monitord-client.rb"
+
+# AZ probes
+IM_PROBES_AZ_HOST_BEACON_FILES="\
+     src/im_mad/remotes/az-probes.d/host/beacon/monitord-client-shepherd_local.sh"
+
+IM_PROBES_AZ_HOST_MONITOR_FILES="\
+     src/im_mad/remotes/az-probes.d/host/monitor/probe_host_monitor.rb"
+
+IM_PROBES_AZ_HOST_SYSTEM_FILES="\
+     src/im_mad/remotes/az-probes.d/host/system/probe_host_system.rb"
+
+IM_PROBES_AZ_VM_MONITOR_FILES="\
+     src/im_mad/remotes/az-probes.d/vm/monitor/probe_vm_monitor.rb"
+
+IM_PROBES_AZ_VM_STATUS_FILES="\
+     src/im_mad/remotes/az-probes.d/vm/status/probe_vm_status.rb"
+
+# ONE monitord-client
+IM_PROBES_ONE_FILES="\
+    src/im_mad/remotes/one.d/monitord-client_control.sh \
+    src/im_mad/remotes/one.d/monitord-client.rb"
+
+# ONE probes
+IM_PROBES_ONE_HOST_BEACON_FILES="\
+     src/im_mad/remotes/one-probes.d/host/beacon/monitord-client-shepherd_local.sh"
+
+IM_PROBES_ONE_HOST_MONITOR_FILES="\
+     src/im_mad/remotes/one-probes.d/host/monitor/probe_host_monitor.rb"
+
+IM_PROBES_ONE_HOST_SYSTEM_FILES="\
+     src/im_mad/remotes/one-probes.d/host/system/probe_host_system.rb"
+
+IM_PROBES_ONE_VM_MONITOR_FILES="\
+     src/im_mad/remotes/one-probes.d/vm/monitor/probe_vm_monitor.rb"
+
+IM_PROBES_ONE_VM_STATUS_FILES="\
+     src/im_mad/remotes/one-probes.d/vm/status/probe_vm_status.rb"
 
 IM_PROBES_PACKET_FILES="src/im_mad/remotes/packet.d/poll"
+
+# PACKET monitord-client
+IM_PROBES_PACKET_FILES="\
+    src/im_mad/remotes/packet.d/monitord-client_control.sh \
+    src/im_mad/remotes/packet.d/monitord-client.rb"
+
+# PACKET probes
+IM_PROBES_PACKET_HOST_BEACON_FILES="\
+     src/im_mad/remotes/packet-probes.d/host/beacon/monitord-client-shepherd_local.sh"
+
+IM_PROBES_PACKET_HOST_MONITOR_FILES="\
+     src/im_mad/remotes/packet-probes.d/host/monitor/probe_host_monitor.rb"
+
+IM_PROBES_PACKET_HOST_SYSTEM_FILES="\
+     src/im_mad/remotes/packet-probes.d/host/system/probe_host_system.rb"
+
+IM_PROBES_PACKET_VM_MONITOR_FILES="\
+     src/im_mad/remotes/packet-probes.d/vm/monitor/probe_vm_monitor.rb"
+
+IM_PROBES_PACKET_VM_STATUS_FILES="\
+     src/im_mad/remotes/packet-probes.d/vm/status/probe_vm_status.rb"
 
 IM_PROBES_VERSION="src/im_mad/remotes/VERSION"
 
@@ -1152,6 +1485,10 @@ NETWORK_FILES="src/vnm_mad/remotes/lib/vnm_driver.rb \
                src/vnm_mad/remotes/lib/security_groups.rb \
                src/vnm_mad/remotes/lib/security_groups_iptables.rb \
                src/vnm_mad/remotes/lib/nic.rb"
+
+NETWORK_HOOKS_PRE_FILES="src/vnm_mad/remotes/hooks/pre/firecracker"
+
+NETWORK_HOOKS_CLEAN_FILES="src/vnm_mad/remotes/hooks/clean/firecracker"
 
 NETWORK_8021Q_FILES="src/vnm_mad/remotes/802.1Q/clean \
                     src/vnm_mad/remotes/802.1Q/post \
@@ -1202,7 +1539,8 @@ NETWORK_OVSWITCH_VXLAN_FILES="src/vnm_mad/remotes/ovswitch_vxlan/clean \
 
 NETWORK_VCENTER_FILES="src/vnm_mad/remotes/vcenter/pre \
                        src/vnm_mad/remotes/vcenter/post \
-                       src/vnm_mad/remotes/vcenter/clean"
+                       src/vnm_mad/remotes/vcenter/clean \
+                       src/vnm_mad/remotes/vcenter/update_sg"
 
 NETWORK_ALIAS_SDNAT_FILES="src/vnm_mad/remotes/alias_sdnat/AliasSDNAT.rb \
                            src/vnm_mad/remotes/alias_sdnat/clean \
@@ -1482,6 +1820,7 @@ TM_ISCSI_FILES="src/tm_mad/iscsi_libvirt/clone \
 DATASTORE_DRIVER_COMMON_SCRIPTS="src/datastore_mad/remotes/xpath.rb \
                              src/datastore_mad/remotes/downloader.sh \
                              src/datastore_mad/remotes/lxd_downloader.sh \
+                             src/datastore_mad/remotes/docker_downloader.sh \
                              src/datastore_mad/remotes/vcenter_uploader.rb \
                              src/datastore_mad/remotes/vcenter_downloader.rb \
                              src/datastore_mad/remotes/url.rb \
@@ -1602,6 +1941,8 @@ MARKETPLACE_DRIVER_S3_SCRIPTS="src/market_mad/remotes/s3/import \
             src/market_mad/remotes/s3/monitor \
             src/market_mad/remotes/s3/S3.rb"
 
+MARKETPLACE_DRIVER_COMMON_SCRIPTS="src/market_mad/remotes/common/lxd.rb"
+
 MARKETPLACE_DRIVER_LXC_SCRIPTS="src/market_mad/remotes/linuxcontainers/import \
             src/market_mad/remotes/linuxcontainers/delete \
             src/market_mad/remotes/linuxcontainers/monitor"
@@ -1609,6 +1950,10 @@ MARKETPLACE_DRIVER_LXC_SCRIPTS="src/market_mad/remotes/linuxcontainers/import \
 MARKETPLACE_DRIVER_TK_SCRIPTS="src/market_mad/remotes/turnkeylinux/import \
             src/market_mad/remotes/turnkeylinux/delete \
             src/market_mad/remotes/turnkeylinux/monitor"
+
+MARKETPLACE_DRIVER_DH_SCRIPTS="src/market_mad/remotes/dockerhub/import \
+            src/market_mad/remotes/dockerhub/delete \
+            src/market_mad/remotes/dockerhub/monitor"
 
 #-------------------------------------------------------------------------------
 # Migration scripts for onedb command, to be installed under $LIB_LOCATION
@@ -1622,6 +1967,9 @@ ONEDB_FILES="src/onedb/fsck.rb \
             src/onedb/database_schema.rb \
             src/onedb/fsck \
             src/onedb/onedb_live.rb"
+
+ONEDB_PATCH_FILES="src/onedb/patches/4.14_monitoring.rb \
+                   src/onedb/patches/history_times.rb"
 
 ONEDB_SHARED_MIGRATOR_FILES="src/onedb/shared/2.0_to_2.9.80.rb \
                              src/onedb/shared/2.9.80_to_2.9.85.rb \
@@ -1665,7 +2013,8 @@ ONEDB_SHARED_MIGRATOR_FILES="src/onedb/shared/2.0_to_2.9.80.rb \
                              src/onedb/shared/5.4.0_to_5.4.1.rb \
                              src/onedb/shared/5.4.1_to_5.5.80.rb \
                              src/onedb/shared/5.5.80_to_5.6.0.rb \
-                             src/onedb/shared/5.6.0_to_5.10.0.rb"
+                             src/onedb/shared/5.6.0_to_5.10.0.rb \
+                             src/onedb/shared/5.10.0_to_5.12.0.rb"
 
 ONEDB_LOCAL_MIGRATOR_FILES="src/onedb/local/4.5.80_to_4.7.80.rb \
                             src/onedb/local/4.7.80_to_4.9.80.rb \
@@ -1681,10 +2030,8 @@ ONEDB_LOCAL_MIGRATOR_FILES="src/onedb/local/4.5.80_to_4.7.80.rb \
                             src/onedb/local/5.5.80_to_5.6.0.rb \
                             src/onedb/local/5.6.0_to_5.7.80.rb \
                             src/onedb/local/5.7.80_to_5.8.0.rb \
-                            src/onedb/local/5.8.0_to_5.10.0.rb"
-
-ONEDB_PATCH_FILES="src/onedb/patches/4.14_monitoring.rb \
-                   src/onedb/patches/history_times.rb"
+                            src/onedb/local/5.8.0_to_5.10.0.rb \
+                            src/onedb/local/5.10.0_to_5.12.0.rb"
 
 #-------------------------------------------------------------------------------
 # Configuration files for OpenNebula, to be installed under $ETC_LOCATION
@@ -1693,7 +2040,8 @@ ONEDB_PATCH_FILES="src/onedb/patches/4.14_monitoring.rb \
 ETC_FILES="share/etc/oned.conf \
            share/etc/defaultrc \
            src/tm_mad/tmrc \
-           src/scheduler/etc/sched.conf"
+           src/scheduler/etc/sched.conf \
+           src/monitor/etc/monitord.conf "
 
 EC2_ETC_FILES="src/vmm_mad/remotes/ec2/ec2_driver.conf \
                src/vmm_mad/remotes/ec2/ec2_driver.default"
@@ -1816,6 +2164,13 @@ INSTALL_GEMS_SHARE_FILES="share/install_gems/install_gems \
 ONETOKEN_SHARE_FILE="share/onetoken/onetoken.sh"
 
 FOLLOWER_CLEANUP_SHARE_FILE="share/hooks/raft/follower_cleanup"
+
+#-------------------------------------------------------------------------------
+# Start script files, to be installed under $SHARE_LOCATION/start-scripts
+#-------------------------------------------------------------------------------
+
+START_SCRIPT_SHARE_FILES="share/start-scripts/map_vnets_start_script \
+                          share/start-scripts/cron_start_script"
 
 #-------------------------------------------------------------------------------
 # OCA Files
@@ -2019,7 +2374,9 @@ ONE_CLI_LIB_FILES="src/cli/one_helper/onegroup_helper.rb \
                    src/cli/one_helper/onevcenter_helper.rb \
                    src/cli/one_helper/onemarket_helper.rb \
                    src/cli/one_helper/onevntemplate_helper.rb \
-                   src/cli/one_helper/onehook_helper.rb"
+                   src/cli/one_helper/onehook_helper.rb \
+                   src/cli/one_helper/oneflow_helper.rb \
+                   src/cli/one_helper/oneflowtemplate_helper.rb"
 
 CLI_BIN_FILES="src/cli/onevm \
                src/cli/onehost \
@@ -2065,7 +2422,9 @@ CLI_CONF_FILES="src/cli/etc/onegroup.yaml \
                 src/cli/etc/onemarketapp.yaml \
                 src/cli/etc/onemarket.yaml \
                 src/cli/etc/onevntemplate.yaml \
-                src/cli/etc/onehook.yaml"
+                src/cli/etc/onehook.yaml \
+                src/cli/etc/oneflow.yaml \
+                src/cli/etc/oneflowtemplate.yaml"
 
 #-----------------------------------------------------------------------------
 # Provision files
@@ -2081,16 +2440,32 @@ ONEPROVISION_ANSIBLE_FILES="share/oneprovision/ansible"
 
 ONEPROVISION_TEMPLATES_FILES="share/oneprovision/templates"
 
+ONEPROVISION_EXAMPLES_FILES="share/oneprovision/examples"
+
 ONEPROVISION_LIB_FILES="src/oneprovision/lib/ansible.rb \
                         src/oneprovision/lib/oneprovision.rb \
-                        src/oneprovision/lib/cluster.rb \
-                        src/oneprovision/lib/datastore.rb \
                         src/oneprovision/lib/driver.rb \
-                        src/oneprovision/lib/host.rb \
                         src/oneprovision/lib/provision.rb \
-                        src/oneprovision/lib/resource.rb \
-                        src/oneprovision/lib/utils.rb \
-                        src/oneprovision/lib/vnet.rb"
+                        src/oneprovision/lib/resources.rb \
+                        src/oneprovision/lib/utils.rb"
+
+ONEPROVISION_LIB_RESOURCES_FILES="src/oneprovision/lib/resources/virtual.rb \
+                                  src/oneprovision/lib/resources/resource.rb \
+                                  src/oneprovision/lib/resources/physical.rb"
+
+ONEPROVISION_LIB_PHYSICAL_R_FILES="src/oneprovision/lib/resources/physical/cluster.rb \
+                                   src/oneprovision/lib/resources/physical/datastore.rb \
+                                   src/oneprovision/lib/resources/physical/host.rb \
+                                   src/oneprovision/lib/resources/physical/physical_resource.rb \
+                                   src/oneprovision/lib/resources/physical/network.rb"
+
+ONEPROVISION_LIB_VIRTUAL_R_FILES="src/oneprovision/lib/resources/virtual/virtual_resource.rb \
+                                  src/oneprovision/lib/resources/virtual/virtual_sync_resource.rb \
+                                  src/oneprovision/lib/resources/virtual/image.rb \
+                                  src/oneprovision/lib/resources/virtual/marketplaceapp.rb \
+                                  src/oneprovision/lib/resources/virtual/template.rb \
+                                  src/oneprovision/lib/resources/virtual/flowtemplate.rb \
+                                  src/oneprovision/lib/resources/virtual/vntemplate.rb"
 
 #-----------------------------------------------------------------------------
 # Sunstone files
@@ -2124,6 +2499,7 @@ SUNSTONE_ETC_VIEW_MIXED="src/sunstone/etc/sunstone-views/mixed/admin.yaml \
 SUNSTONE_MODELS_FILES="src/sunstone/models/OpenNebulaJSON.rb \
                        src/sunstone/models/SunstoneServer.rb \
                        src/sunstone/models/SunstoneViews.rb \
+                       src/sunstone/models/OpenNebula2FA/SunstoneWebAuthn.rb \
                        src/sunstone/models/OpenNebula2FA/sunstone_qr_code.rb \
                        src/sunstone/models/OpenNebula2FA/sunstone_optp.rb \
                        src/sunstone/models/OpenNebula2FA/sunstone_2f_auth.rb "
@@ -2301,7 +2677,8 @@ src/sunstone/public/locale/languages/tr_datatable.txt"
 #-----------------------------------------------------------------------------
 
 ONEGATE_FILES="src/onegate/onegate-server.rb \
-                src/onegate/config.ru"
+               src/onegate/config.ru \
+               share/onegate/onegate"
 
 ONEGATE_BIN_FILES="src/onegate/bin/onegate-server"
 
@@ -2321,10 +2698,13 @@ ONEFLOW_ETC_FILES="src/flow/etc/oneflow-server.conf"
 ONEFLOW_LIB_FILES="src/flow/lib/grammar.rb \
                     src/flow/lib/grammar.treetop \
                     src/flow/lib/LifeCycleManager.rb \
+                    src/flow/lib/ServiceWatchDog.rb \
+                    src/flow/lib/ServiceAutoScaler.rb \
                     src/flow/lib/log.rb \
                     src/flow/lib/models.rb \
                     src/flow/lib/strategy.rb \
-                    src/flow/lib/validator.rb"
+                    src/flow/lib/validator.rb \
+                    src/flow/lib/EventManager.rb"
 
 ONEFLOW_LIB_STRATEGY_FILES="src/flow/lib/strategy/straight.rb"
 
@@ -2348,6 +2728,17 @@ ONEHEM_ETC_FILES="src/hem/etc/onehem-server.conf"
 #-----------------------------------------------------------------------------
 
 DOCKER_MACHINE_BIN_FILES="src/docker_machine/src/docker_machine/bin/docker-machine-driver-opennebula"
+
+#-----------------------------------------------------------------------------
+# SSH files
+#-----------------------------------------------------------------------------
+
+SSH_SH_LIB_FILES="share/ssh/bin/ssh-socks-cleaner"
+
+SSH_SH_OVERRIDE_LIB_FILES="share/ssh/bin/ssh"
+
+SSH_SHARE_FILES="share/ssh/etc/config \
+                 share/ssh/etc/config-pre7.6"
 
 #-----------------------------------------------------------------------------
 # MAN files
@@ -2406,14 +2797,30 @@ MAN_FILES="share/man/oneacct.1.gz \
 # Docs Files
 #-----------------------------------------------------------------------------
 
-DOCS_FILES="LICENSE LICENSE.addons NOTICE README.md"
+DOCS_FILES="LICENSE LICENSE.onsla LICENSE.onsla-nc NOTICE README.md"
 
 #-----------------------------------------------------------------------------
 # Ruby VENDOR files
 #-----------------------------------------------------------------------------
 
-VENDOR_DIRS="share/vendor/ruby/gems/rbvmomi \
-             share/vendor/ruby/gems/packethost"
+VENDOR_DIRS="share/vendor/ruby/gems/packethost"
+
+#-------------------------------------------------------------------------------
+# Libvirt RelaxNG schemas
+#-------------------------------------------------------------------------------
+
+LIBVIRT_RNG_SHARE_MODULE_FILES="share/schemas/libvirt/basictypes.rng \
+                               share/schemas/libvirt/cputypes.rng \
+                               share/schemas/libvirt/domaincaps.rng \
+                               share/schemas/libvirt/domaincheckpoint.rng \
+                               share/schemas/libvirt/domaincommon.rng \
+                               share/schemas/libvirt/domain.rng \
+                               share/schemas/libvirt/domainsnapshot.rng \
+                               share/schemas/libvirt/networkcommon.rng \
+                               share/schemas/libvirt/nwfilter_params.rng \
+                               share/schemas/libvirt/storagecommon.rng"
+
+CONTEXT_SHARE=$(find share/context/ -type f \( ! -iname "*.sh" ! -iname "SConstruct" \))
 
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------

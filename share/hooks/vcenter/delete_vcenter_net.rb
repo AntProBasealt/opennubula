@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -31,7 +31,9 @@ else
 end
 
 if File.directory?(GEMS_LOCATION)
-    Gem.use_paths(GEMS_LOCATION)
+    $LOAD_PATH.reject! {|l| l =~ /vendor_ruby/ }
+    require 'rubygems'
+    Gem.use_paths(File.realpath(GEMS_LOCATION))
 end
 
 $LOAD_PATH << RUBY_LIB_LOCATION
@@ -63,7 +65,7 @@ VNET_XPATH = '//EXTRA/VNET'
 # Changes due to new hooks
 arguments_raw = Base64.decode64(STDIN.read)
 arguments_xml = Nokogiri::XML(arguments_raw)
-success = arguments_xml.xpath(SUCCESS_XPATH).text
+success = arguments_xml.xpath(SUCCESS_XPATH).text != 'false'
 
 unless success
     err_msg = arguments_xml.xpath(ERROR_XPATH).text

@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # ---------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                  #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                  #
 #                                                                              #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may      #
 # not use this file except in compliance with the License. You may obtain      #
@@ -34,12 +34,17 @@ else
     GEMS_LOCATION     ||= ONE_LOCATION + '/share/gems'
 end
 
-Gem.use_paths(GEMS_LOCATION) if File.directory?(GEMS_LOCATION)
+if File.directory?(GEMS_LOCATION)
+    $LOAD_PATH.reject! {|l| l =~ /vendor_ruby/ }
+    require 'rubygems'
+    Gem.use_paths(File.realpath(GEMS_LOCATION))
+end
 
 $LOAD_PATH << RUBY_LIB_LOCATION
 $LOAD_PATH << File.dirname(__FILE__)
 
 require 'vcenter_driver'
+CONFIG = VCenterConf.new
 
 src          = ARGV[0]
 dst          = ARGV[1]
@@ -85,6 +90,7 @@ target_path_escaped = VCenterDriver::FileHelper
 target_path = VCenterDriver::FileHelper.unescape_path(target_path_escaped)
 
 begin
+    retries ||= 0
     vi_client = VCenterDriver::VIClient.new_from_host(host_id)
     disk_xpath ="TEMPLATE/DISK[SOURCE=\"#{src_path_escaped}\"]"
     one_disk = one_vm.retrieve_xmlelements(disk_xpath) rescue nil
@@ -101,7 +107,11 @@ begin
 
     if !(!disk.managed? || (is_storage_drs && disk.volatile?))
         if is_storage_drs
-            raise 'Non persistent images not supported in StorageDRS'
+            vm = VCenterDriver::VirtualMachine.new(vi_client, nil, vm_id)
+            # Get a single DS using StoragePod recommendation
+            # We overwrite the reference in target_ds_ref from the StoragePod
+            # to the single recommended DS
+            target_ds_ref = vm.recommended_ds(target_ds_ref)
         end
 
         source_ds_vc = VCenterDriver::Datastore.new_from_ref(source_ds_ref,
@@ -127,6 +137,10 @@ rescue StandardError => e
     if VCenterDriver::CONFIG[:debug_information]
         STDERR.puts "#{message} #{e.backtrace}"
     end
+
+    sleep 60
+    retry if retries < CONFIG[:retries]
+
     exit(-1)
 ensure
     vi_client.close_connection if vi_client

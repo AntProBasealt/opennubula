@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -331,228 +331,266 @@ class DatacenterFolder
         { vcenter_instance_name => template_objects }
     end
 
-    def get_unimported_networks(npool,vcenter_instance_name, hpool, args)
+    def cluster_networks(one_host)
+        ccr_ref = one_host['TEMPLATE/VCENTER_CCR_REF']
+        cluster = VCenterDriver::ClusterComputeResource
+                  .new_from_ref(ccr_ref, @vi_client)
+        # cluster = cluster_mob(one_host)
+        raise "Cluster with ref: #{ccr_ref} not found" if cluster.nil?
+
+        networks = cluster.item.network
+        return networks
+    end
+
+    # Return ONE cluster ID
+    def one_cluster_id(one_host)
+        if !one_host || !one_host['CLUSTER_ID']
+            cluster_id = -1
+        else
+            cluster_id = one_host['CLUSTER_ID']
+        end
+
+        cluster_id.to_i
+    end
+
+    # Get vSwitch of Standard PortGroup
+    # If there is differents vSwitches returns the first.
+    def vSwitch(vc_pg)
+        vswitch = []
+        vc_hosts = vc_pg.host
+        vc_hosts.each do |vc_host|
+            host_pgs = vc_host.configManager.networkSystem.networkInfo.portgroup
+            host_pgs.each do |pg|
+                if vc_pg.name == pg.spec.name
+                    vswitch << pg.spec.vswitchName
+                end
+            end
+        end
+        vswitch.uniq!
+        vswitch << 'Invalid configuration' if vswitch.length > 1
+        vswitch.join(" / ")
+    end
+
+    # Determine if a network must be excluded from the list
+    def exclude_network?(vc_network, one_host, args, vc_network_hash)
+
+        vc_network_ref = vc_network_hash[:vc_network_ref]
+        vc_network_name = vc_network_hash[:vc_network_name]
+        vc_network_host = vc_network_hash[:vc_network_host]
+        vc_network_tag = vc_network_hash[:vc_network_tag]
+
+        # Exclude some networks if filter = true
+        if args[:filter]
+            if ( one_host && one_host['TEMPLATE/NSX_PASSWORD'].nil?)
+                # Only NSX-V and NSX-T can be excluded
+                network_type = VCenterDriver::Network.get_network_type(vc_network, vc_network_name)
+                if network_type == VCenterDriver::Network::NETWORK_TYPE_NSXT ||\
+                   network_type == VCenterDriver::Network::NETWORK_TYPE_NSXV
+
+                    return true
+                end
+            end
+            # Exclude networks without hosts
+            if vc_network_host.empty?
+                return true
+            end
+            # Exclude DVS uplinks
+            unless vc_network_tag.empty?
+                if vc_network_tag[0][:key] == 'SYSTEM/DVS.UPLINKPG'
+                    return true
+                end
+            end
+            # Exclude portgroup used for VXLAN communication in NSX
+            if vc_network_name.match(/^vxw-vmknicPg-dvs-(.*)/)
+                return true
+            end
+            return false
+        end
+        return false
+    end
+
+    # Proccess each network
+    def process_network(vc_network,
+                      vcenter_instance_name,
+                      vcenter_uuid,
+                      hpool,
+                      one_host,
+                      args)
+
+        full_process = !args[:short]
+
+        vc_network_ref = vc_network._ref
+        vc_network_name = vc_network.name
+        vc_network_host = vc_network['host']
+        vc_network_tag = vc_network['tag']
+
+        vc_network_hash = {}
+        vc_network_hash[:vc_network_ref] = vc_network_ref
+        vc_network_hash[:vc_network_name] = vc_network_name
+        vc_network_hash[:vc_network_host] = vc_network_host
+        vc_network_hash[:vc_network_tag] = vc_network_tag
+
+        # Initialize network hash
+        network = {}
+        # Add name to network hash
+        network[vc_network_ref] = {'name' => vc_network_name}
+        # By default no network is excluded
+        network[vc_network_ref][:excluded] = false
+
+        # Initialize opts hash used to inject data into one template
+        opts = {}
+
+        if full_process
+            # Add network type to network hash
+            network_type = VCenterDriver::Network.get_network_type(vc_network, vc_network_name)
+            network[vc_network_ref][:network_type] = network_type
+        end
+
+        # Determine if the network must be excluded
+        network[vc_network_ref][:excluded] =  exclude_network?(vc_network,
+                                                               one_host,
+                                                               args,
+                                                               vc_network_hash)
+        return nil if network[vc_network_ref][:excluded] == true
+
+        if full_process
+        case network[vc_network_ref][:network_type]
+        # Distributed PortGroups
+        when VCenterDriver::Network::NETWORK_TYPE_DPG
+            network[vc_network_ref][:sw_name] = \
+                vc_network.config.distributedVirtualSwitch.name
+            # For DistributedVirtualPortgroups there is networks and uplinks
+            network[vc_network_ref][:uplink] = \
+                vc_network.config.uplink
+            #network[vc_network_ref][:uplink] = false
+        # NSX-V PortGroups
+        when VCenterDriver::Network::NETWORK_TYPE_NSXV
+            network[vc_network_ref][:sw_name] = \
+                vc_network.config.distributedVirtualSwitch.name
+            # For NSX-V ( is the same as DistributedVirtualPortgroups )
+            # there is networks and uplinks
+            network[vc_network_ref][:uplink] = \
+                vc_network.config.uplink
+                network[vc_network_ref][:uplink] = false
+        # Standard PortGroups
+        when VCenterDriver::Network::NETWORK_TYPE_PG
+            # There is no uplinks for standard portgroups, so all Standard
+            # PortGroups are networks and no uplinks
+            network[vc_network_ref][:uplink] = false
+            network[vc_network_ref][:sw_name] = vSwitch(vc_network)
+        # NSX-T PortGroups
+        when VCenterDriver::Network::NETWORK_TYPE_NSXT
+            network[vc_network_ref][:sw_name] = \
+                vc_network.summary.opaqueNetworkType
+            # There is no uplinks for NSX-T networks, so all NSX-T networks
+            # are networks and no uplinks
+            network[vc_network_ref][:uplink] = false
+        else
+            raise 'Unknown network type: ' \
+                  "#{network[vc_network_ref][:network_type]}"
+        end
+        end
+
+        # Multicluster nets support
+        network[vc_network_ref][:clusters] = {}
+        network[vc_network_ref][:clusters][:refs] = []
+        network[vc_network_ref][:clusters][:one_ids] = []
+        network[vc_network_ref][:clusters][:names] = []
+
+        # Get hosts related to this network and add them if is not
+        # excluded
+        vc_hosts = vc_network.host
+        vc_hosts.each do |vc_host|
+            # Get vCenter Cluster
+            vc_cluster = vc_host.parent
+            vc_cluster_ref = vc_cluster._ref
+            vc_cluster_name = vc_cluster.name
+            # Get one host from each vCenter cluster
+            one_host = VCenterDriver::VIHelper
+                       .find_by_ref(OpenNebula::HostPool,
+                                    "TEMPLATE/VCENTER_CCR_REF",
+                                    vc_cluster_ref,
+                                    vcenter_uuid)
+            # Check if network is excluded from each host
+            next if exclude_network?(vc_network,one_host,args, vc_network_hash)
+            # Insert vCenter cluster ref
+            network[vc_network_ref][:clusters][:refs] << vc_cluster_ref
+            # Insert OpenNebula cluster id
+            cluster_id = one_cluster_id(one_host)
+            network[vc_network_ref][:clusters][:one_ids] << cluster_id
+            # Insert vCenter cluster name
+            network[vc_network_ref][:clusters][:names] << vc_cluster_name
+
+            opts[:dc_name] = vc_cluster_name
+        end
+
+        # Remove duplicate entries
+        network[vc_network_ref][:clusters][:refs].uniq!
+        network[vc_network_ref][:clusters][:one_ids].uniq!
+        network[vc_network_ref][:clusters][:names].uniq!
+
+        # Mark network as processed
+        network[vc_network_ref][:processed] = true
+
+        if full_process
+        # General net_info related to datacenter
+        opts[:vcenter_uuid] = vcenter_uuid
+        opts[:vcenter_instance_name] = vcenter_instance_name
+        opts[:network_name] = network[vc_network_ref]['name']
+        opts[:network_ref]  = network.keys.first
+        opts[:network_type] = network[vc_network_ref][:network_type]
+        opts[:sw_name] = network[vc_network_ref][:sw_name]
+
+        network[vc_network_ref] = \
+            network[vc_network_ref].merge(VCenterDriver::Network
+                                                    .to_one_template(opts))
+        else
+          network[vc_network_ref][:ref] = vc_network_ref
+          network[vc_network_ref][:name] = network[vc_network_ref]['name']
+        end
+
+        network
+    end
+
+    def get_unimported_networks(npool, vcenter_instance_name, hpool, args)
         vcenter_uuid = get_vcenter_instance_uuid
-        pc = @vi_client.vim.serviceContent.propertyCollector
-
-        #Get all port groups and distributed port groups in vcenter instance
-        view = @vi_client.vim.serviceContent.viewManager.CreateContainerView({
-                container: @vi_client.vim.rootFolder,
-                type:      ['Network','DistributedVirtualPortgroup','OpaqueNetwork'],
-                recursive: true
-        })
-
-        filterSpec = RbVmomi::VIM.PropertyFilterSpec(
-            :objectSet => [
-                :obj => view,
-                :skip => true,
-                :selectSet => [
-                RbVmomi::VIM.TraversalSpec(
-                    :name => 'traverseEntities',
-                    :type => 'ContainerView',
-                    :path => 'view',
-                    :skip => false
-                )
-                ]
-            ],
-            :propSet => [
-                { :type => 'Network', :pathSet => ['name'] },
-                { :type => 'DistributedVirtualPortgroup', :pathSet => ['name'] },
-                { :type => 'OpaqueNetwork', :pathSet => ['name'] }
-            ]
-        )
-        result = pc.RetrieveProperties(:specSet => [filterSpec])
-
         networks = {}
-        result.each do |r|
-            exist = VCenterDriver::VIHelper.find_by_ref(OpenNebula::VirtualNetworkPool,
-                    "TEMPLATE/VCENTER_NET_REF",
-                    r.obj._ref,
-                    vcenter_uuid,
-                    npool)
+
+        # Selected host in OpenNebula
+        one_client = OpenNebula::Client.new()
+        one_host = OpenNebula::Host.new_with_id(args[:host], one_client)
+        rc = one_host.info
+        raise rc.message if OpenNebula.is_error? rc
+
+        # Get all networks in vcenter cluster (one_host)
+        vc_cluster_networks = cluster_networks(one_host)
+
+        # Iterate over vcenter networks
+        vc_cluster_networks.each do |vc_cluster_network|
+            exist = VCenterDriver::VIHelper
+                    .find_by_ref(OpenNebula::VirtualNetworkPool,
+                                'TEMPLATE/VCENTER_NET_REF',
+                                vc_cluster_network._ref,
+                                vcenter_uuid,
+                                npool)
 
             next if exist
 
-            if args[:filter]
-                # Exclude networks without hosts
-                next if r.obj['host'].empty?
+            network = process_network(vc_cluster_network,
+                                      vcenter_instance_name,
+                                      vcenter_uuid,
+                                      hpool,
+                                      one_host,
+                                      args)
 
-                # Exclude DVS uplinks
-                unless r.obj['tag'].empty?
-                    next if r.obj['tag'][0][:key] == 'SYSTEM/DVS.UPLINKPG'
-                end
-                # Exclude NSX uplinks
-                next if r.obj['name'].match(/^vxw-vmknicPg-dvs-(.*)/)
-            end
-
-            networks[r.obj._ref] = r.to_hash if r.obj.is_a?(RbVmomi::VIM::DistributedVirtualPortgroup) || r.obj.is_a?(RbVmomi::VIM::Network) || r.obj.is_a?(RbVmomi::VIM::OpaqueNetwork)
-
-            if r.obj.is_a?(RbVmomi::VIM::DistributedVirtualPortgroup)
-                # Here can be NETWORK_TYPE_DPG or NETWORK_TYPE_NSXV
-                if r['name'].match(/^vxw-dvs-(.*)-virtualwire-(.*)-sid-(.*)/)
-                    networks[r.obj._ref][:network_type] = VCenterDriver::Network::NETWORK_TYPE_NSXV
-                else
-                    networks[r.obj._ref][:network_type] = VCenterDriver::Network::NETWORK_TYPE_DPG
-                end
-            elsif r.obj.is_a?(RbVmomi::VIM::OpaqueNetwork)
-                networks[r.obj._ref][:network_type] = VCenterDriver::Network::NETWORK_TYPE_NSXT
-            elsif r.obj.is_a?(RbVmomi::VIM::Network)
-                networks[r.obj._ref][:network_type] = VCenterDriver::Network::NETWORK_TYPE_PG
-            else
-                networks[r.obj._ref][:network_type] = VCenterDriver::Network::NETWORK_TYPE_UNKNOWN
-            end
-            networks[r.obj._ref][:uplink] = false
-            networks[r.obj._ref][:processed] = false
-
-            #Multicluster nets support
-            networks[r.obj._ref][:clusters] = {}
-            networks[r.obj._ref][:clusters][:refs] = []
-            networks[r.obj._ref][:clusters][:one_ids] = []
-            networks[r.obj._ref][:clusters][:names] = []
+            networks.merge!(network) unless network.nil?
         end
-        view.DestroyView # Destroy the view
-
-        #Get datacenters
-        fetch! if @items.empty?
-
-        #Iterate over datacenters
-        @items.values.each do |dc|
-            dc_name = dc.item.name
-            view = @vi_client.vim.serviceContent.viewManager.CreateContainerView({
-                container: dc.item,
-                type:      ['ClusterComputeResource'],
-                recursive: true
-            })
-
-            filterSpec = RbVmomi::VIM.PropertyFilterSpec(
-                :objectSet => [
-                    :obj => view,
-                    :skip => true,
-                    :selectSet => [
-                    RbVmomi::VIM.TraversalSpec(
-                        :name => 'traverseEntities',
-                        :type => 'ContainerView',
-                        :path => 'view',
-                        :skip => false
-                    )
-                    ]
-                ],
-                :propSet => [
-                    { :type => 'ClusterComputeResource', :pathSet => ['name','network'] }
-                ]
-            )
-
-            result = pc.RetrieveProperties(:specSet => [filterSpec])
-
-            clusters = {}
-            result.each do |r|
-                browser = r.obj.environmentBrowser || nil
-                if browser
-                    browser.QueryConfigTarget.distributedVirtualPortgroup.each do |s|
-                        next if !networks.key?(s.portgroupKey) || networks[s.portgroupKey][:processed]
-
-                        networks[s.portgroupKey][:uplink] = s.uplinkPortgroup
-                        networks[s.portgroupKey][:processed] = true
-                        networks[s.portgroupKey][:sw_name] = s.switchName
-                    end
-                end
-                clusters[r.obj._ref] = r.to_hash if r.obj.is_a?(RbVmomi::VIM::ClusterComputeResource)
-            end
-
-            view.DestroyView # Destroy the view
-
-            #general net_info related to datacenter
-            opts = {}
-            opts[:vcenter_uuid]           = vcenter_uuid
-            opts[:vcenter_instance_name]  = vcenter_instance_name
-            opts[:dc_name]                = dc_name
-
-            clusters.each do |ref, info|
-                one_host = VCenterDriver::VIHelper.find_by_ref(OpenNebula::HostPool,
-                                                               "TEMPLATE/VCENTER_CCR_REF",
-                                                               ref,
-                                                               vcenter_uuid,
-                                                               hpool)
-
-                if !one_host || !one_host['CLUSTER_ID']
-                    cluster_id = -1
-                else
-                    cluster_id = one_host['CLUSTER_ID']
-                end
-
-                # Remove networks except for onevcenter list_all command
-                if args[:filter]
-                    # Remove NSX networks if NSX_STATUS != "OK"
-                    if one_host && one_host['TEMPLATE/NSX_STATUS'] != 'OK'
-                        networks.delete_if do |_k,v|
-                            v[:network_type] == 'Opaque Network' || \
-                                v[:network_type] == 'NSX-V'
-                        end
-                    end
-                end
-
-                one_cluster = VCenterDriver::ClusterComputeResource.new_from_ref(ref, @vi_client)
-                location = VCenterDriver::VIHelper.get_location(one_cluster.item)
-
-                one_cluster['host'].each do |host|
-                    begin
-                        esx_host = VCenterDriver::ESXHost.new_from_ref(host._ref, @vi_client)
-                        esx_host.lock
-
-                        pg_inside = esx_host.get_pg_inside
-
-                        networks.each {|ref, n|
-                            next if networks[ref][:sw_name]
-                            pg_inside.each do |vswitch, network_names|
-                                network_names.each do |name|
-                                    if n['name'] == name
-                                        networks[ref][:sw_name] = vswitch
-                                    end
-                                end
-                            end
-                        }
-                    ensure
-                        esx_host.unlock if esx_host
-                    end
-                end
-
-                network_obj = info['network']
-                cname = info['name']
-
-                network_obj.each do |n|
-                    network_ref  = n._ref
-
-                    next unless networks[network_ref]
-
-                    if !networks[network_ref][:uplink]
-
-                        # network can belong to more than 1 cluster
-                        networks[network_ref][:clusters][:refs] << ref
-                        networks[network_ref][:clusters][:one_ids] << cluster_id.to_i
-                        networks[network_ref][:clusters][:names] << cname
-                        networks[network_ref][:vcenter] = vcenter_instance_name
-
-                        next if networks[network_ref][:clusters][:refs].size > 1
-
-                        opts[:network_name] = networks[network_ref]['name']
-                        opts[:network_ref]  = network_ref
-                        opts[:network_type] = networks[network_ref][:network_type]
-                        opts[:sw_name] = networks[network_ref][:sw_name]
-
-                        networks[network_ref] = networks[network_ref].merge(VCenterDriver::Network.to_one_template(opts))
-                    else
-                        networks.delete(network_ref)
-                    end
-
-                end #networks loop
-            end #clusters loop
-        end # datacenters loop
-
+        # Added import id
         imid = -1
-        networks.map{ |k,v| v[:import_id] = imid += 1 }
-
+        networks.map {|_k, v| v[:import_id] = imid += 1 }
         { vcenter_instance_name => networks }
     end
+
 
 end # class DatatacenterFolder
 

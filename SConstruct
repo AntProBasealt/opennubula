@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -67,6 +67,7 @@ add_bison(main_env)
 # Include dirs
 main_env.Append(CPPPATH=[
     cwd+'/include',
+    cwd+'/src/monitor/include',
     cwd+'/src/parsers'
 ])
 
@@ -109,7 +110,9 @@ main_env.Append(LIBPATH=[
     cwd+'/src/vdc',
     cwd+'/src/vrouter',
     cwd+'/src/market',
-    cwd+'/src/ipamm'
+    cwd+'/src/ipamm',
+    cwd+'/src/data_model',
+    cwd+'/src/monitor/src/protocol'
 ])
 
 # Compile flags
@@ -150,6 +153,16 @@ if mysql == 'yes':
 else:
     main_env.Append(mysql='no')
 
+# PostgreSql
+postgresql = ARGUMENTS.get('postgresql', 'no')
+if postgresql == 'yes':
+    main_env.Append(postgresql='yes')
+    main_env.Append(CPPPATH=['/usr/include/postgresql'])
+    main_env.Append(CPPFLAGS=["-DPOSTGRESQL_DB"])
+    main_env.Append(LIBS=['libpq'])
+else:
+    main_env.Append(postgresql='no')
+
 # Flag to compile with xmlrpc-c versions prior to 1.31 (September 2012)
 new_xmlrpc = ARGUMENTS.get('new_xmlrpc', 'no')
 if new_xmlrpc == 'yes':
@@ -183,11 +196,21 @@ else:
 # Rubygem generation
 main_env.Append(rubygems=ARGUMENTS.get('rubygems', 'no'))
 
+# Enterprise Edition
+main_env.Append(enterprise=ARGUMENTS.get('enterprise', 'no'))
+
 # Sunstone minified files generation
 main_env.Append(sunstone=ARGUMENTS.get('sunstone', 'no'))
 
+# TODO this should be aligned with one-ee-tools workflows
+# Onedb Marshal files generation
+main_env.Append(marshal=ARGUMENTS.get('marshal', 'no'))
+
 # Docker-machine addon generation
 main_env.Append(docker_machine=ARGUMENTS.get('docker_machine', 'no'))
+
+# Context packages download
+main_env.Append(context=ARGUMENTS.get('context', 'no'))
 
 if not main_env.GetOption('clean'):
     try:
@@ -244,7 +267,7 @@ else:
 # libxml2
 main_env.ParseConfig('xml2-config --libs --cflags')
 
-svncterm_path = 'src/vmm_mad/remotes/lib/lxd/svncterm_server/SConstruct'
+svncterm_path = 'src/svncterm_server/SConstruct'
 
 # SCONS scripts to build
 build_scripts = [
@@ -259,7 +282,6 @@ build_scripts = [
     'src/datastore/SConstruct',
     'src/group/SConstruct',
     'src/mad/SConstruct',
-    'src/mad/utils/SConstruct',
     'src/nebula/SConstruct',
     'src/pool/SConstruct',
     'src/vm/SConstruct',
@@ -290,10 +312,12 @@ build_scripts = [
     'src/sunstone/public/locale/languages/SConstruct',
     'src/sunstone/public/SConstruct',
     'share/rubygems/SConstruct',
-    'src/im_mad/collectd/SConstruct',
     'src/client/SConstruct',
     'src/docker_machine/SConstruct',
-    svncterm_path
+    'src/monitor/SConstruct',
+    'src/onedb/SConstruct',
+    svncterm_path,
+    'share/context/SConstruct'
 ]
 
 # disable svncterm

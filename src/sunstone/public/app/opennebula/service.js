@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -84,6 +84,11 @@ define(function(require) {
     "recover" : function(params) {
       params.cache_name = CACHE_NAME;
       OpenNebulaAction.simple_action(params, RESOURCE, "recover", null, PATH);
+    },
+    "recover_delete" : function(params) {
+      var action_obj = {"delete": true};
+      params.cache_name = CACHE_NAME;
+      OpenNebulaAction.simple_action(params, RESOURCE, "recover", action_obj, PATH);
     },
     "rename" : function(params) {
       var action_obj = params.data.extra_param;

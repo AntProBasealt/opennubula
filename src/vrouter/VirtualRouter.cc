@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------ */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems              */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems              */
 /*                                                                          */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may  */
 /* not use this file except in compliance with the License. You may obtain  */
@@ -20,6 +20,8 @@
 #include "VirtualMachine.h"
 #include "Request.h"
 #include "VirtualMachineTemplate.h"
+#include "DispatchManager.h"
+
 /* -------------------------------------------------------------------------- */
 
 static void vrouter_prefix(VectorAttribute* nic, const string& attr)
@@ -488,7 +490,8 @@ Template * VirtualRouter::get_vm_template() const
 
     if (!obj_template->get("KEEPALIVED_ID", keepalived_id))
     {
-        keepalived_id = (oid & 0xFF);
+        // Keep Alive should be arbitrary unique number from 1 to 255
+        keepalived_id = (oid % 255) + 1;
     }
 
     tmpl->replace("VROUTER_KEEPALIVED_ID", keepalived_id);

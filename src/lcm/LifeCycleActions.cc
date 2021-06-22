@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -297,31 +297,24 @@ void  LifeCycleManager::migrate_action(const LCMAction& la)
         if (vm->get_state() == VirtualMachine::POWEROFF)
         {
             vm->set_state(VirtualMachine::PROLOG_MIGRATE_POWEROFF);
-            vm->set_action(VMActions::MIGRATE_ACTION, la.uid(), la.gid(),
-                    la.req_id());
-
         }
         else if (vm->get_state() == VirtualMachine::SUSPENDED)
         {
             vm->set_state(VirtualMachine::PROLOG_MIGRATE_SUSPEND);
-            vm->set_action(VMActions::MIGRATE_ACTION, la.uid(), la.gid(),
-                    la.req_id());
         }
         else //VirtualMachine::UNKNOWN
         {
             vm->set_state(VirtualMachine::PROLOG_MIGRATE_UNKNOWN);
 
-            vm->set_previous_running_etime(the_time);
-
-            vm->set_previous_etime(the_time);
-
-            vm->set_previous_action(VMActions::MIGRATE_ACTION, la.uid(), la.gid(),
-                    la.req_id());
-
-            vm->set_previous_vm_info();
-
-            vmpool->update_previous_history(vm);
+            vm->set_previous_action(VMActions::MIGRATE_ACTION, la.uid(),
+                    la.gid(), la.req_id());
         }
+
+        vm->set_previous_running_etime(the_time);
+
+        vm->set_previous_etime(the_time);
+
+        vmpool->update_previous_history(vm);
 
         vm->set_state(VirtualMachine::ACTIVE);
 
@@ -332,7 +325,7 @@ void  LifeCycleManager::migrate_action(const LCMAction& la)
             vm->delete_snapshots();
         }
 
-        vm->reset_info();
+        vm->set_action(VMActions::MIGRATE_ACTION, la.uid(), la.gid(), la.req_id());
 
         vm->get_capacity(sr);
 
@@ -341,6 +334,8 @@ void  LifeCycleManager::migrate_action(const LCMAction& la)
         if ( vm->get_hid() != vm->get_previous_hid() )
         {
             hpool->del_capacity(vm->get_previous_hid(), sr);
+
+            vm->release_previous_vnc_port();
         }
 
         vm->set_stime(the_time);
@@ -399,9 +394,6 @@ void  LifeCycleManager::live_migrate_action(const LCMAction& la)
         hpool->add_capacity(vm->get_hid(), sr);
 
         vm->set_stime(time(0));
-
-        vm->set_action(VMActions::LIVE_MIGRATE_ACTION, la.uid(), la.gid(),
-                    la.req_id());
 
         vmpool->update_history(vm);
 
@@ -734,11 +726,15 @@ void  LifeCycleManager::restore_action(const LCMAction& la)
 
         vm->set_state(VirtualMachine::BOOT_SUSPENDED);
 
+        vm->set_etime(the_time);
+
+        vm->set_running_etime(the_time);
+
+        vmpool->update_history(vm);
+
         vm->cp_history();
 
         vm->set_stime(the_time);
-
-        vm->set_last_poll(0);
 
         vm->set_running_stime(the_time);
 
@@ -793,11 +789,15 @@ void  LifeCycleManager::restart_action(const LCMAction& la)
 
         vm->set_state(VirtualMachine::BOOT_POWEROFF);
 
+        vm->set_etime(the_time);
+
+        vm->set_running_etime(the_time);
+
+        vmpool->update_history(vm);
+
         vm->cp_history();
 
         vm->set_stime(the_time);
-
-        vm->set_last_poll(0);
 
         vm->set_running_stime(the_time);
 
@@ -993,10 +993,7 @@ void LifeCycleManager::clean_up_vm(VirtualMachine * vm, bool dispose,
         vm->delete_snapshots();
     }
 
-    vm->reset_info();
-
     vm->set_etime(the_time);
-    vm->set_vm_info();
 
     vm->get_capacity(sr);
 
@@ -1056,6 +1053,7 @@ void LifeCycleManager::clean_up_vm(VirtualMachine * vm, bool dispose,
         break;
 
         case VirtualMachine::HOTPLUG_NIC:
+        case VirtualMachine::HOTPLUG_NIC_POWEROFF:
             vm->clear_attach_nic();
 
             vm->set_running_etime(the_time);
@@ -1384,6 +1382,7 @@ void LifeCycleManager::recover(VirtualMachine * vm, bool success,
         break;
 
         case VirtualMachine::HOTPLUG_NIC:
+        case VirtualMachine::HOTPLUG_NIC_POWEROFF:
             if (success)
             {
                 lcm_action = LCMAction::ATTACH_NIC_SUCCESS;
@@ -1667,6 +1666,7 @@ void LifeCycleManager::retry(VirtualMachine * vm)
         case VirtualMachine::CLEANUP_DELETE:
         case VirtualMachine::HOTPLUG:
         case VirtualMachine::HOTPLUG_NIC:
+        case VirtualMachine::HOTPLUG_NIC_POWEROFF:
         case VirtualMachine::HOTPLUG_SNAPSHOT:
         case VirtualMachine::HOTPLUG_SAVEAS:
         case VirtualMachine::HOTPLUG_SAVEAS_POWEROFF:
@@ -1760,6 +1760,7 @@ void  LifeCycleManager::updatesg_action(const LCMAction& la)
                 case VirtualMachine::BOOT_STOPPED_FAILURE:
                 case VirtualMachine::MIGRATE:
                 case VirtualMachine::HOTPLUG_NIC:
+                case VirtualMachine::HOTPLUG_NIC_POWEROFF:
                 case VirtualMachine::UNKNOWN:
                     is_error = true;
                     break;

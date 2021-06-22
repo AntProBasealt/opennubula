@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -129,7 +129,7 @@ define(function(require) {
 
   function _submitWizard() {
     var context = ".sunstone-content > #vms-tab #vms-tab-wizardForms.is-active";
-    var templateJSON = {};
+    var templateJSON = this.template;
     $.each(this.wizardTabs, function(index, wizardTab) {
       $.extend(
         true, 
@@ -154,6 +154,7 @@ define(function(require) {
   function _fill(context, element) {
     this.setHeader(element);
     this.resourceId = element.ID;
+    this.template = element.TEMPLATE;
 
     var templateJSON = element.TEMPLATE;
 

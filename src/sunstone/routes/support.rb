@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -21,7 +21,7 @@ require 'base64'
 
 UNSUPPORTED_RUBY = !(RUBY_VERSION =~ /^1.8/).nil?
 GITHUB_TAGS_URL = 'https://api.github.com/repos/opennebula/one/tags'
-ENTREPRISE_REPO_URL = 'https://downloads.opennebula.systems/repo/<VERSION>/'
+ENTERPRISE_REPO_URL = 'https://downloads.opennebula.io/repo/'
 
 begin
     require 'zendesk_api'
@@ -144,9 +144,10 @@ get '/support/request' do
     end
 
     zrequests.each do |zrequest|
-        if zrequest.status == 'pending'
+        case zrequest.status
+        when 'pending'
             pending_requests += 1
-        elsif zrequest.status == 'open'
+        when 'open'
             open_requests += 1
         end
 
@@ -214,15 +215,8 @@ get '/support/check' do
             return [200, JSON.pretty_generate(:pass => true)]
         end
 
-        version = one_version.slice(0..one_version.rindex('.') - 1)
-        minor_version = version.slice(version.rindex('.') + 1..-1).to_i
-        minor_version -= 1 unless minor_version.even?
-        major_version = version.slice(0..version.rindex('.') - 1)
-
-        full_version = "#{major_version}.#{minor_version}"
-        url = ENTREPRISE_REPO_URL.sub('<VERSION>', full_version)
         begin
-            http = Curl.get(url) do |request|
+            http = Curl.get(ENTERPRISE_REPO_URL) do |request|
                 if !$conf[:proxy].nil? && !$conf[:proxy].empty?
                     request.proxy_url = $conf[:proxy]
                 end

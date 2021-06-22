@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -41,25 +41,34 @@ define(function(require) {
     StateActions.disableAllStateActions();
     StateActions.enableStateActions(element.STATE, element.LCM_STATE);
 
-    // Enable / disable vnc button
-    if (OpenNebulaVM.isVNCSupported(element)) {
+    var isVNCSupported = OpenNebulaVM.isVNCSupported(element),
+      isSPICESupported = OpenNebulaVM.isSPICESupported(element),
+      isWFileSupported = OpenNebulaVM.isWFileSupported(element),
+      isRDPSupported = OpenNebulaVM.isRDPSupported(element);
+
+    // All remote buttons are disabled
+    var allDisabled = (!isVNCSupported && !isSPICESupported && !isWFileSupported && !isRDPSupported);
+    $("#vmsremote_buttons").toggle(!allDisabled);
+
+    if (isVNCSupported) {
       $(".vnc-sunstone-info").show();
-    } else {
-      $(".vnc-sunstone-info").hide();
-    }
-
-    // Enable / disable rdp button
-    if (OpenNebulaVM.isRDPSupported(element)) {
-      $(".rdp-sunstone-info").show();
-    } else {
-      $(".rdp-sunstone-info").hide();
-    }
-
-    if (OpenNebulaVM.isSPICESupported(element)) {
-      $(".spice-sunstone-info").show();
-    } else {
       $(".spice-sunstone-info").hide();
     }
+    else if (isSPICESupported) {
+      $(".spice-sunstone-info").show();
+      $(".vnc-sunstone-info").hide();
+    }
+    else {
+      $(".spice-sunstone-info").hide();
+      $(".vnc-sunstone-info").hide();
+    }
+    
+    // Show / hide virt-viewer button
+    $(".vv-sunstone-info").toggle(Boolean(isWFileSupported));
+
+    // Show / hide rdp button
+    $(".rdp-sunstone-info").toggle(Boolean(isRDPSupported));
+
     if(config && 
       config["system_config"] && 
       config["system_config"]["allow_vnc_federation"] && 

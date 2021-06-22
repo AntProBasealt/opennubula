@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -43,8 +43,8 @@ AllCops:
     - src/sunstone/bin/novnc-server
     - src/sunstone/config.ru
     - src/im_mad/remotes/dummy-probes.d/vms/monitor/monitor.rb
-    - src/im_mad/remotes/dummy.d/collectd-client.rb
-    - src/im_mad/remotes/dummy.d/collectd-client.rb
+    - src/im_mad/remotes/dummy.d/monitord-client.rb
+    - src/im_mad/remotes/dummy.d/monitord-client.rb
     - src/im_mad/remotes/kvm-probes.d/host/monitor/numa_usage.rb
     - src/im_mad/remotes/kvm-probes.d/host/system/machines_models.rb
     - src/im_mad/remotes/kvm-probes.d/host/system/numa_host.rb
@@ -52,7 +52,7 @@ AllCops:
     - src/im_mad/remotes/lib/probe_db.rb
     - src/im_mad/remotes/lxd-probes.d/host/monitor/numa_usage.rb
     - src/im_mad/remotes/lxd-probes.d/host/system/numa_host.rb
-    - src/im_mad/remotes/lxd-probes.d/vms/status/status.rb
+    - src/im_mad/remotes/lxd-probes.d/vms/status/state.rb
     - src/im_mad/remotes/node-probes.d/numa_usage.rb
     - src/im_mad/remotes/lib/linux.rb
     - src/im_mad/remotes/node-probes.d/numa_host.rb
@@ -79,13 +79,14 @@ AllCops:
     - src/im_mad/remotes/lxd-probes.d/host/system/pci.rb
     - src/im_mad/remotes/lxd-probes.d/pci.rb
     - src/im_mad/remotes/kvm-probes.d/pci.rb
-    - src/im_mad/remotes/kvm.d/collectd-client.rb
-    - src/im_mad/remotes/lxd.d/collectd-client.rb
+    - src/im_mad/remotes/kvm.d/monitord-client.rb
+    - src/im_mad/remotes/lxd.d/monitord-client.rb
     - src/im_mad/remotes/vcenter.d/poll
     - src/im_mad/remotes/packet.d/poll
     - src/im_mad/remotes/ec2.d/poll
     - src/im_mad/remotes/one.d/poll
     - src/im_mad/remotes/az.d/poll
+    - src/im_mad/remotes/lib/vcenter_cluster.rb
     - src/vnm_mad/remotes/ovswitch/post
     - src/vnm_mad/remotes/ovswitch/clean
     - src/vnm_mad/remotes/ovswitch/pre
@@ -184,7 +185,6 @@ AllCops:
     - share/hooks/ft/host_error.rb
     - share/instance_types/ec2-instance-types.rb
     - share/instance_types/az-instance-types.rb
-    - share/vendor/ruby/gems/rbvmomi/**/*
     - share/vendor/ruby/gems/packethost/spec/spec_helper.rb
     - share/vendor/ruby/gems/packethost/spec/support/webmock.rb
     - share/vendor/ruby/gems/packethost/spec/support/fake_packet.rb
@@ -269,6 +269,7 @@ AllCops:
     - src/sunstone/public/config.rb
     - src/sunstone/routes/oneflow.rb
     - src/sunstone/routes/vcenter.rb
+    - src/sunstone/models/OpenNebula2FA/SunstoneWebAuthn.rb
     - src/onegate/onegate-server.rb
     - src/datastore_mad/remotes/vcenter_downloader.rb
     - src/datastore_mad/remotes/vcenter_uploader.rb
@@ -280,7 +281,7 @@ AllCops:
     - src/im_mad/remotes/lxd-probes.d/lxd.rb
     - src/im_mad/remotes/kvm-probes.d/kvm.rb
     - src/im_mad/remotes/kvm-probes.d/machines-models.rb
-    - src/im_mad/remotes/common.d/collectd-client.rb
+    - src/im_mad/remotes/common.d/monitord-client.rb
     - src/im_mad/remotes/node-probes.d/pci.rb
     - src/hm_mad/one_hm.rb
     - src/vnm_mad/one_vnm.rb
@@ -299,7 +300,6 @@ AllCops:
     - src/vnm_mad/remotes/lib/vnm_driver.rb
     - src/vnm_mad/remotes/lib/sg_driver.rb
     - src/vnm_mad/remotes/lib/command.rb
-    - src/vnm_mad/remotes/lib/vlan.rb
     - src/vnm_mad/remotes/lib/address.rb
     - src/cli/command_parser.rb
     - src/cli/one_helper.rb
@@ -312,7 +312,6 @@ AllCops:
     - src/cli/one_helper/oneacct_helper.rb
     - src/cli/one_helper/onequota_helper.rb
     - src/cli/one_helper/oneuser_helper.rb
-    - src/cli/one_helper/oneimage_helper.rb
     - src/cli/one_helper/onemarketapp_helper.rb
     - src/cli/one_helper/onegroup_helper.rb
     - src/cli/one_helper/onevnet_helper.rb
@@ -406,7 +405,6 @@ AllCops:
     - src/vmm_mad/remotes/lib/lxd/opennebula_vm.rb
     - src/vmm_mad/remotes/lib/lxd/command.rb
     - src/vmm_mad/remotes/lib/poll_common.rb
-    - src/vmm_mad/remotes/az/az_driver.rb
     - src/vmm_mad/remotes/packet/packet_driver.rb
     - src/vmm_mad/remotes/ec2/ec2_driver.rb
     - src/vmm_mad/exec/one_vmm_exec.rb
@@ -503,6 +501,7 @@ AllCops:
     - src/onedb/shared/4.1.80_to_4.2.0.rb
     - src/onedb/shared/5.6.0_to_5.10.0.rb
     - src/onedb/shared/5.5.80_to_5.6.0.rb
+    - src/onedb/shared/5.10.0_to_5.12.0.rb
     - src/onedb/local/5.3.80_to_5.4.0.rb
     - src/onedb/local/4.13.80_to_4.13.85.rb
     - src/onedb/local/5.6.0_to_5.7.80.rb
@@ -519,35 +518,21 @@ AllCops:
     - src/onedb/local/5.8.0_to_5.9.80.rb
     - src/onedb/local/5.8.0_to_5.10.0.rb
     - src/onedb/local/5.6.0_to_5.10.0.rb
+    - src/onedb/local/5.10.0_to_5.12.0.rb
+    - src/onedb/onedb_live.rb
     - src/onedb/onedb_backend.rb
     - src/onedb/sqlite2mysql.rb
     - src/market_mad/remotes/s3/S3.rb
     - src/market_mad/one_market.rb
     - src/tm_mad/one_tm.rb
-    - src/flow/lib/models/service_template_pool.rb
-    - src/flow/lib/models/service_pool.rb
-    - src/flow/lib/models/service_template.rb
-    - src/flow/lib/models/role.rb
-    - src/flow/lib/models/service.rb
-    - src/flow/lib/strategy.rb
     - src/flow/lib/grammar.rb
-    - src/flow/lib/LifeCycleManager.rb
-    - src/flow/lib/log.rb
-    - src/flow/lib/models.rb
     - src/flow/lib/validator.rb
-    - src/flow/lib/strategy/straight.rb
-    - src/flow/oneflow-server.rb
+
 
 
 ########
 # LAYOUT
 ########
-
-Lint/RaiseException:
-    Enabled: true
-
-Lint/StructNewOverride:
-    Enabled: true
 
 # Line Length config:
 Layout/LineLength:
@@ -560,8 +545,6 @@ Layout/IndentationWidth:
 # no space before block paramenter {|var| code }
 Layout/SpaceInsideBlockBraces:
     SpaceBeforeBlockParameters: false
-
-###
 
 # Align the end keyword
 Layout/EndAlignment:
@@ -584,7 +567,14 @@ Layout/HashAlignment:
 Layout/SpaceAroundOperators:
     Enabled: false
 
-###
+Layout/SpaceAroundMethodCallOperator:
+    Enabled: true
+
+Layout/EmptyLinesAroundAttributeAccessor:
+    Enabled: true
+
+Layout/BeginEndAlignment:
+  Enabled: true
 
 #######
 # STYLE
@@ -693,9 +683,84 @@ Style/FloatDivision:
 Style/RedundantBegin:
     Enabled: false
 
+Style/ExponentialNotation:
+    Enabled: true
+
+Style/SlicingWithRange:
+    Enabled: true
+
+Style/AccessorGrouping:
+  Enabled: False
+
+Style/ArrayCoercion:
+  Enabled: True
+
+Style/BisectedAttrAccessor:
+  Enabled: True
+
+Style/CaseLikeIf:
+  Enabled: True
+
+Style/HashAsLastArrayItem:
+  Enabled: True
+
+Style/HashLikeCase:
+  Enabled: True
+
+Style/RedundantAssignment:
+  Enabled: True
+
+Style/RedundantFetchBlock:
+  Enabled: True
+
+Style/RedundantFileExtensionInRequire:
+  Enabled: True
+
+Style/RedundantRegexpCharacterClass:
+  Enabled: True
+
+Style/RedundantRegexpEscape:
+  Enabled: False
+
+Style/CombinableLoops:
+  Enabled: false
+
+Style/ExplicitBlockArgument:
+  Enabled: true
+
+Style/GlobalStdStream:
+  Enabled: false
+
+Style/KeywordParametersOrder:
+  Enabled: true
+
+Style/OptionalBooleanParameter:
+  Enabled: false
+
+Style/RedundantSelfAssignment:
+  Enabled: true
+
+Style/SingleArgumentDig:
+  Enabled: true
+
+Style/SoleNestedConditional:
+  Enabled: false
+
+Style/StringConcatenation:
+  Enabled: false
+
 ######
 # LINT
 ######
+
+Lint/RaiseException:
+    Enabled: true
+
+Lint/StructNewOverride:
+    Enabled: true
+
+Lint/DeprecatedOpenSSLConstant:
+    Enabled: true
 
 # check duplicate X:
 Lint/DuplicateCaseCondition:
@@ -710,7 +775,11 @@ Lint/DuplicateHashKey:
 
 # check empty exceptions
 Lint/SuppressedException:
-    Enabled: true
+    Enabled: false
+
+# Workaround version 0.84
+Lint/RedundantCopDisableDirective:
+    Enabled: false
 
 # check matching parameters in format
 Lint/FormatParameterMismatch:
@@ -726,8 +795,64 @@ Lint/ShadowingOuterLocalVariable:
 
 # Check for debugger info
 Lint/Debugger:
-     Enabled: true
+    Enabled: true
 
+# Check file permissions
+Lint/ScriptPermission:
+    Enabled: false
+
+Lint/DuplicateElsifCondition:
+  Enabled: True
+
+Lint/MixedRegexpCaptureTypes:
+  Enabled: True
+
+Lint/BinaryOperatorWithIdenticalOperands:
+  Enabled: true
+
+Lint/ConstantDefinitionInBlock:
+  Enabled: false
+
+Lint/DuplicateRequire:
+  Enabled: true
+
+Lint/DuplicateRescueException:
+  Enabled: true
+
+Lint/EmptyConditionalBody:
+  Enabled: true
+
+Lint/EmptyFile:
+  Enabled: true
+
+Lint/FloatComparison:
+  Enabled: false
+
+Lint/IdentityComparison:
+  Enabled: true
+
+Lint/MissingSuper:
+  Enabled: true
+
+Lint/OutOfRangeRegexpRef:
+  Enabled: true
+
+Lint/SelfAssignment:
+  Enabled: true
+
+Lint/TopLevelReturnWithArgument:
+  Enabled: true
+Lint/TrailingCommaInAttributeDeclaration:
+  Enabled: true
+
+Lint/UnreachableLoop:
+  Enabled: true
+
+Lint/UselessMethodDefinition:
+  Enabled: true
+
+Lint/UselessTimes:
+  Enabled: true
 
 #########
 # METRICS

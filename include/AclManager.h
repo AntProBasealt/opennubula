@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -23,11 +23,10 @@
 #include "AclRule.h"
 #include "NebulaLog.h"
 
-#include "SqlDB.h"
-
 using namespace std;
 
 class PoolObjectAuth;
+class SqlDB;
 
 extern "C" void * acl_action_loop(void *arg);
 
@@ -80,10 +79,10 @@ public:
      *    @param op The operation to be authorized
      *    @return true if the authorization is granted by any rule
      */
-    const bool authorize(int                    uid,
-                         const set<int>&        user_groups,
-                         const PoolObjectAuth&  obj_perms,
-                         AuthRequest::Operation op);
+    bool authorize(int                    uid,
+                   const set<int>&        user_groups,
+                   const PoolObjectAuth&  obj_perms,
+                   AuthRequest::Operation op) const;
 
     /**
      *  Takes an authorization request for oneadmin
@@ -93,8 +92,8 @@ public:
      *    @param op The operation to be authorized
      *    @return true if the authorization is granted for oneadmin
      */
-    const bool oneadmin_authorize(const PoolObjectAuth&  obj_perms,
-                         AuthRequest::Operation op);
+    bool oneadmin_authorize(const PoolObjectAuth&  obj_perms,
+                            AuthRequest::Operation op) const;
 
     /**
      *  Adds a new rule to the ACL rule set
@@ -286,7 +285,7 @@ private:
             long long             resource_oid_mask,
             long long             resource_gid_mask,
             long long             resource_cid_mask,
-            const multimap<long long, AclRule*>& rules);
+            const multimap<long long, AclRule*>& rules) const;
     /**
      *  Wrapper for match_rules. It will check if any rules in the temporary
      *  multimap or in the internal one grants permission.
@@ -314,7 +313,7 @@ private:
             long long             individual_obj_type,
             long long             group_obj_type,
             long long             cluster_obj_type,
-            const multimap<long long, AclRule*> &tmp_rules);
+            const multimap<long long, AclRule*> &tmp_rules) const;
     /**
      * Deletes all rules that match the user mask
      *
@@ -354,17 +353,17 @@ private:
     /**
      *  Function to lock the manager
      */
-    void lock()
+    void lock() const
     {
-        pthread_mutex_lock(&mutex);
+        pthread_mutex_lock(const_cast<pthread_mutex_t *>(&mutex));
     };
 
     /**
      *  Function to unlock the manager
      */
-    void unlock()
+    void unlock() const
     {
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(const_cast<pthread_mutex_t *>(&mutex));
     };
 
     // -------------------------------------------------------------------------

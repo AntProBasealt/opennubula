@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -66,7 +66,6 @@ define(function(require) {
     "support-tab",
     "official-support-tab",
     "settings-tab",
-    "upgrade-top-tab",
     "vmgroup-tab",
     "secgroups-tab",
     "provision-tab"
@@ -865,6 +864,7 @@ define(function(require) {
           SunstoneCfg["tabs"][tabName]["panelInstances"][panelName] = panelInstance;
           templatePanelsParams.push({
             "panelName": panelName,
+            "class": panelInstance.class,
             "icon": panelInstance.icon,
             "title": panelInstance.title,
             "html": panelInstance.html(),
@@ -1302,27 +1302,34 @@ define(function(require) {
 
   var _setupNavigoRoutes = function() {
     router =  new Navigo(null, true);
+    var routeForm = function(){
+      if(_getTab() == undefined){
+        window.sunstoneNoMultipleRedirects = true;
+        // This will happen if the user opens sunstone directly in a /form url
+        _showTab(this);
+      }
+    };
+    var routeWithID = function(id){
+      window.sunstoneNoMultipleRedirects = true;
+      _routerShowElement(this, id);
+    };
+    var routeNormal = function(){
+      window.sunstoneNoMultipleRedirects = true;
+      _routerShowTab(this);
+    };
+
     for (var tabName in SunstoneCfg["tabs"]) {
-      router.on(new RegExp("(?:#|/)"+tabName+"/form"), function(){
-        if(_getTab() == undefined){
-          window.sunstoneNoMultipleRedirects = true;
-          // This will happen if the user opens sunstone directly in a /form url
-          _showTab(this);
-        }
-      }.bind(tabName));
+      router.on(new RegExp("(?:#|/)"+tabName+"/form"), routeForm.bind(tabName));
+      router.on(new RegExp("^"+tabName+"/form"), routeForm.bind(tabName));
 
-      router.on(new RegExp("(?:#|/)"+tabName+"/(\\w+)"), function(id){
-        window.sunstoneNoMultipleRedirects = true;
-        _routerShowElement(this, id);
-      }.bind(tabName));
+      router.on(new RegExp("(?:#|/)"+tabName+"/(\\w+)"), routeWithID.bind(tabName));
+      router.on(new RegExp("^"+tabName+"/(\\w+)"), routeWithID.bind(tabName));
 
-      router.on(new RegExp("(?:#|/)"+tabName), function(){
-        window.sunstoneNoMultipleRedirects = true;
-        _routerShowTab(this);
-      }.bind(tabName));
+      router.on(new RegExp("(?:#|/)"+tabName), routeNormal.bind(tabName));
+      router.on(new RegExp("^"+tabName), routeNormal.bind(tabName));
     }
 
-    router.on(function(){
+    router.on(function(params){
       _routerShowTab(DASHBOARD_TAB_ID);
     });
 
@@ -1335,6 +1342,15 @@ define(function(require) {
 
     router.resolve();
   };
+
+  var _getPaginate = function(){
+    var rtn = [[6, 12, 36, 72], [6, 12, 36, 72]];
+    if(config && config.system_config && config.system_config.paginate){
+      var paginate = config.system_config.paginate;
+      rtn = typeof paginate === 'string' ? JSON.parse(paginate) : paginate;
+    }
+    return rtn;
+  }
 
   var Sunstone = {
     "addMainTabs": _addMainTabs,
@@ -1374,7 +1390,9 @@ define(function(require) {
 
     "TOP_INTERVAL": TOP_INTERVAL,
 
-    "setupNavigoRoutes": _setupNavigoRoutes
+    "setupNavigoRoutes": _setupNavigoRoutes,
+
+    "getPaginate": _getPaginate
   };
 
   return Sunstone;

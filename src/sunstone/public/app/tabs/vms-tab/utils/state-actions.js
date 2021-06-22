@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -84,6 +84,7 @@ define(function(require) {
   LCM_STATE_ACTIONS[ OpenNebulaVM.LCM_STATES.CLEANUP_DELETE ] = ["VM.updateconf"];
   LCM_STATE_ACTIONS[ OpenNebulaVM.LCM_STATES.HOTPLUG_SNAPSHOT ] = [];
   LCM_STATE_ACTIONS[ OpenNebulaVM.LCM_STATES.HOTPLUG_NIC ] = [];
+  LCM_STATE_ACTIONS[ OpenNebulaVM.LCM_STATES.HOTPLUG_NIC_POWEROFF ] = [];
   LCM_STATE_ACTIONS[ OpenNebulaVM.LCM_STATES.HOTPLUG_SAVEAS ] = [];
   LCM_STATE_ACTIONS[ OpenNebulaVM.LCM_STATES.HOTPLUG_SAVEAS_POWEROFF ] = ["VM.updateconf"];
   LCM_STATE_ACTIONS[ OpenNebulaVM.LCM_STATES.HOTPLUG_SAVEAS_SUSPENDED ] = [];
@@ -134,22 +135,22 @@ define(function(require) {
 
   function disableAllStateActions() {
     $(".state-dependent").prop("disabled", true).
-        removeClass("vm-action-enabled").
-        addClass("vm-action-disabled").
+        removeClass("action-enabled").
+        addClass("action-disabled").
         on("click.stateaction", function(e) { return false; });
   }
 
   function resetStateButtons() {
     $(".state-dependent").
-        addClass("vm-action-enabled").
-        removeClass("vm-action-disabled").
+        addClass("action-enabled").
+        removeClass("action-disabled").
         off("click.stateaction");
   }
 
   function enableStateButton(button_action) {
     $(".state-dependent[href='" + button_action + "']").removeAttr("disabled").
-        addClass("vm-action-enabled").
-        removeClass("vm-action-disabled").
+        addClass("action-enabled").
+        removeClass("action-disabled").
         off("click.stateaction");
   }
 

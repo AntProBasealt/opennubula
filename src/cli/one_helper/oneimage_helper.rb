@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -19,6 +19,10 @@ require 'one_helper/onevm_helper'
 
 # CLI helper for oneimage command
 class OneImageHelper < OpenNebulaHelper::OneHelper
+
+    # This list contains prefixes that should skip adding user home to the path
+    # This must have the same content as the case $FROM in downloader.sh
+    PREFIXES = %w[http https ssh s3 rbd vcenter lxd docker]
 
     TEMPLATE_OPTIONS=[
         {
@@ -82,7 +86,7 @@ class OneImageHelper < OpenNebulaHelper::OneHelper
             :description => 'Path of the image file',
             :format => String,
             :proc => lambda do |o, _options|
-                next [0, o] if o.match(%r{^https?://})
+                next [0, o] if o.match(%r{^(#{PREFIXES.join('|')})://})
 
                 if o[0, 1]=='/'
                     path=o
@@ -192,7 +196,7 @@ class OneImageHelper < OpenNebulaHelper::OneHelper
     def format_pool(options)
         config_file = self.class.table_conf
 
-        table = CLIHelper::ShowTable.new(config_file, self) do
+        CLIHelper::ShowTable.new(config_file, self) do
             column :ID, 'ONE identifier for the Image', :size=>4 do |d|
                 d['ID']
             end
@@ -246,8 +250,6 @@ class OneImageHelper < OpenNebulaHelper::OneHelper
             default :ID, :USER, :GROUP, :NAME, :DATASTORE, :SIZE, :TYPE,
                     :PERSISTENT, :STAT, :RVMS
         end
-
-        table
     end
 
     def check_orphans

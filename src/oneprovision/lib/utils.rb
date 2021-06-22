@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -32,6 +32,7 @@ class OneProvisionLoopException < RuntimeError
     attr_reader :text
 
     def initialize(text = nil)
+        super
         @text = text
     end
 
@@ -219,35 +220,59 @@ module OneProvision
                     Utils.fail("Failed to read template: #{e}")
                 end
 
-                return yaml unless yaml['extends']
+                if yaml['extends']
+                    yaml['extends'] = [yaml['extends']].flatten
 
-                base = read_config(yaml['extends'])
+                    yaml['extends'].reverse.each do |f|
+                        base = read_config(f)
 
-                yaml.delete('extends')
-                base['defaults'] ||= {}
-                yaml['defaults'] ||= {}
+                        yaml.delete('extends')
+                        base['defaults'] ||= {}
+                        yaml['defaults'] ||= {}
 
-                # replace scalars or append array from child YAML
-                yaml.each do |key, value|
-                    next if key == 'defaults'
+                        if base['playbook']
+                            playbooks = []
 
-                    if (value.is_a? Array) && (base[key].is_a? Array)
-                        base[key].concat(value)
-                    else
-                        base[key] = value
+                            playbooks << base['playbook']
+                            playbooks << yaml['playbook'] if yaml['playbook']
+
+                            playbooks.flatten!
+
+                            yaml['playbook'] = playbooks
+
+                            base.delete('playbook')
+                        end
+
+                        if yaml['playbook']
+                            yaml['playbook'] = [yaml['playbook']]
+                            yaml['playbook'].flatten!
+                        end
+
+                        # replace scalars or append array from child YAML
+                        yaml.each do |key, value|
+                            next if key == 'defaults'
+
+                            if (value.is_a? Array) && (base[key].is_a? Array)
+                                base[key].concat(value)
+                            else
+                                base[key] = value
+                            end
+                        end
+
+                        # merge each defaults section separately
+                        %w[connection provision configuration].each do |section|
+                            base['defaults'][section] ||= {}
+                            yaml['defaults'][section] ||= {}
+                            defaults = yaml['defaults'][section]
+
+                            base['defaults'][section].merge!(defaults)
+                        end
+
+                        yaml = base
                     end
                 end
 
-                # merge each defaults section separately
-                %w[connection provision configuration].each do |section|
-                    base['defaults'][section] ||= {}
-                    yaml['defaults'][section] ||= {}
-                    defaults = yaml['defaults'][section]
-
-                    base['defaults'][section].merge!(defaults)
-                end
-
-                base
+                yaml
             end
 
             # Gets the value of an ERB expression
@@ -257,10 +282,18 @@ module OneProvision
             #
             # @return          [String]         Evaluated value
             def get_erb_value(provision, value)
+                unless value.match(/@./)
+                    raise OneProvisionLoopException,
+                          "value #{value} not allowed"
+                end
+
                 template = ERB.new value
                 ret = template.result(provision._binding)
 
-                raise "#{value} not found." if ret.empty?
+                if ret.empty?
+                    raise OneProvisionLoopException,
+                          "#{value} not found."
+                end
 
                 ret
             end
@@ -274,13 +307,14 @@ module OneProvision
             def evaluate_erb(provision, root)
                 if root.is_a? Hash
                     root.each_pair do |key, value|
-                        if value.is_a? Array
+                        case value
+                        when Array
                             root[key] = value.map do |x|
                                 evaluate_erb(provision, x)
                             end
-                        elsif value.is_a? Hash
+                        when Hash
                             root[key] = evaluate_erb(provision, value)
-                        elsif value.is_a? String
+                        when String
                             if value =~ /<%= /
                                 root[key] = get_erb_value(provision, value)
                             end
@@ -312,6 +346,8 @@ module OneProvision
             def create_deployment_file(host, provision_id, provision_name)
                 ssh_key = try_read_file(host['connection']['public_key'])
                 config = Base64.strict_encode64(host['configuration'].to_yaml)
+
+                reject = %w[im_mad vm_mad provision connection configuration]
 
                 Nokogiri::XML::Builder.new do |xml|
                     xml.HOST do
@@ -346,6 +382,12 @@ module OneProvision
                                         xml.SSH_PUBLIC_KEY ssh_key
                                     end
                                 end
+                            end
+
+                            host.each do |key, value|
+                                next if reject.include?(key)
+
+                                xml.send(key.upcase, value)
                             end
                         end
                     end
@@ -399,7 +441,7 @@ module OneProvision
                     ind_tab = ' '
                 end
 
-                str = attributes.collect do |key, value|
+                attributes.collect do |key, value|
                     next unless value
 
                     str_line = ''
@@ -443,8 +485,6 @@ module OneProvision
                     end
                     str_line
                 end.compact.join("\n")
-
-                str
             end
 
         end

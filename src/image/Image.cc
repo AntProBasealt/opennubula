@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------ */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems              */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems              */
 /*                                                                          */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may  */
 /* not use this file except in compliance with the License. You may obtain  */
@@ -14,14 +14,6 @@
 /* limitations under the License.                                           */
 /* ------------------------------------------------------------------------ */
 
-#include <limits.h>
-#include <string.h>
-
-#include <iostream>
-#include <sstream>
-#include <openssl/evp.h>
-#include <iomanip>
-
 #include "Image.h"
 #include "ImagePool.h"
 
@@ -30,6 +22,11 @@
 #include "NebulaUtil.h"
 #include "LifeCycleManager.h"
 #include "Nebula.h"
+
+#include <sstream>
+#include <openssl/evp.h>
+#include <iomanip>
+
 
 #define TO_UPPER(S) transform(S.begin(),S.end(),S.begin(),(int(*)(int))toupper)
 
@@ -661,9 +658,10 @@ void Image::disk_attribute(VirtualMachineDisk *    disk,
 
     for (it = inherit_attrs.begin(); it != inherit_attrs.end(); it++)
     {
+        string current_val = disk->vector_value(*it);
         get_template_attribute(*it, inherit_val);
 
-        if (!inherit_val.empty())
+        if (current_val.empty() && !inherit_val.empty())
         {
             disk->replace(*it, inherit_val);
         }
@@ -801,29 +799,41 @@ Image::DiskType Image::str_to_disk_type(string& s_disk_type)
     {
         type = Image::FILE;
     }
-    else if (s_disk_type == "BLOCK")
-    {
-        type = Image::BLOCK;
-    }
-    else if (s_disk_type == "ISCSI")
-    {
-        type = Image::ISCSI;
-    }
     else if (s_disk_type == "CDROM")
     {
         type = Image::CD_ROM;
+    }
+    else if (s_disk_type == "BLOCK")
+    {
+        type = Image::BLOCK;
     }
     else if (s_disk_type == "RBD")
     {
         type = Image::RBD;
     }
-    else if (s_disk_type == "SHEEPDOG")
+    else if (s_disk_type == "RBD_CDROM")
     {
-        type = Image::SHEEPDOG;
+        type = Image::RBD_CDROM;
     }
     else if (s_disk_type == "GLUSTER")
     {
         type = Image::GLUSTER;
+    }
+    else if (s_disk_type == "GLUSTER_CDROM")
+    {
+        type = Image::GLUSTER_CDROM;
+    }
+    else if (s_disk_type == "SHEEPDOG")
+    {
+        type = Image::SHEEPDOG;
+    }
+    else if (s_disk_type == "SHEEPDOG_CDROM")
+    {
+        type = Image::SHEEPDOG_CDROM;
+    }
+    else if (s_disk_type == "ISCSI")
+    {
+        type = Image::ISCSI;
     }
 
     return type;

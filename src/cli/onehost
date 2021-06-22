@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -29,7 +29,9 @@ else
 end
 
 if File.directory?(GEMS_LOCATION)
-    Gem.use_paths(GEMS_LOCATION)
+    $LOAD_PATH.reject! {|l| l =~ /vendor_ruby/ }
+    require 'rubygems'
+    Gem.use_paths(File.realpath(GEMS_LOCATION))
 end
 
 $LOAD_PATH << RUBY_LIB_LOCATION
@@ -77,13 +79,12 @@ CommandParser::CmdParser.new(ARGV) do
         :description => 'Force probe upgrade in onehost sync'
     }
 
-    RSYNC = {
-        :name => 'rsync',
-        :large => '--rsync',
-        :description => 'Use rsync to synchronize remotes. In case some '\
-                        'probes are no longer in the fronted ithey will be '\
-                        'deleted in the hosts. rsync command must be '\
-                        'installed in the frontend and nodes.'
+    SSH = {
+        :name => 'ssh',
+        :large => '--ssh',
+        :description => 'Use SSH to synchronize remotes. In case some '\
+                        'probes are no longer in the fronted they will be '\
+                        'deleted in the hosts.'
     }
 
     TYPE = {
@@ -95,7 +96,53 @@ CommandParser::CmdParser.new(ARGV) do
     }
 
     CREAT_OPTIONS = [IM, VMM, OneClusterHelper::CLUSTER, TYPE]
-    SYNC_OPTIONS  = [OneClusterHelper::CLUSTER, FORCE, RSYNC]
+    SYNC_OPTIONS  = [OneClusterHelper::CLUSTER, FORCE, SSH]
+
+    ########################################################################
+    # Monitoring PLOT options
+    ########################################################################
+    START_T = {
+        :name => 'start',
+        :large => '--start date',
+        :description => 'Start date to show data',
+        :format => String
+    }
+
+    END_T = {
+        :name => 'end',
+        :large => '--end date',
+        :description => 'End date to show data',
+        :format => String
+    }
+
+    UNIT = {
+        :name => 'unit',
+        :large => '--unit unit',
+        :description => 'Unit to format data',
+        :format => String
+    }
+
+    TABLE = {
+        :name => 'table',
+        :large => '--table',
+        :description => 'Show monitoring information in table format'
+    }
+
+    N_ELEMS = {
+        :name => 'n_elems',
+        :large => '--n elements',
+        :description => 'Number of records to show',
+        :format => Integer
+    }
+
+    CSV_WITH_SEP = {
+        :name => 'csv',
+        :large => '--csv separator',
+        :description => 'Show data in CSV format',
+        :format => String
+    }
+
+    PLOT_OPTS = [START_T, END_T, UNIT, TABLE, N_ELEMS, CSV_WITH_SEP]
 
     ########################################################################
     # Formatters for arguments
@@ -303,5 +350,26 @@ CommandParser::CmdParser.new(ARGV) do
     command :forceupdate, forceupdate_desc, [:range, :hostid_list, nil],
             :options => [OneClusterHelper::CLUSTER] do
         helper.forceupdate(args[0], options)
+    end
+
+    monitoring_desc = <<-EOT.unindent
+        Show monitoring metrics in a graphic
+    EOT
+
+    command :monitoring,
+            monitoring_desc,
+            :hostid,
+            :attr,
+            :options => PLOT_OPTS do
+        helper.perform_action(args[0], options, 'monitoring') do |host|
+            rc = host.info
+
+            if OpenNebula.is_error?(rc)
+                STDERR.puts rc.message
+                exit(-1)
+            end
+
+            helper.monitoring(host, args[1], options)
+        end
     end
 end

@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -34,7 +34,9 @@ module VCenterDriver
     end
 
     if File.directory?(GEMS_LOCATION)
-        Gem.use_paths(GEMS_LOCATION)
+        $LOAD_PATH.reject! {|l| l =~ /vendor_ruby/ }
+        require 'rubygems'
+        Gem.use_paths(File.realpath(GEMS_LOCATION))
     end
 
     $LOAD_PATH << RUBY_LIB_LOCATION
@@ -181,6 +183,46 @@ module VCenterDriver
             @target_ds_ref
         end
 
+
+        # Get a recommendation from a provided storagepod
+        # Returns the recommended datastore reference
+        def recommended_ds(ds_ref)
+            # Fail if datastore is not a storage pod
+            raise "Cannot recommend from a non storagepod reference" if !ds_ref.start_with?('group-')
+
+            # Retrieve information needed to create storage_spec hash
+            storage_manager = vi_client.vim.serviceContent.storageResourceManager
+            vcenter_name = get_vcenter_name
+            vc_template = RbVmomi::VIM::VirtualMachine.new(vi_client.vim, get_template_ref)
+            dc = cluster.get_dc
+            vcenter_vm_folder_object = vcenter_folder(vcenter_folder_ref, vc_template, dc)
+			storpod = get_ds(ds_ref)
+            disk_move_type = calculate_disk_move_type(storpod, vc_template, linked_clones)
+            spec_hash = spec_hash_clone(disk_move_type)
+            clone_spec = RbVmomi::VIM.VirtualMachineCloneSpec(spec_hash)
+
+            # Create hash needed to get the recommendation
+            storage_spec = RbVmomi::VIM.StoragePlacementSpec(
+                type: 'clone',
+                cloneName: vcenter_name,
+                folder: vcenter_vm_folder_object,
+                podSelectionSpec: RbVmomi::VIM.StorageDrsPodSelectionSpec(storagePod: storpod),
+                vm: vc_template,
+                cloneSpec: clone_spec
+            )
+
+            # Query a storage placement recommendation
+            result = storage_manager
+                       .RecommendDatastores(storageSpec: storage_spec) rescue nil
+            raise "Could not get placement specification for StoragePod" if result.nil?
+            if !result.respond_to?(:recommendations) || result.recommendations.size == 0
+                raise "Could not get placement specification for StoragePod"
+            end
+
+            # Return recommended DS reference
+            result.recommendations.first.action.first.destination._ref
+		end
+
         # Cached cluster
         # @return ClusterComputeResource
         def cluster
@@ -285,10 +327,12 @@ module VCenterDriver
         end
 
         # @return RbVmomi::VIM::Datastore or nil
-        def get_ds
-            current_ds_id  = one_item["HISTORY_RECORDS/HISTORY[last()]/DS_ID"]
-            current_ds     = VCenterDriver::VIHelper.one_item(OpenNebula::Datastore, current_ds_id)
-            current_ds_ref = current_ds['TEMPLATE/VCENTER_DS_REF']
+        def get_ds(current_ds_ref = nil)
+            if !current_ds_ref
+                current_ds_id  = one_item["HISTORY_RECORDS/HISTORY[last()]/DS_ID"]
+                current_ds     = VCenterDriver::VIHelper.one_item(OpenNebula::Datastore, current_ds_id)
+                current_ds_ref = current_ds['TEMPLATE/VCENTER_DS_REF']
+            end
 
             if current_ds_ref
                 dc = cluster.get_dc
@@ -352,9 +396,30 @@ module VCenterDriver
         def get_vcenter_name
             vm_prefix = host['TEMPLATE/VM_PREFIX']
             vm_prefix = VM_PREFIX_DEFAULT if vm_prefix.nil? || vm_prefix.empty?
+
+            if !one_item['USER_TEMPLATE/VM_PREFIX'].nil?
+                vm_prefix = one_item['USER_TEMPLATE/VM_PREFIX']
+            end
             vm_prefix.gsub!("$i", one_item['ID'])
 
-            vm_prefix + one_item['NAME']
+            vm_suffix = ""
+            if !one_item['USER_TEMPLATE/VM_SUFFIX'].nil?
+                vm_suffix = one_item['USER_TEMPLATE/VM_SUFFIX']
+            end
+            vm_suffix.gsub!("$i", one_item['ID'])
+
+            vm_prefix + one_item['NAME'] + vm_suffix
+        end
+
+        # @return vCenter Tags
+        def vcenter_tags
+            one_item.info if one_item.instance_of?(OpenNebula::VirtualMachine)
+            one_item.retrieve_xmlelements("USER_TEMPLATE/VCENTER_TAG")
+        end
+
+        # @return if has vCenter Tags
+        def vcenter_tags?
+            vcenter_tags.size > 0
         end
 
         ############################################################################
@@ -373,24 +438,10 @@ module VCenterDriver
 
             ds = get_ds
 
-            # Default disk move type (Full Clone)
-            disk_move_type = :moveAllDiskBackingsAndDisallowSharing
-
-            if ds.instance_of? RbVmomi::VIM::Datastore
-                use_linked_clones = drv_action['USER_TEMPLATE/VCENTER_LINKED_CLONES']
-                if use_linked_clones && use_linked_clones.downcase == 'yes'
-                    # Check if all disks in template has delta disks
-                    disks = vc_template.config
-                                    .hardware.device.grep(RbVmomi::VIM::VirtualDisk)
-
-                    disks_no_delta = disks.select { |d| d.backing.parent == nil }
-
-                    # Can use linked clones if all disks have delta disks
-                    if (disks_no_delta.size == 0)
-                        disk_move_type = :moveChildMostDiskBacking
-                    end
-                end
-            end
+            asking_for_linked_clones = drv_action['USER_TEMPLATE/VCENTER_LINKED_CLONES']
+            disk_move_type = calculate_disk_move_type(ds,
+                                                      vc_template,
+                                                      asking_for_linked_clones)
 
             spec_hash = spec_hash_clone(disk_move_type)
 
@@ -399,12 +450,8 @@ module VCenterDriver
             # Specify vm folder in vSpere's VM and Templates view F#4823
             vcenter_vm_folder = nil
             vcenter_vm_folder = drv_action["USER_TEMPLATE/VCENTER_VM_FOLDER"]
-            vcenter_vm_folder_object = nil
             dc = cluster.get_dc
-            if !!vcenter_vm_folder && !vcenter_vm_folder.empty?
-                vcenter_vm_folder_object = dc.item.find_folder(vcenter_vm_folder)
-            end
-            vcenter_vm_folder_object = vc_template.parent if vcenter_vm_folder_object.nil?
+            vcenter_vm_folder_object = vcenter_folder(vcenter_vm_folder, vc_template, dc)
 
             if ds.instance_of? RbVmomi::VIM::StoragePod
                 # VM is cloned using Storage Resource Manager for StoragePods
@@ -534,6 +581,48 @@ module VCenterDriver
             end
         end
 
+
+        # Calculates how to move disk backinggs from the
+        # vCenter VM Template moref
+        def calculate_disk_move_type(ds, vc_template, use_linked_clones)
+            # Default disk move type (Full Clone)
+            disk_move_type = :moveAllDiskBackingsAndDisallowSharing
+
+            if ds.instance_of? RbVmomi::VIM::Datastore
+                if use_linked_clones && use_linked_clones.downcase == 'yes'
+                    # Check if all disks in template has delta disks
+                    disks = vc_template.config
+                                       .hardware
+                                       .device
+                                       .grep(RbVmomi::VIM::VirtualDisk)
+
+                    disks_no_delta = disks.select { |d| d.backing.parent == nil }
+
+                    # Can use linked clones if all disks have delta disks
+                    if (disks_no_delta.size == 0)
+                        disk_move_type = :moveChildMostDiskBacking
+                    end
+                end
+            end
+
+            disk_move_type
+        end
+
+        # Get vcenter folder object from the reference
+        # If folder is not found, the folder of the
+        # vCenter VM Template is returned
+        def vcenter_folder(vcenter_vm_folder, vc_template, dc)
+            vcenter_vm_folder_object = nil
+
+            if !!vcenter_vm_folder && !vcenter_vm_folder.empty?
+                vcenter_vm_folder_object = dc.item.find_folder(vcenter_vm_folder)
+            end
+
+            vcenter_vm_folder_object = vc_template.parent if vcenter_vm_folder_object.nil?
+            vcenter_vm_folder_object
+        end
+
+
         # @return clone parameters spec hash
         def spec_hash_clone(disk_move_type)
             # Relocate spec
@@ -642,6 +731,10 @@ module VCenterDriver
             one_item['USER_TEMPLATE/VCENTER_TEMPLATE_REF']
         end
 
+        def vcenter_folder_ref
+            one_item['USER_TEMPLATE/VCENTER_VM_FOLDER']
+        end
+
         # Queries to OpenNebula the machine disks xml representation
         def get_one_disks
             one_item.info if one_item.instance_of?(OpenNebula::VirtualMachine)
@@ -654,6 +747,10 @@ module VCenterDriver
             one_item.retrieve_xmlelements("TEMPLATE/NIC")
         end
 
+        def linked_clones
+            one_item['USER_TEMPLATE/VCENTER_LINKED_CLONES']
+        end
+
         # perform a query to vCenter asking for the OpenNebula disk
         #
         # @param one_disk [XMLelement]  The OpenNebula object representation of the disk
@@ -664,7 +761,6 @@ module VCenterDriver
         # @return [vCenter_disk] the proper disk
         def query_disk(one_disk, keys, vc_disks)
             index     = one_disk['DISK_ID']
-            cloned    = one_disk["CLONE"].nil? || one_disk["CLONE"] == "YES"
             unmanaged = "opennebula.disk.#{index}"
             managed   = "opennebula.mdisk.#{index}"
 
@@ -684,8 +780,12 @@ module VCenterDriver
                 end
 
                 # Try to find the disk using the path known by OpenNebula
-                path = !cloned ? one_disk['SOURCE'] : disk_real_path(one_disk, index)
-                query = vc_disks.select {|dev| path == dev[:path_wo_ds]}
+                source_path = one_disk['SOURCE']
+                calculated_path = disk_real_path(one_disk, index)
+                query = vc_disks.select { |dev|
+                    source_path == dev[:path_wo_ds] ||
+                    calculated_path == dev[:path_wo_ds]
+                }
             end
 
             return nil if query.size != 1
@@ -935,22 +1035,73 @@ module VCenterDriver
         end
 
         def reference_all_disks
-            extraconfig = []
+            # OpenNebula VM disks saved inside .vmx file in vCenter
+            disks_extraconfig_current = {}
+            # iterate over all attributes and get the disk information
+            # keys for disks are prefixed with opennebula.disk and opennebula.mdisk
+            @item.config.extraConfig.each do |elem|
+                disks_extraconfig_current[elem.key] = elem.value if elem.key.start_with?("opennebula.disk.")
+                disks_extraconfig_current[elem.key] = elem.value if elem.key.start_with?("opennebula.mdisk.")
+            end
+
+            # disks that exist currently in the vCenter Virtual Machine
+            disks_vcenter_current = []
             disks_each(:synced?) do |disk|
                 begin
                     key_prefix = disk.managed? ? "opennebula.mdisk." : "opennebula.disk."
                     k = "#{key_prefix}#{disk.id}"
                     v = "#{disk.key}"
 
-                    extraconfig << {key: k, value: v}
+                    disks_vcenter_current << {key: k, value: v}
                 rescue StandardError => e
                     next
                 end
             end
 
-            spec_hash = {:extraConfig => extraconfig}
-            spec = RbVmomi::VIM.VirtualMachineConfigSpec(spec_hash)
-            @item.ReconfigVM_Task(:spec => spec).wait_for_completion
+            update = false
+            # differences in the number of disks between vCenter and OpenNebula VMs
+            num_disks_difference = disks_extraconfig_current.keys.count - disks_vcenter_current.count
+
+            # check if disks are same in vCenter and OpenNebula
+            disks_vcenter_current.each do |item|
+                # check if vCenter disk have representation in the extraConfig
+                # but with a different key, then we have to update
+                if (disks_extraconfig_current.has_key? item[:key]) and !(disks_extraconfig_current[item[:key]] == item[:value])
+                    update = true
+                end
+                # check if vCenter disk hasn't got a representation in the extraConfig
+                # then we have to update
+                if !disks_extraconfig_current.has_key? item[:key]
+                    update = true
+                end
+            end
+
+            # new configuration for vCenter .vmx file
+            disks_extraconfig_new = {}
+
+            if num_disks_difference != 0 || update
+                # Step 1: remove disks in the current configuration of .vmx
+                # Avoids having an old disk in the configuration that does not really exist
+                disks_extraconfig_current.keys.each do |key|
+                    disks_extraconfig_new[key] = ""
+                end
+
+                # Step 2: add current vCenter disks to new configuration
+                disks_vcenter_current.each do |item|
+                    disks_extraconfig_new[item[:key]] = item[:value]
+                end
+
+                # Step 3: create extraconfig_new with the values to update
+                extraconfig_new = []
+                disks_extraconfig_new.keys.each do |key|
+                    extraconfig_new << {key: key, value: disks_extraconfig_new[key]}
+                end
+
+                # Step 4: update the extraConfig
+                spec_hash = {:extraConfig => extraconfig_new}
+                spec = RbVmomi::VIM.VirtualMachineConfigSpec(spec_hash)
+                @item.ReconfigVM_Task(:spec => spec).wait_for_completion
+            end
         end
 
         # Build extraconfig section to reference disks
@@ -1190,6 +1341,12 @@ module VCenterDriver
                 :extraConfig  => extraconfig,
                 :deviceChange => device_change
             }
+            num_cores = one_item["TEMPLATE/TOPOLOGY/CORES"] || num_cpus.to_i
+            if num_cpus.to_i % num_cores.to_i != 0
+                num_cores = num_cpus.to_i
+            end
+            spec_hash[:numCoresPerSocket] = num_cores.to_i
+
             spec_hash[:bootOptions] = boot_opts if boot_opts
 
             spec = RbVmomi::VIM.VirtualMachineConfigSpec(spec_hash)
@@ -1215,7 +1372,7 @@ module VCenterDriver
             one_item.each('TEMPLATE/CONTEXT/*') do |context_element|
                 # next if !context_element.text
                 context_text += context_element.name + "='" +
-                                context_element.text.gsub("'", "\\'") + "'\n"
+                                context_element.text.gsub("'", "\'") + "'\n"
             end
 
             # token
@@ -1929,10 +2086,16 @@ module VCenterDriver
                       :fileName  => ""
                     )
                 else
-                    ds           = get_effective_ds(disk)
-                    ds_name      = ds['name']
+                    ds = get_effective_ds(disk)
+                    if ds.item._ref.start_with?('group-')
+                        ds_object = self.item.datastore.first
+                        ds_name   = ds_object.name
+                    else
+                        ds_object = ds.item
+                        ds_name = ds['name']
+                    end
                     vmdk_backing = RbVmomi::VIM::VirtualDiskFlatVer2BackingInfo(
-                      :datastore => ds.item,
+                      :datastore => ds_object,
                       :diskMode  => 'persistent',
                       :fileName  => "[#{ds_name}] #{img_name}"
                     )
@@ -1987,6 +2150,9 @@ module VCenterDriver
                 template_id = one_item['TEMPLATE/TEMPLATE_ID']
                 new_template = OpenNebula::Template.new_with_id(template_id, one_client)
                 new_template.info
+
+                # unlock VM Template
+                new_template.unlock()
 
                 # Update the template reference
                 new_template.update("VCENTER_TEMPLATE_REF=#{@item._ref}", true)
@@ -2176,10 +2342,13 @@ module VCenterDriver
 
         # Create a snapshot for the VM
         def create_snapshot(snap_id, snap_name)
+            memory_dumps = true
+            memory_dumps = CONFIG[:memory_dumps] if CONFIG[:memory_dumps]
+
             snapshot_hash = {
                 :name        => snap_id,
                 :description => "OpenNebula Snapshot: #{snap_name}",
-                :memory      => true,
+                :memory      => memory_dumps,
                 :quiesce     => true
             }
 

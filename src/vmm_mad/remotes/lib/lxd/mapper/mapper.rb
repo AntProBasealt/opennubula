@@ -1,7 +1,7 @@
 #!/usr/bin/ruby
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -53,24 +53,24 @@ class Mapper
     #   as root
     #---------------------------------------------------------------------------
     COMMANDS = {
-        :lsblk      => 'sudo lsblk',
-        :losetup    => 'sudo losetup',
-        :mount      => 'sudo mount',
-        :umount     => 'sudo umount',
-        :kpartx     => 'sudo kpartx',
-        :nbd        => 'sudo -u root -g oneadmin qemu-nbd',
-        :su_mkdir   => 'sudo mkdir -p',
+        :lsblk      => 'sudo -n lsblk',
+        :losetup    => 'sudo -n losetup',
+        :mount      => 'sudo -n mount',
+        :umount     => 'sudo -n umount',
+        :kpartx     => 'sudo -n kpartx',
+        :nbd        => 'sudo -n -u root -g oneadmin qemu-nbd',
+        :su_mkdir   => 'sudo -n mkdir -p',
         :mkdir      => 'mkdir -p',
-        :catfstab   => 'sudo catfstab',
+        :catfstab   => 'sudo -n catfstab',
         :cat        => 'cat',
         :file       => 'file -L -s',
-        :blkid      => 'sudo blkid',
-        :e2fsck     => 'sudo e2fsck',
-        :resize2fs  => 'sudo resize2fs',
-        :xfs_growfs => 'sudo xfs_growfs',
-        :rbd        => 'sudo rbd-nbd --id',
-        :xfs_admin  => 'sudo xfs_admin',
-        :tune2fs    => 'sudo tune2fs',
+        :blkid      => 'sudo -n blkid',
+        :e2fsck     => 'sudo -n e2fsck',
+        :resize2fs  => 'sudo -n resize2fs',
+        :xfs_growfs => 'sudo -n xfs_growfs',
+        :rbd        => 'sudo -n rbd-nbd --id',
+        :xfs_admin  => 'sudo -n xfs_admin',
+        :tune2fs    => 'sudo -n tune2fs',
         :mkfs       => '/sbin/mkfs'
     }
 
@@ -87,7 +87,7 @@ class Mapper
     # Errors should be log using OpenNebula driver functions
     def do_map(_one_vm, _disk, _directory)
         OpenNebula.log_error("map function not implemented for #{self.class}")
-        ""
+        ''
     end
 
     # Unmaps a previously mapped partition
@@ -98,7 +98,7 @@ class Mapper
     # @return nil
     def do_unmap(_device, _one_vm, _disk, _directory)
         OpenNebula.log_error("unmap function not implemented for #{self.class}")
-        ""
+        ''
     end
 
     #---------------------------------------------------------------------------
@@ -263,7 +263,8 @@ class Mapper
 
         mkdir_safe(path)
 
-        rc, _out, err = Command.execute("#{COMMANDS[:mount]} #{dev} #{path}", true)
+        rc, _out, err = Command.execute("#{COMMANDS[:mount]} #{dev} #{path}",
+                                        true)
 
         if rc != 0
             OpenNebula.log_error("mount_dev: #{err}")
@@ -293,16 +294,25 @@ class Mapper
     # @return [Hash] with partitions
     def lsblk(device)
         partitions = {}
+        blocklist = ''
 
-        rc, o, e = Command.execute("#{COMMANDS[:lsblk]} -OJ #{device}", false)
+        cmd ="#{COMMANDS[:lsblk]} -OJ #{device}"
 
-        if rc != 0 || o.empty?
-            OpenNebula.log_error("lsblk: #{e}")
-            return partitions
+        3.times do |t| # wait for device to be ready to be parsed
+            rc, o, e = Command.execute(cmd, false)
+
+            if rc != 0 || o.empty?
+                OpenNebula.log_error("#{__method__}: #{rc}, #{o}, #{e}") if t == 3
+                sleep 1
+                next
+            end
+
+            blocklist = o
+            break
         end
 
         begin
-            partitions = JSON.parse(o)['blockdevices']
+            partitions = JSON.parse(blocklist)['blockdevices']
 
             if !device.empty?
                 partitions = partitions[0]
@@ -314,7 +324,7 @@ class Mapper
                 end
 
                 partitions.delete_if do |p|
-                  p['fstype'].casecmp('swap').zero? if p['fstype']
+                    p['fstype'].casecmp('swap').zero? if p['fstype']
                 end
             end
         rescue StandardError

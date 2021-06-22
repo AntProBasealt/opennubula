@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -16,7 +16,7 @@
 # limitations under the License.                                             #
 #--------------------------------------------------------------------------- #
 
-#Arguments: hypervisor ds_location collectd_port monitor_push_period host_id hostname
+#Arguments: hypervisor ds_location monitord_port monitor_push_period host_id hostname
 HYPERVISOR=$1
 DATASTORE_LOCATION=${2:-"/var/lib/one/datastores"}
 

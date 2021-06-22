@@ -1,5 +1,5 @@
 # Copyright 2018 www.privaz.io Valletech AB
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -153,7 +153,8 @@ LCM_STATE = IntEnum('LCM_STATE', '''
             PROLOG_MIGRATE_UNKNOWN_FAILURE
             DISK_RESIZE
             DISK_RESIZE_POWEROFF
-            DISK_RESIZE_UNDEPLOYED''', start=0)
+            DISK_RESIZE_UNDEPLOYED
+            HOTPLUG_NIC_POWEROFF''', start=0)
 
 MARKETPLACEAPP_STATES = IntEnum('MARKETPLACEAPP_STATES', '''INIT READY LOCKED
         ERROR DISABLED''', start=0)

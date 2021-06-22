@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -125,6 +125,14 @@ module OpenNebula
             set_status("OFFLINE")
         end
 
+        #Resets monitoring forcing an update
+        def forceupdate()
+            rc = offline
+            return rc if OpenNebula.is_error?(rc)
+
+            enable
+        end
+
         def flush(action)
             self.disable
 
@@ -134,7 +142,7 @@ module OpenNebula
             rc = vm_pool.info
             if OpenNebula.is_error?(rc)
                  puts rc.message
-                 exit -1
+                 exit(-1)
             end
 
             vm_pool.each do |vm|
@@ -184,8 +192,7 @@ module OpenNebula
         #        ["1337266088", "800"]]
         #   }
         def monitoring(xpath_expressions)
-            return super(HOST_METHODS[:monitoring], 'HOST',
-                'LAST_MON_TIME', xpath_expressions)
+            return super(HOST_METHODS[:monitoring], xpath_expressions)
         end
 
         # Retrieves this Host's monitoring data from OpenNebula, in XML
@@ -240,7 +247,8 @@ module OpenNebula
                 vi_client = VCenterDriver::VIClient.new_from_host(self["ID"])
                 importer  = VCenterDriver::VmmImporter.new(@client, vi_client)
 
-                return importer.import({wild: wild, template: template, one_item: vm, host: self['ID']})
+                return importer.import({wild: wild, template: template,
+                                        one_item: vm, host: self['ID']})
             else
                 rc = vm.allocate(template)
 

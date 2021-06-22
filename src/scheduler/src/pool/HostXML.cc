@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -25,11 +25,14 @@
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-int HostXML::host_num_paths =  4;
+int HostXML::host_num_paths = 7;
 
 const char *HostXML::host_paths[] = {
     "/HOST/TEMPLATE/",
     "/HOST/HOST_SHARE/",
+    "/HOST/HOST_SHARE/DATASTORES/",
+    "/HOST/MONITORING/CAPACITY/",
+    "/HOST/MONITORING/SYSTEM/",
     "/HOST/",
     "/HOST/CLUSTER_TEMPLATE/"};
 
@@ -47,7 +50,7 @@ void HostShareXML::init_attributes(ObjectXML * host)
     host->xpath<long long>(max_mem, "/HOST/HOST_SHARE/MAX_MEM", 0);
     host->xpath<long long>(max_cpu, "/HOST/HOST_SHARE/MAX_CPU", 0);
 
-    host->xpath<long long>(free_disk, "/HOST/HOST_SHARE/FREE_DISK", 0);
+    host->xpath<long long>(free_disk, "/HOST/HOST_SHARE/DATASTORES/FREE_DISK", 0);
     host->xpath<long long>(running_vms, "/HOST/HOST_SHARE/RUNNING_VMS", 0);
 
     //-------------------- HostShare Datastores ------------------------------

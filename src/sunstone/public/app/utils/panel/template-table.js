@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -430,7 +430,11 @@ define(function(require) {
               modify
           );
         } else {
-          str += '<tr><td class="key_td">' + Locale.tr(field) + '</td><td class="value_td" id="value_td_input_' + field + '">' + TemplateUtils.htmlEncode(value) + '</td>';
+          str += '<tr><td class="key_td">' + Locale.tr(field) + '</td><td class="value_td" id="value_td_input_' + field + '">';
+          str += (field.toLowerCase() === "link")
+            ? '<a target="_blank" href="'+TemplateUtils.htmlEncode(value)+'">' + TemplateUtils.htmlEncode(value) + '</a></td>'
+            : TemplateUtils.htmlEncode(value) + '</td>';
+          
           if (modify) {
             var edit_html = "";
             var delete_html = "";

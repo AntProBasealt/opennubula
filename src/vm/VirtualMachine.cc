@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -13,30 +13,25 @@
 /* See the License for the specific language governing permissions and        */
 /* limitations under the License.                                             */
 /* -------------------------------------------------------------------------- */
-#include <limits.h>
-#include <string.h>
-#include <time.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <regex.h>
-#include <unistd.h>
-
-#include <iostream>
-#include <sstream>
-#include <queue>
-
 #include "VirtualMachine.h"
+#include "VirtualMachineManager.h"
 #include "VirtualNetworkPool.h"
+#include "VMGroupPool.h"
 #include "ImagePool.h"
 #include "NebulaLog.h"
 #include "NebulaUtil.h"
 #include "Snapshots.h"
 #include "ScheduledAction.h"
+#include "LifeCycleManager.h"
+#include "ClusterPool.h"
+#include "DatastorePool.h"
 
 #include "Nebula.h"
 
 #include "vm_file_var_syntax.h"
 #include "vm_var_syntax.h"
+
+#include <sys/stat.h>
 
 /* ************************************************************************** */
 /* Virtual Machine :: Constructor/Destructor                                  */
@@ -49,8 +44,7 @@ VirtualMachine::VirtualMachine(int           id,
                                const string& _gname,
                                int           umask,
                                VirtualMachineTemplate * _vm_template):
-        PoolObjectSQL(id,VM,"",_uid,_gid,_uname,_gname,table),
-        last_poll(0),
+        PoolObjectSQL(id,VM,"",_uid,_gid,_uname,_gname,one_db::vm_table),
         state(INIT),
         prev_state(INIT),
         lcm_state(LCM_INIT),
@@ -293,6 +287,8 @@ int VirtualMachine::lcm_state_from_str(string& st, LcmState& state)
         state = DISK_RESIZE_POWEROFF;
     } else if ( st == "DISK_RESIZE_UNDEPLOYED" ) {
         state = DISK_RESIZE_UNDEPLOYED;
+    } else if ( st == "HOTPLUG_NIC_POWEROFF" ) {
+        state = HOTPLUG_NIC_POWEROFF;
     } else {
         return -1;
     }
@@ -430,6 +426,8 @@ string& VirtualMachine::lcm_state_to_str(string& st, LcmState state)
             st = "DISK_RESIZE_POWEROFF"; break;
         case DISK_RESIZE_UNDEPLOYED:
             st = "DISK_RESIZE_UNDEPLOYED"; break;
+        case HOTPLUG_NIC_POWEROFF:
+            st = "HOTPLUG_NIC_POWEROFF"; break;
     }
 
         return st;
@@ -453,47 +451,15 @@ string VirtualMachine::state_str()
 /* Virtual Machine :: Database Access Functions                               */
 /* ************************************************************************** */
 
-const char * VirtualMachine::table = "vm_pool";
-
-const char * VirtualMachine::db_names =
-    "oid, name, body, uid, gid, last_poll, state, lcm_state, "
-    "owner_u, group_u, other_u, short_body, search_token";
-
-const char * VirtualMachine::db_bootstrap = "CREATE TABLE IF NOT EXISTS "
-    "vm_pool (oid INTEGER PRIMARY KEY, name VARCHAR(128), body MEDIUMTEXT, "
-    "uid INTEGER, gid INTEGER, last_poll INTEGER, state INTEGER, "
-    "lcm_state INTEGER, owner_u INTEGER, group_u INTEGER, other_u INTEGER, "
-    "short_body MEDIUMTEXT, search_token MEDIUMTEXT";
-
-const char * VirtualMachine::monit_table = "vm_monitoring";
-
-const char * VirtualMachine::monit_db_names = "vmid, last_poll, body";
-
-const char * VirtualMachine::monit_db_bootstrap = "CREATE TABLE IF NOT EXISTS "
-    "vm_monitoring (vmid INTEGER, last_poll INTEGER, body MEDIUMTEXT, "
-    "PRIMARY KEY(vmid, last_poll))";
-
-
-const char * VirtualMachine::showback_table = "vm_showback";
-
-const char * VirtualMachine::showback_db_names = "vmid, year, month, body";
-
-const char * VirtualMachine::showback_db_bootstrap =
-    "CREATE TABLE IF NOT EXISTS vm_showback "
-    "(vmid INTEGER, year INTEGER, month INTEGER, body MEDIUMTEXT, "
-    "PRIMARY KEY(vmid, year, month))";
-
-/* -------------------------------------------------------------------------- */
-
 int VirtualMachine::bootstrap(SqlDB * db)
 {
     int rc;
 
     ostringstream oss_vm;
 
-    oss_vm << VirtualMachine::db_bootstrap;
+    oss_vm << one_db::vm_db_bootstrap;
 
-    if (db->fts_available())
+    if (db->supports(SqlDB::SqlFeature::FTS))
     {
         oss_vm << ", FULLTEXT ftidx(search_token))";
     }
@@ -502,9 +468,9 @@ int VirtualMachine::bootstrap(SqlDB * db)
         oss_vm << ")";
     }
 
-    ostringstream oss_monit(VirtualMachine::monit_db_bootstrap);
+    ostringstream oss_monit(one_db::vm_monitor_db_bootstrap);
     ostringstream oss_hist(History::db_bootstrap);
-    ostringstream oss_showback(VirtualMachine::showback_db_bootstrap);
+    ostringstream oss_showback(one_db::vm_showback_db_bootstrap);
 
     ostringstream oss_index("CREATE INDEX state_oid_idx on vm_pool (state, oid);");
 
@@ -777,7 +743,6 @@ int VirtualMachine::insert(SqlDB * db, string& error_str)
     set<int> cluster_ids;
     set<int> datastore_ids;
     vector<Template *> quotas;
-
     ostringstream oss;
 
     // ------------------------------------------------------------------------
@@ -929,6 +894,16 @@ int VirtualMachine::insert(SqlDB * db, string& error_str)
     parse_cpu_model(user_obj_template);
 
     // ------------------------------------------------------------------------
+    // Validate RAW attribute
+    // ------------------------------------------------------------------------
+    rc = Nebula::instance().get_vmm()->validate_raw(obj_template, error_str);
+
+    if (rc != 0)
+    {
+        goto error_raw;
+    }
+
+    // ------------------------------------------------------------------------
     // PCI Devices (Needs to be parsed before network)
     // ------------------------------------------------------------------------
     rc = parse_pci(error_str, user_obj_template);
@@ -1036,8 +1011,8 @@ int VirtualMachine::insert(SqlDB * db, string& error_str)
     // -------------------------------------------------------------------------
     // Get and set DEPLOY_ID for imported VMs
     // -------------------------------------------------------------------------
-    user_obj_template->get("IMPORT_VM_ID", value);
-    user_obj_template->erase("IMPORT_VM_ID");
+    user_obj_template->get("DEPLOY_ID", value);
+    user_obj_template->erase("DEPLOY_ID");
 
     if (!value.empty())
     {
@@ -1049,8 +1024,8 @@ int VirtualMachine::insert(SqlDB * db, string& error_str)
         }
         else
         {
-            deploy_id = value;
             obj_template->add("IMPORTED", "YES");
+            deploy_id = value;
         }
     }
 
@@ -1143,6 +1118,7 @@ error_one_vms:
     error_str = "Trying to import an OpenNebula VM: 'one-*'.";
     goto error_common;
 
+error_raw:
 error_os:
 error_pci:
 error_defaults:
@@ -1725,12 +1701,11 @@ int VirtualMachine::insert_replace(SqlDB *db, bool replace, string& error_str)
 
     if (replace)
     {
-        oss << "UPDATE " << table << " SET "
+        oss << "UPDATE " << one_db::vm_table << " SET "
             << "name = '"         <<  sql_name      << "', "
             << "body = '"         <<  sql_xml       << "', "
             << "uid = "           <<  uid           << ", "
             << "gid = "           <<  gid           << ", "
-            << "last_poll = "     <<  last_poll     << ", "
             << "state = "         <<  state         << ", "
             << "lcm_state = "     <<  lcm_state     << ", "
             << "owner_u = "       <<  owner_u       << ", "
@@ -1741,13 +1716,13 @@ int VirtualMachine::insert_replace(SqlDB *db, bool replace, string& error_str)
     }
     else
     {
-        oss << "INSERT INTO " << table << " ("<< db_names <<") VALUES ("
+        oss << "INSERT INTO " << one_db::vm_table
+            << " ("<< one_db::vm_db_names << ") VALUES ("
             <<        oid           << ","
             << "'" << sql_name      << "',"
             << "'" << sql_xml       << "',"
             <<        uid           << ","
             <<        gid           << ","
-            <<        last_poll     << ","
             <<        state         << ","
             <<        lcm_state     << ","
             <<        owner_u       << ","
@@ -1807,85 +1782,13 @@ int VirtualMachine::update_search(SqlDB * db)
         return -1;
     }
 
-    oss << "UPDATE " << table << " SET "
+    oss << "UPDATE " << one_db::vm_table << " SET "
         << "search_token = '" << sql_text << "' "
         << "WHERE oid = " << oid;
 
     db->free_str(sql_text);
 
     return db->exec_wr(oss);
-}
-
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-
-int VirtualMachine::update_monitoring(SqlDB * db)
-{
-    ostringstream oss;
-    int           rc;
-
-    string xml_body;
-    string error_str;
-    char * sql_xml;
-
-    float       cpu = 0;
-    long long   memory = 0;
-
-    obj_template->get("CPU", cpu);
-    obj_template->get("MEMORY", memory);
-
-    oss << "<VM>"
-        << "<ID>" << oid << "</ID>"
-        << "<LAST_POLL>" << last_poll << "</LAST_POLL>"
-        << monitoring.to_xml(xml_body)
-        << "<TEMPLATE>"
-        <<   "<CPU>"    << cpu << "</CPU>"
-        <<   "<MEMORY>" << memory << "</MEMORY>"
-        << "</TEMPLATE>"
-        << "</VM>";
-
-    sql_xml = db->escape_str(oss.str());
-
-    if ( sql_xml == 0 )
-    {
-        goto error_body;
-    }
-
-    if ( validate_xml(sql_xml) != 0 )
-    {
-        goto error_xml;
-    }
-
-    oss.str("");
-
-    oss << "REPLACE INTO " << monit_table << " ("<< monit_db_names <<") VALUES ("
-        <<          oid             << ","
-        <<          last_poll       << ","
-        << "'" <<   sql_xml         << "')";
-
-    db->free_str(sql_xml);
-
-    rc = db->exec_local_wr(oss);
-
-    return rc;
-
-error_xml:
-    db->free_str(sql_xml);
-
-    error_str = "could not transform the VM to XML.";
-
-    goto error_common;
-
-error_body:
-    error_str = "could not insert the VM in the DB.";
-
-error_common:
-    oss.str("");
-    oss << "Error updating VM monitoring information, " << error_str;
-
-    NebulaLog::log("ONE",Log::ERROR, oss);
-
-    return -1;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -2214,7 +2117,6 @@ string& VirtualMachine::to_xml_extended(string& xml, int n_history) const
 {
     string template_xml;
     string user_template_xml;
-    string monitoring_xml;
     string history_xml;
     string perm_xml;
     string snap_xml;
@@ -2230,7 +2132,7 @@ string& VirtualMachine::to_xml_extended(string& xml, int n_history) const
         << "<GNAME>"     << gname     << "</GNAME>"
         << "<NAME>"      << name      << "</NAME>"
         << perms_to_xml(perm_xml)
-        << "<LAST_POLL>" << last_poll << "</LAST_POLL>"
+        << "<LAST_POLL>" << monitoring.timestamp() << "</LAST_POLL>"
         << "<STATE>"     << state     << "</STATE>"
         << "<LCM_STATE>" << lcm_state << "</LCM_STATE>"
         << "<PREV_STATE>"     << prev_state     << "</PREV_STATE>"
@@ -2240,7 +2142,7 @@ string& VirtualMachine::to_xml_extended(string& xml, int n_history) const
         << "<ETIME>"     << etime     << "</ETIME>"
         << "<DEPLOY_ID>" << deploy_id << "</DEPLOY_ID>"
         << lock_db_to_xml(lock_str)
-        << monitoring.to_xml(monitoring_xml)
+        << monitoring.to_xml()
         << obj_template->to_xml(template_xml)
         << user_obj_template->to_xml(user_template_xml);
 
@@ -2305,7 +2207,7 @@ string& VirtualMachine::to_json(string& json) const
         << "\"UNAME\": \""<< uname << "\","
         << "\"GNAME\": \""<< gname << "\","
         << "\"NAME\": \""<< name << "\","
-        << "\"LAST_POLL\": \""<< last_poll << "\","
+        << "\"LAST_POLL\": \""<< monitoring.timestamp() << "\","
         << "\"STATE\": \""<< state << "\","
         << "\"LCM_STATE\": \""<< lcm_state << "\","
         << "\"PREV_STATE\": \""<< prev_state << "\","
@@ -2370,7 +2272,7 @@ string& VirtualMachine::to_token(string& text) const
 
 string& VirtualMachine::to_xml_short(string& xml)
 {
-    string disks_xml, monitoring_xml, user_template_xml, history_xml, nics_xml;
+    string disks_xml, user_template_xml, history_xml, nics_xml;
     string cpu_tmpl, mem_tmpl;
 
     ostringstream   oss;
@@ -2385,7 +2287,7 @@ string& VirtualMachine::to_xml_short(string& xml)
         << "<UNAME>"     << uname     << "</UNAME>"
         << "<GNAME>"     << gname     << "</GNAME>"
         << "<NAME>"      << name      << "</NAME>"
-        << "<LAST_POLL>" << last_poll << "</LAST_POLL>"
+        << "<LAST_POLL>" << monitoring.timestamp() << "</LAST_POLL>"
         << "<STATE>"     << state     << "</STATE>"
         << "<LCM_STATE>" << lcm_state << "</LCM_STATE>"
         << "<RESCHED>"   << resched   << "</RESCHED>"
@@ -2412,7 +2314,7 @@ string& VirtualMachine::to_xml_short(string& xml)
     }
 
     oss << "</TEMPLATE>"
-        << monitoring.to_xml_short(monitoring_xml)
+        << monitoring.to_xml_short()
         << user_obj_template->to_xml_short(user_template_xml);
 
     if ( hasHistory() )
@@ -2462,7 +2364,6 @@ int VirtualMachine::from_xml(const string &xml_str)
     rc += xpath(gname,     "/VM/GNAME", "not_found");
     rc += xpath(name,      "/VM/NAME",  "not_found");
 
-    rc += xpath<time_t>(last_poll, "/VM/LAST_POLL", 0);
     rc += xpath(resched, "/VM/RESCHED", 0);
 
     rc += xpath<time_t>(stime, "/VM/STIME", 0);
@@ -2525,21 +2426,6 @@ int VirtualMachine::from_xml(const string &xml_str)
     }
 
     nics.init(vnics, true);
-
-    ObjectXML::free_nodes(content);
-    content.clear();
-
-    // -------------------------------------------------------------------------
-    // Virtual Machine Monitoring
-    // -------------------------------------------------------------------------
-    ObjectXML::get_nodes("/VM/MONITORING", content);
-
-    if (content.empty())
-    {
-        return -1;
-    }
-
-    rc += monitoring.from_xml_node(content[0]);
 
     ObjectXML::free_nodes(content);
     content.clear();
@@ -2618,41 +2504,12 @@ int VirtualMachine::from_xml(const string &xml_str)
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int VirtualMachine::update_info(const string& monitor_data)
+void VirtualMachine::load_monitoring()
 {
-    int    rc;
-    string error;
-
-    ostringstream oss;
-
-    last_poll = time(0);
-
-    rc = monitoring.update(monitor_data, error);
-
-    if ( rc != 0)
-    {
-        oss << "Ignoring monitoring information, error:" << error
-            << ". Monitor information was: " << monitor_data;
-
-        NebulaLog::log("VMM", Log::ERROR, oss);
-
-        set_template_error_message(oss.str());
-
-        log("VMM", Log::ERROR, oss);
-
-        return -1;
-    }
-
-    set_vm_info();
-
-    clear_template_monitor_error();
-
-    oss << "VM " << oid << " successfully monitored: " << monitor_data;
-
-    NebulaLog::log("VMM", Log::DEBUG, oss);
-
-    return 0;
-};
+    // Get last monitoring record
+    auto vmpool = Nebula::instance().get_vmpool();
+    monitoring = vmpool->get_monitoring(oid);
+}
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -2855,21 +2712,6 @@ void VirtualMachine::clear_template_error_message()
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-void VirtualMachine::set_template_monitor_error(const string& message)
-{
-    set_template_error_message("ERROR_MONITOR", message);
-}
-
-/* -------------------------------------------------------------------------- */
-
-void VirtualMachine::clear_template_monitor_error()
-{
-    user_obj_template->erase("ERROR_MONITOR");
-}
-
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-
 void VirtualMachine::get_public_clouds(const string& pname, set<string> &clouds) const
 {
     vector<VectorAttribute *>                 attrs;
@@ -3042,6 +2884,14 @@ int VirtualMachine::updateconf(VirtualMachineTemplate& tmpl, string &err)
 
             err = "configuration cannot be updated in state " + state_str();
             return -1;
+    }
+
+    // -------------------------------------------------------------------------
+    // Validates RAW data section
+    // -------------------------------------------------------------------------
+    if (Nebula::instance().get_vmm()->validate_raw(&tmpl, err) != 0)
+    {
+        return -1;
     }
 
     // -------------------------------------------------------------------------
@@ -3622,6 +3472,26 @@ int VirtualMachine::set_detach_nic(int nic_id)
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
+
+void VirtualMachine::delete_attach_alias(VirtualMachineNic *nic)
+{
+    std::set<int> a_ids;
+
+    one_util::split_unique(nic->vector_value("ALIAS_IDS"), ',', a_ids);
+
+    for (const auto& id : a_ids)
+    {
+        VirtualMachineNic * nic_a = nics.delete_nic(id);
+
+        if (nic_a != 0)
+        {
+            obj_template->remove(nic_a->vector_attribute());
+        }
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 /* VirtualMachine VMGroup interface                                           */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -3736,6 +3606,9 @@ void VirtualMachine::encrypt()
     user_obj_template->encrypt(one_key);
 };
 
+/* ------------------------------------------------------------------------ */
+/* ------------------------------------------------------------------------ */
+
 void VirtualMachine::decrypt()
 {
     std::string one_key;
@@ -3743,4 +3616,89 @@ void VirtualMachine::decrypt()
 
     obj_template->decrypt(one_key);
     user_obj_template->decrypt(one_key);
+};
+
+/* ------------------------------------------------------------------------ */
+/* ------------------------------------------------------------------------ */
+
+void VirtualMachine::get_quota_template(VirtualMachineTemplate& quota_tmpl,
+        bool only_running)
+{
+    std::string memory, cpu;
+
+    get_template_attribute("MEMORY", memory);
+    get_template_attribute("CPU", cpu);
+
+    if ((state == VirtualMachine::ACTIVE) ||
+        (state == VirtualMachine::PENDING) ||
+        (state == VirtualMachine::CLONING) ||
+        (state == VirtualMachine::CLONING_FAILURE) ||
+        (state == VirtualMachine::HOLD) )
+    {
+        quota_tmpl.add("RUNNING_MEMORY", memory);
+        quota_tmpl.add("RUNNING_CPU", cpu);
+        quota_tmpl.add("RUNNING_VMS", 1);
+
+        if (only_running)
+        {
+            quota_tmpl.add("MEMORY", 0);
+            quota_tmpl.add("CPU", 0);
+            quota_tmpl.add("VMS", 0);
+        }
+        else
+        {
+            quota_tmpl.add("MEMORY", memory);
+            quota_tmpl.add("CPU", cpu);
+            quota_tmpl.add("VMS", 1);
+        }
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+void VirtualMachine::release_previous_vnc_port()
+{
+    ClusterPool * cpool = Nebula::instance().get_clpool();
+
+    VectorAttribute * graphics = get_template_attribute("GRAPHICS");
+
+    unsigned int previous_port;
+
+    if (graphics == nullptr ||
+            graphics->vector_value("PREVIOUS_PORT", previous_port) != 0)
+    {
+        return;
+    }
+
+    cpool->release_vnc_port(previous_history->cid, previous_port);
+
+    graphics->remove("PREVIOUS_PORT");
+};
+
+/* -------------------------------------------------------------------------- */
+
+void VirtualMachine::rollback_previous_vnc_port()
+{
+    ClusterPool * cpool = Nebula::instance().get_clpool();
+
+    VectorAttribute * graphics = get_template_attribute("GRAPHICS");
+
+    unsigned int previous_port;
+    unsigned int port;
+
+    if (graphics == nullptr ||
+            graphics->vector_value("PREVIOUS_PORT", previous_port) != 0)
+    {
+        return;
+    }
+
+    if ( graphics->vector_value("PORT", port) == 0 )
+    {
+        cpool->release_vnc_port(history->cid, port);
+    }
+
+    graphics->replace("PORT", previous_port);
+
+    graphics->remove("PREVIOUS_PORT");
 };

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -19,6 +19,24 @@
 
 #include "Request.h"
 #include "Nebula.h"
+#include "ClusterPool.h"
+#include "DatastorePool.h"
+#include "DocumentPool.h"
+#include "HookPool.h"
+#include "HostPool.h"
+#include "ImagePool.h"
+#include "MarketPlacePool.h"
+#include "MarketPlaceAppPool.h"
+#include "SecurityGroupPool.h"
+#include "VdcPool.h"
+#include "VirtualMachinePool.h"
+#include "VirtualNetworkPool.h"
+#include "VirtualRouterPool.h"
+#include "VMGroupPool.h"
+#include "VMTemplatePool.h"
+#include "VNTemplatePool.h"
+#include "ZonePool.h"
+
 
 using namespace std;
 
@@ -50,6 +68,10 @@ protected:
     {
         object->to_xml(str);
     };
+
+    virtual void load_monitoring(PoolObjectSQL *obj) const
+    {
+    }
 };
 
 /* ------------------------------------------------------------------------- */
@@ -69,11 +91,17 @@ public:
 
     /* -------------------------------------------------------------------- */
 
+protected:
     void to_xml(RequestAttributes& att, PoolObjectSQL * object,
             string& str) override
     {
         static_cast<VirtualMachine *>(object)->to_xml_extended(str);
     };
+
+    void load_monitoring(PoolObjectSQL *obj) const override
+    {
+        static_cast<VirtualMachine*>(obj)->load_monitoring();
+    }
 };
 
 /* ------------------------------------------------------------------------- */
@@ -93,6 +121,7 @@ public:
 
     /* -------------------------------------------------------------------- */
 
+protected:
     void request_execute(xmlrpc_c::paramList const& _paramList,
                          RequestAttributes& att) override;
 };
@@ -115,6 +144,7 @@ public:
 
     /* -------------------------------------------------------------------- */
 
+protected:
     void to_xml(RequestAttributes& att, PoolObjectSQL * object, string& str) override;
 };
 
@@ -136,6 +166,7 @@ public:
 
     /* -------------------------------------------------------------------- */
 
+protected:
     void request_execute(xmlrpc_c::paramList const& _paramList,
                          RequestAttributes& att) override;
 };
@@ -155,7 +186,6 @@ public:
         pool        = nd.get_ipool();
         auth_object = PoolObjectSQL::IMAGE;
     };
-
 };
 
 /* ------------------------------------------------------------------------- */
@@ -172,6 +202,12 @@ public:
         pool        = nd.get_hpool();
         auth_object = PoolObjectSQL::HOST;
     };
+
+protected:
+    void load_monitoring(PoolObjectSQL *obj) const override
+    {
+        static_cast<Host*>(obj)->load_monitoring();
+    }
 };
 
 /* ------------------------------------------------------------------------- */
@@ -191,6 +227,7 @@ public:
 
     /* -------------------------------------------------------------------- */
 
+protected:
     void to_xml(RequestAttributes& att, PoolObjectSQL * object, string& str) override
     {
         static_cast<Group*>(object)->to_xml_extended(str);
@@ -214,6 +251,7 @@ public:
 
     /* -------------------------------------------------------------------- */
 
+protected:
     void to_xml(RequestAttributes& att, PoolObjectSQL * object, string& str) override
     {
         static_cast<User*>(object)->to_xml_extended(str);
@@ -397,6 +435,7 @@ public:
 
     ~HookInfo(){};
 
+protected:
     void to_xml(RequestAttributes& att, PoolObjectSQL * object,
         string& str)
     {

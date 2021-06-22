@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -23,14 +23,14 @@ module OpenNebula
         # Constants and Class attribute accessors
         #######################################################################
 
-
         VM_POOL_METHODS = {
-            :info               => "vmpool.info",
-            :info_extended      => "vmpool.infoextended",
-            :monitoring         => "vmpool.monitoring",
-            :accounting         => "vmpool.accounting",
-            :showback           => "vmpool.showback",
-            :calculate_showback => "vmpool.calculateshowback"
+            :info               => 'vmpool.info',
+            :info_extended      => 'vmpool.infoextended',
+            :info_set           => 'vmpool.infoset',
+            :monitoring         => 'vmpool.monitoring',
+            :accounting         => 'vmpool.accounting',
+            :showback           => 'vmpool.showback',
+            :calculate_showback => 'vmpool.calculateshowback'
         }
 
         # Constants for info queries (include/RequestManagerPoolInfoFilter.h)
@@ -40,7 +40,6 @@ module OpenNebula
         #######################################################################
         # Class constructor & Pool Methods
         #######################################################################
-
 
         # +client+ a Client object that represents a XML-RPC connection
         # +user_id+ is to refer to a Pool with VirtualMachines from that user
@@ -102,21 +101,21 @@ module OpenNebula
         end
 
         # Define info methods shortcuts for different filters
-        # info_all() 
+        # info_all()
         # info_all!()
-        # info_all_extended 
+        # info_all_extended
         # info_all_extended!()
-        # info_mine() 
+        # info_mine()
         # info_mine!()
-        # info_mine_extended 
+        # info_mine_extended
         # info_mine_extended!()
-        # info_group() 
+        # info_group()
         # info_group!()
-        # info_group_extended 
+        # info_group_extended
         # info_group_extended!()
-        # info_primary_group() 
+        # info_primary_group()
         # info_primary_group!()
-        # info_primary_group_extended 
+        # info_primary_group_extended
         # info_primary_group_extended!()
         %w[mine all group primary_group].each do |ifilter|
             const_name = "OpenNebula::Pool::INFO_#{ifilter.upcase}"
@@ -160,6 +159,14 @@ module OpenNebula
                         default_args[:query])
         end
 
+        # Retrieves the set of VMs especified in vm_ids
+        #
+        # @param [String] comma separated list of vm ids.
+        # @param [Boolean] if true extended body is retrieved.
+        #
+        def info_set(vm_ids, extended)
+            xmlrpc_info(VM_POOL_METHODS[:info_set], vm_ids, extended)
+        end
 
         # Retrieves the monitoring data for all the VMs in the pool
         #
@@ -191,19 +198,21 @@ module OpenNebula
         #     }
         #   }
         #
-        def monitoring(xpath_expressions, filter_flag=INFO_ALL)
-            return super(VM_POOL_METHODS[:monitoring],
-                'VM', 'LAST_POLL', xpath_expressions, filter_flag)
+        def monitoring(xpaths, filter_flag=INFO_ALL)
+            return super(VM_POOL_METHODS[:monitoring], xpaths, filter_flag)
         end
 
         # Retrieves the monitoring data for all the VMs in the pool, in XML
         #
         # @param [Integer] filter_flag Optional filter flag to retrieve all or
         #   part of the Pool. Possible values: INFO_ALL, INFO_GROUP, INFO_MINE.
-        #
+        # @param [Integer] num Optional Retrieve monitor records in the last num
+        #   seconds. 0 just the last record, -1 or nil all records
         # @return [String] VM monitoring data, in XML
-        def monitoring_xml(filter_flag=INFO_ALL)
-            return @client.call(VM_POOL_METHODS[:monitoring], filter_flag)
+        def monitoring_xml(filter_flag=INFO_ALL, num=nil)
+            return @client.call(VM_POOL_METHODS[:monitoring], filter_flag) if num.nil?
+
+            @client.call(VM_POOL_METHODS[:monitoring], filter_flag, num.to_i)
         end
 
         # Processes all the history records, and stores the monthly cost for

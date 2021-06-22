@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -181,9 +181,15 @@ module CLIHelper
     ANSI_YELLOW = "\33[33m"
 
     # CLI states
-    OK_STATES      = %w[runn rdy on configured SUCCESS]
-    BAD_STATES     = %w[fail err error ERROR]
-    REGULAR_STATES = %w[pending]
+    OK_STATES      = %w[runn rdy on configured SUCCESS RUNNING]
+    BAD_STATES     = %w[fail
+                        err
+                        error
+                        ERROR
+                        FAILED_DEPLOYING
+                        FAILED_UNDEPLOYING
+                        FAILED_SCALING]
+    REGULAR_STATES = %w[pending WARNING]
 
     # Set state color
     #
@@ -319,9 +325,10 @@ module CLIHelper
             column[:size] = 5
 
             conf.each do |c|
-                if c.is_a? Symbol
+                case c
+                when Symbol
                     column[c] = true
-                elsif c.is_a? Hash
+                when Hash
                     c.each do |key, value|
                         column[key] = value
                     end
@@ -350,6 +357,12 @@ module CLIHelper
         # @param options [Hash] Object with CLI user options
         # @param top     [Boolean]     True to not update columns again
         def show(data, options = {}, top = false)
+            if options[:list]
+                @cli_columns = options[:list].collect {|o| o.upcase.to_sym }
+            else
+                @cli_columns = @default_columns
+            end
+
             update_columns(options) unless top
 
             if data.is_a? Hash
@@ -471,7 +484,7 @@ module CLIHelper
 
         # Get header in string format
         def header_str
-            @default_columns.collect do |c|
+            @cli_columns.collect do |c|
                 if @columns[c]
                     format_str(c, c.to_s)
                 else
@@ -489,12 +502,12 @@ module CLIHelper
 
             update_columns_size(options)
 
+            options[:csv_del] ? del = options[:csv_del] : del = ','
+
             if !options[:csv] && (!options.key? :no_header)
                 CLIHelper.print_header(header_str)
-            end
-
-            if options[:csv] && (!options.key? :no_header)
-                print_csv_data([@default_columns], options[:csv_del])
+            elsif options[:csv] && (!options.key? :no_header)
+                puts CSV.generate_line(@cli_columns, :col_sep => del)
             end
 
             @res_data ? print_data(@res_data, options) : puts
@@ -519,10 +532,16 @@ module CLIHelper
         # @param data [Array] Array with data to show
         # @param del  [Char]  CSV delimiter
         def print_csv_data(data, del)
-            del ? del = del : del = ','
+            del ||= ','
 
             data.each do |l|
-                puts CSV.generate_line(l, :col_sep => del)
+                result = []
+
+                @cli_columns.each do |col|
+                    result << l[@default_columns.index(col)]
+                end
+
+                puts CSV.generate_line(result, :col_sep => del)
             end
         end
 
@@ -531,25 +550,26 @@ module CLIHelper
         # @param data        [Array]  Array with data to show
         # @param stat_column [String] Name of the state column
         def print_normal_data(data, stat_column)
-            ncolumns = @default_columns.length
-
             if stat_column
-                stat        = stat_column.upcase.to_sym
-                stat_column = @default_columns.index(stat)
+                stat = stat_column.upcase.to_sym
             else
-                stat_column = @default_columns.index(:STAT)
+                stat = :STAT
             end
 
             data.each do |l|
                 result = []
 
-                ncolumns.times do |i|
+                @cli_columns.each do |col|
+                    i = @default_columns.index(col)
+
+                    # Column might not exist
+                    next unless i
+
                     dat = l[i]
-                    col = @default_columns[i]
 
                     str = format_str(col, dat)
 
-                    str = CLIHelper.color_state(str) if i == stat_column
+                    str = CLIHelper.color_state(str) if col == stat
 
                     result << str
                 end
@@ -564,8 +584,17 @@ module CLIHelper
         #
         # @return        [Array] Array with selected columns information
         def data_array(data, options)
+            # Take default table columns and desired ones by the user
+            cols = @default_columns
+
+            @cli_columns.each do |col|
+                next if @default_columns.include?(col)
+
+                @default_columns.insert(@cli_columns.index(col) + 1, col)
+            end
+
             res_data = data.collect do |d|
-                @default_columns.collect do |c|
+                cols.collect do |c|
                     @columns[c][:proc].call(d).to_s if @columns[c]
                 end
             end
@@ -602,7 +631,7 @@ module CLIHelper
         def config_expand_data
             ret = []
 
-            @default_columns.each do |column|
+            @cli_columns.each do |column|
                 expand_c = @columns[column][:expand]
 
                 next unless expand_c
@@ -623,7 +652,7 @@ module CLIHelper
         def config_adjust_data
             ret = []
 
-            @default_columns.each do |column|
+            @cli_columns.each do |column|
                 next unless @columns[column][:adjust]
 
                 ret << column.to_s.downcase
@@ -639,7 +668,9 @@ module CLIHelper
         def expand_columns(expand_columns, all = false)
             return if expand_columns.empty?
 
-            if $stdout.tty? || (IO.console && IO.console.tty?)
+            if $stdout.isatty
+                terminal_size = $stdout.winsize[1]
+            elsif IO.console && IO.console.tty?
                 terminal_size = IO.console.winsize[1]
             else
                 terminal_size = nil
@@ -647,13 +678,13 @@ module CLIHelper
 
             return if terminal_size.nil?
 
-            default_columns = columns_info(@default_columns)
+            default_columns = columns_info(@cli_columns)
             expand_columns  = columns_info(expand_columns)
 
             total_size     = total_columns_size(default_columns)
             columns_size   = total_columns_size(expand_columns)
 
-            terminal_size -= (@default_columns.size - 1)
+            terminal_size -= (@cli_columns.size - 1)
             left_size      = terminal_size - total_size
             remaining_size = left_size
 
@@ -725,7 +756,7 @@ module CLIHelper
             expand_data = []
 
             if expand_all
-                expand_data = @default_columns
+                expand_data = @cli_columns
             elsif expand
                 expand_data += options[:expand]
             end
@@ -739,7 +770,7 @@ module CLIHelper
             unless expand_all
                 adjust.each do |column|
                     column = column.upcase.to_sym
-                    size   = max_size(@default_columns.index(column))
+                    size   = max_size(@cli_columns.index(column))
 
                     if size && size > @columns[column][:size]
                         @columns[column][:adjust] = true
@@ -791,10 +822,6 @@ module CLIHelper
             rescue StandardError => e
                 CLIHelper.fail(e.message)
             end
-
-            return unless options[:list]
-
-            @default_columns = options[:list].collect {|o| o.upcase.to_sym }
         end
 
         # Filter data
@@ -815,7 +842,7 @@ module CLIHelper
                 m = s.match(/^(.*?)#{operators}(.*?)$/)
 
                 if m
-                    index = @default_columns.index(m[1].to_sym)
+                    index = @default_columns.index(m[1].upcase.to_sym)
 
                     if index
                         {

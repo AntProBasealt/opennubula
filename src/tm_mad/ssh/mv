@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -60,11 +60,6 @@ if [ `is_disk $DST_PATH` -eq 1 ]; then
     exit 0
 fi
 
-if [ "$SRC" == "$DST" ]; then
-    log "Not moving $SRC to $DST, they are the same path"
-    exit 0
-fi
-
 if [ `lcm_state` -eq 60 ]; then
     log "Not moving files from $SRC_HOST in FT mode"
     exit 0
@@ -82,6 +77,13 @@ MONITOR=$(ssh_monitor_and_log "$SRC_HOST" "$MONITOR_CMD" 'Get .monitor')
 
 ssh_make_path "$DST_HOST" "$DST_PATH" "$MONITOR"
 
+RANDOM_FILE=$(ssh "$DST_HOST" "mktemp -p \"$DST_DIR\"")
+trap "ssh $DST_HOST \"rm -f $RANDOM_FILE\"" EXIT TERM INT HUP
+if ssh "$SRC_HOST" "test -f $RANDOM_FILE"; then
+    log "Not moving $SRC to $DST, they are the same path"
+    exit 0
+fi
+
 log "Moving $SRC to $DST"
 
 ssh_exec_and_log "$DST_HOST" "rm -rf '$DST_PATH'" \
@@ -95,8 +97,6 @@ rm -rf $SRC_PATH
 EOF
 )
 
-ssh_exec_and_log "$SRC_HOST" "$TAR_SSH" "Error copying disk directory to target host"
-hup_collectd $DST_HOST
-hup_collectd $SRC_HOST
+ssh_forward ssh_exec_and_log "$SRC_HOST" "$TAR_SSH" "Error copying disk directory to target host"
 
 exit 0

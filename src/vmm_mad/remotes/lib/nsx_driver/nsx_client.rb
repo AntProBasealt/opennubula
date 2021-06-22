@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -30,7 +30,9 @@ module NSXDriver
     end
 
     if File.directory?(GEMS_LOCATION)
-        Gem.use_paths(GEMS_LOCATION)
+        $LOAD_PATH.reject! {|l| l =~ /vendor_ruby/ }
+        require 'rubygems'
+        Gem.use_paths(File.realpath(GEMS_LOCATION))
     end
 
     $LOAD_PATH << RUBY_LIB_LOCATION
@@ -58,71 +60,81 @@ module NSXDriver
         end
 
         def self.new_child(nsxmgr, nsx_user, nsx_password, type)
+            [nsxmgr, nsx_user, nsx_password, type].each do |v|
+                next if !v.nil? && !v.empty?
+
+                return nil
+            end
+
             case type.upcase
-            when NSXDriver::NSXConstants::NSXT
-                NSXDriver::NSXTClient.new(nsxmgr, nsx_user, nsx_password)
-            when NSXDriver::NSXConstants::NSXV
-                NSXDriver::NSXVClient.new(nsxmgr, nsx_user, nsx_password)
+            when NSXConstants::NSXT
+                NSXTClient.new(nsxmgr, nsx_user, nsx_password)
+            when NSXConstants::NSXV
+                NSXVClient.new(nsxmgr, nsx_user, nsx_password)
             else
-                error_msg = "Unknown object type: #{type}"
-                error = NSXDriver::NSXError::UnknownObject.new(error_msg)
+                error_msg = "Unknown NSX type: #{type}"
+                error     = NSXError::UnknownObject.new(error_msg)
                 raise error
             end
         end
 
-        def self.new_from_id(host_id)
-            client = OpenNebula::Client.new
-            host = OpenNebula::Host.new_with_id(host_id, client)
-            rc = host.info
-
-            if OpenNebula.is_error?(rc)
-                raise "Could not get host info for ID: \
-                        #{host_id} - #{rc.message}"
-            end
-
+        def self.new_from_host(host)
             nsxmgr = host['TEMPLATE/NSX_MANAGER']
             nsx_user = host['TEMPLATE/NSX_USER']
-            nsx_password = NSXDriver::NSXClient
-                           .nsx_pass(host['TEMPLATE/NSX_PASSWORD'])
+            nsx_password = host['TEMPLATE/NSX_PASSWORD']
             nsx_type = host['TEMPLATE/NSX_TYPE']
 
             new_child(nsxmgr, nsx_user, nsx_password, nsx_type)
         end
 
-        # METHODS
+        def self.new_from_id(hid)
+            client = OpenNebula::Client.new
+            host   = OpenNebula::Host.new_with_id(hid, client)
 
-        def check_response(response, codes_array)
-            codes_array.each do |code|
-                return true if response.code.to_i == code
+            rc = host.info(true)
+
+            if OpenNebula.is_error?(rc)
+                raise "Could not get host info for ID: #{hid} - #{rc.message}"
             end
-            false
+
+            new_from_host(host)
         end
 
-        def self.nsx_pass(nsx_pass_enc)
-            client = OpenNebula::Client.new
-            system = OpenNebula::System.new(client)
-            config = system.get_configuration
+        # METHODS
 
-            if OpenNebula.is_error?(config)
-                raise "Error getting oned configuration : #{config.message}"
+        # Return response if match with responses codes, If response not match
+        # with expected responses codes then raise an IncorrectResponseCodeError
+        def check_response(response, codes_array)
+            unless response.nil?
+                return response if codes_array.include?(response.code.to_i)
+
+                response_json = JSON.parse(response.body)
+                nsx_error = "\nNSX error code: " \
+                            "#{response_json['errorCode']}, " \
+                            "\nNSX error details: " \
+                            "#{response_json['details']}"
+                raise NSXError::IncorrectResponseCodeError, nsx_error
             end
-
-            token = config['ONE_KEY']
-            @nsx_password = VCenterDriver::VIClient
-                            .decrypt(nsx_pass_enc, token)
+            raise NSXError::IncorrectResponseCodeError, nsx_error
         end
 
         # Return: respose.body
-        def get(url); end
+        def get(url, aditional_headers = []); end
+
+        # Return: response
+        def get_full_response(url, aditional_headers = []); end
 
         # Return: id of the created object
-        def post(url, data); end
+        def post(url, data, aditional_headers = []); end
 
-        def put(url, data); end
+        def put(url, data, aditional_headers = []); end
 
         def delete(url); end
 
         def get_token(url); end
+
+        # Prepare headers
+        def add_headers(aditional_headers = []); end
 
     end
 

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -29,6 +29,7 @@ define(function(require) {
   var StateActions = require("tabs/vms-tab/utils/state-actions");
   var Vnc = require("utils/vnc");
   var Spice = require("utils/spice");
+  var VMsTableUtils = require('../../vms-tab/utils/datatable-common');
 
   var TemplateVmsList = require("hbs!./list");
   var TemplateConfirmSaveAsTemplate = require("hbs!./confirm_save_as_template");
@@ -137,7 +138,7 @@ define(function(require) {
       "iDisplayLength": 6,
       "bAutoWidth": false,
       "sDom" : "<\"H\">t<\"F\"lp>",
-      "aLengthMenu": [[6, 12, 36, 72], [6, 12, 36, 72]],
+      "aLengthMenu": Sunstone.getPaginate(),
       "aaSorting"  : [[0, "desc"]],
       "aoColumnDefs": [
           { "bVisible": false, "aTargets": ["all"]},
@@ -170,53 +171,55 @@ define(function(require) {
       },
       "fnRowCallback": function( nRow, aData, iDisplayIndex, iDisplayIndexFull ) {
         var data = aData.VM;
-
         if(data == undefined){
           return nRow;
         }
-
         var state = get_provision_vm_state(data);
-
         var monitoring = "";
         if(data.MONITORING.GUEST_IP){
           monitoring = "<li class=\"provision-bullet-item\"><span class=\"\"><i class=\"fas fa-fw fa-lg fa-server\"/>" + data.MONITORING.GUEST_IP + "</span></li>";
         }
-
-        $(".provision_vms_ul", context).append("<div class=\"column\">"+
-            "<ul class=\"provision-pricing-table menu vertical\" opennebula_id=\""+data.ID+"\" datatable_index=\""+iDisplayIndexFull+"\">"+
-              "<li class=\"provision-title\">"+
-                "<a class=\"provision_info_vm_button\">"+
-                "<span class=\""+ state.color +"-color right\" title=\""+state.str+"\">"+
-                  "<i class=\"fas fa-square\"/>"+
-                "</span>"+
-                data.NAME + "</a>"+
-              "</li>"+
-              "<li class=\"provision-bullet-item\" >"+
-                "<i class=\"fas fa-fw fa-lg fa-laptop\"/> "+
-                "x"+data.TEMPLATE.CPU+" - "+
+        var charter = VMsTableUtils.leasesClock(data);
+        var addStyle = charter && charter.length && 'style="padding-left:.5rem;"' 
+        $(".provision_vms_ul", context).append("<div class='column'>\
+            <ul class='8 provision-pricing-table menu vertical' opennebula_id='"+data.ID+"' datatable_index='"+iDisplayIndexFull+"'>\
+              <li class='provision-title'>\
+                <div style='display: inline-flex;justify-content:space-between;width:100%;align-items: baseline;'>\
+                  <a class='provision_info_vm_button' style='flex-grow:1;'>\
+                    <span class='"+ state.color +"-color right' title='"+state.str+"'>\
+                      <i class='fas fa-square'/>\
+                    </span>"+
+                    data.NAME + 
+                  "</a>\
+                  <div class='charter' "+addStyle+">"+charter+"</div> \
+                </div>\
+              </li>\
+              <li class='provision-bullet-item' >\
+                <i class='fas fa-fw fa-lg fa-laptop'/> "+"x"+data.TEMPLATE.CPU+" - "+
                 ((data.TEMPLATE.MEMORY > 1000) ?
                   (Math.floor(data.TEMPLATE.MEMORY/1024)+"GB") :
                   (TemplateUtils.htmlEncode(data.TEMPLATE.MEMORY)+"MB"))+
                 " - "+
                 get_provision_disk_image(data) +
-              "</li>"+
-              "<li class=\"provision-bullet-item\" >"+
-                "<span class=\"\">"+
+              "</li>\
+              <li class='provision-bullet-item' >\
+                <span class=''>"+
                   get_provision_ips(data) +
-                "</span>"+
-              "</li>"+ monitoring +
-              "<li class=\"provision-bullet-item-last\" >"+
-                "<span class=\"\">"+
-                  "<i class=\"fas fa-fw fa-lg fa-user\"/> "+
+                "</span>\
+              </li>"+ monitoring +
+              "<li class='provision-bullet-item-last' >\
+                <span class=''>\
+                  <i class='fas fa-fw fa-lg fa-user'/> "+
                   data.UNAME+
                 "</span>"+
-                "<span class=\"right\">"+
+                "<span class='right'>"+
                   Humanize.prettyTimeAgo(data.STIME)+
-                "</span>"+
-              "</li>"+
-            "</ul>"+
-          "</div>");
-
+                "</span>\
+              </li>\
+            </ul>\
+          </div>"
+        );
+        VMsTableUtils.tooltipCharters();
         return nRow;
       }
     });
@@ -326,9 +329,11 @@ define(function(require) {
             $(".provision_save_as_template_confirm_button_disabled", context).hide();
           }
 
-          if (OpenNebula.VM.isVNCSupported(data) ||
-             OpenNebula.VM.isSPICESupported(data)) {
+          $(".provision_rdp_button", context).toggle(Boolean(OpenNebulaVM.isRDPSupported(data)));
+          $(".provision_wfile_button", context).toggle(Boolean(OpenNebulaVM.isWFileSupported(data)));
 
+          if (OpenNebulaVM.isVNCSupported(data) ||
+             OpenNebulaVM.isSPICESupported(data)) {
             $(".provision_vnc_button", context).show();
             $(".provision_vnc_button_disabled", context).hide();
           }else{
@@ -445,40 +450,40 @@ define(function(require) {
               timeout: true,
               id: data.ID,
               monitor: {
-                monitor_resources : "MONITORING/CPU,MONITORING/MEMORY,MONITORING/NETTX,MONITORING/NETRX"
+                monitor_resources : "CPU,MEMORY,NETTX,NETRX"
               }
             },
             success: function(request, response){
               var vm_graphs = [
                   {
-                      monitor_resources : "MONITORING/CPU",
+                      monitor_resources : "CPU",
                       labels : "Real CPU",
                       humanize_figures : false,
                       div_graph : $(".vm_cpu_provision_graph", context)
                   },
                   {
-                      monitor_resources : "MONITORING/MEMORY",
+                      monitor_resources : "MEMORY",
                       labels : "Real MEM",
                       humanize_figures : true,
                       div_graph : $(".vm_memory_provision_graph", context)
                   },
                   {
                       labels : "Network reception",
-                      monitor_resources : "MONITORING/NETRX",
+                      monitor_resources : "NETRX",
                       humanize_figures : true,
                       convert_from_bytes : true,
                       div_graph : $(".vm_net_rx_provision_graph", context)
                   },
                   {
                       labels : "Network transmission",
-                      monitor_resources : "MONITORING/NETTX",
+                      monitor_resources : "NETTX",
                       humanize_figures : true,
                       convert_from_bytes : true,
                       div_graph : $(".vm_net_tx_provision_graph", context)
                   },
                   {
                       labels : "Network reception speed",
-                      monitor_resources : "MONITORING/NETRX",
+                      monitor_resources : "NETRX",
                       humanize_figures : true,
                       convert_from_bytes : true,
                       y_sufix : "B/s",
@@ -487,7 +492,7 @@ define(function(require) {
                   },
                   {
                       labels : "Network transmission speed",
-                      monitor_resources : "MONITORING/NETTX",
+                      monitor_resources : "NETTX",
                       humanize_figures : true,
                       convert_from_bytes : true,
                       y_sufix : "B/s",
@@ -752,25 +757,56 @@ define(function(require) {
       return false;
     });
 
+    context.on("click", ".provision_rdp_button", function() {
+      var vm = $(".provision_info_vm", context).data("vm") || {};
+      var rdp = OpenNebulaVM.isRDPSupported(vm) || {};
+
+      var username, password;
+      if (vm.TEMPLATE && vm.TEMPLATE.CONTEXT) {
+        var context = vm.TEMPLATE.CONTEXT;
+        for (var prop in context) {
+          var propUpperCase = String(prop).toUpperCase();
+          (propUpperCase === "USERNAME") && (username = context[prop]);
+          (propUpperCase === "PASSWORD") && (password = context[prop]);
+        }
+      }
+
+      Sunstone.runAction("VM.save_rdp", JSON.parse(JSON.stringify({
+        name: vm.NAME,
+        ip: rdp.IP,
+        username: username,
+        password: password,
+      })));
+    });
+
+    context.on("click", ".provision_wfile_button", function() {
+      var vm_id = $(".provision_info_vm", context).attr("vm_id") || '';
+      var vm = $(".provision_info_vm", context).data("vm") || {};
+      var wFile = OpenNebulaVM.isWFileSupported(vm) || {};
+
+      ("VM.save_virt_viewer_action", vm.ID, wFile);
+      Sunstone.runAction("VM.save_virt_viewer_action", vm_id, wFile);
+    });
+
     context.on("click", ".provision_vnc_button", function(){
       var button = $(this);
       button.attr("disabled", "disabled");
       var vm_id = $(".provision_info_vm", context).attr("vm_id");
       var vm_data = $(".provision_info_vm", context).data("vm");
 
-      OpenNebula.VM.vnc({
+      OpenNebulaVM.vnc({
         data : {
           id: vm_id
         },
         success: function(request, response){
-          if (OpenNebula.VM.isVNCSupported(vm_data)) {
+          if (OpenNebulaVM.isVNCSupported(vm_data)) {
 
             var dialog = Sunstone.getDialog(VNC_DIALOG_ID);
             dialog.setElement(response);
             dialog.show();
 
             button.removeAttr("disabled");
-          } else if (OpenNebula.VM.isSPICESupported(vm_data)) {
+          } else if (OpenNebulaVM.isSPICESupported(vm_data)) {
             var dialog = Sunstone.getDialog(SPICE_DIALOG_ID);
             dialog.setElement(response);
             dialog.show();
@@ -877,6 +913,7 @@ define(function(require) {
             break;
           case OpenNebulaVM.LCM_STATES.HOTPLUG:
           case OpenNebulaVM.LCM_STATES.HOTPLUG_NIC:
+          case OpenNebulaVM.LCM_STATES.HOTPLUG_NIC_POWEROFF:
           case OpenNebulaVM.LCM_STATES.HOTPLUG_SAVEAS:
           case OpenNebulaVM.LCM_STATES.HOTPLUG_SAVEAS_POWEROFF:
           case OpenNebulaVM.LCM_STATES.HOTPLUG_SAVEAS_SUSPENDED:

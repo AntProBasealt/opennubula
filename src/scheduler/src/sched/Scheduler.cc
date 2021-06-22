@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -318,8 +318,9 @@ void Scheduler::start()
     acls  = new AclXML(client, zone_id);
     upool = new UserPoolXML(client);
 
-    hpool  = new HostPoolXML(client);
-    clpool = new ClusterPoolXML(client);
+    hpool    = new HostPoolXML(client);
+    clpool   = new ClusterPoolXML(client);
+    hmonpool = new MonitorPoolXML(client);
 
     dspool     = new SystemDatastorePoolXML(client);
     img_dspool = new ImageDatastorePoolXML(client);
@@ -492,6 +493,15 @@ int Scheduler::set_up_pools()
     {
         return rc;
     }
+
+    rc = hmonpool->set_up();
+
+    if ( rc != 0 )
+    {
+        return rc;
+    }
+
+    hpool->merge_monitoring(hmonpool);
 
     return 0;
 };
@@ -1714,7 +1724,7 @@ int Scheduler::do_scheduled_actions()
     const map<int, ObjectXML*>  vms = vmapool->get_objects();
     map<int, ObjectXML*>::const_iterator vm_it;
 
-    string action_st, error_msg;
+    string action_st, args_st, error_msg;
 
     string time_str = one_util::log_time(time(0));
 
@@ -1736,6 +1746,7 @@ int Scheduler::do_scheduled_actions()
             }
 
             action_st = (*action)->vector_value("ACTION");
+            args_st   = (*action)->vector_value("ARGS");
 
             int rc = VirtualMachineXML::parse_action_name(action_st);
 
@@ -1748,7 +1759,7 @@ int Scheduler::do_scheduled_actions()
             }
             else
             {
-                rc = vmapool->action(vm->get_oid(), action_st, error_msg);
+                rc = vmapool->action(vm->get_oid(), action_st, args_st, error_msg);
 
                 if (rc == 0)
                 {

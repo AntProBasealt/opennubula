@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -19,10 +19,6 @@ module VirtualMachineDevice
     class Disk < Device
 
         attr_reader :size
-
-        def initialize(id, one_res, vc_res)
-            super(id, one_res, vc_res)
-        end
 
         # Create the OpenNebula disk representation
         # Allow us to create the class without vCenter representation
@@ -97,7 +93,8 @@ module VirtualMachineDevice
 
             config = {}
 
-            if action == :delete
+            case action
+            when :delete
                 if managed?
                     key = "opennebula.mdisk.#{@id}"
                 else
@@ -106,14 +103,14 @@ module VirtualMachineDevice
 
                 config[:key] = key
                 config[:value] = ''
-            elsif action == :resize
+            when :resize
                 if new_size
                     d = device
                     d.capacityInKB = new_size
                     config[:device] = d
                     config[:operation] = :edit
                 end
-            elsif action == :attach
+            when :attach
                 puts 'not supported'
             end
 

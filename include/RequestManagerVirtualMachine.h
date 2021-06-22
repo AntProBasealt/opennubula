@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -19,6 +19,7 @@
 
 #include "Request.h"
 #include "Nebula.h"
+#include "VirtualMachinePool.h"
 
 using namespace std;
 
@@ -535,7 +536,7 @@ public:
     VirtualMachineDiskSnapshotRename():
         RequestManagerVirtualMachine("one.vm.disksnapshotrename",
                            "Rename a disk snapshot",
-                           "A:siiis") 
+                           "A:siiis")
     {
         vm_action = VMActions::DISK_SNAPSHOT_RENAME_ACTION;
     }

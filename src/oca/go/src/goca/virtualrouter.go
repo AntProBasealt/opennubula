@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -47,21 +47,21 @@ func (c *Controller) VirtualRouterByName(name string, args ...int) (int, error) 
 
 	vrouterPool, err := (&VirtualRoutersController{c}).Info(args...)
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 
 	match := false
 	for i := 0; i < len(vrouterPool.VirtualRouters); i++ {
 		if vrouterPool.VirtualRouters[i].Name == name {
 			if match {
-				return 0, errors.New("multiple resources with that name")
+				return -1, errors.New("multiple resources with that name")
 			}
 			id = vrouterPool.VirtualRouters[i].ID
 			match = true
 		}
 	}
 	if !match {
-		return 0, errors.New("resource not found")
+		return -1, errors.New("resource not found")
 	}
 
 	return id, nil
@@ -120,7 +120,7 @@ func (vc *VirtualRouterController) Info(decrypt bool) (*vr.VirtualRouter, error)
 func (vc *VirtualRoutersController) Create(tpl string) (int, error) {
 	response, err := vc.c.Client.Call("one.vrouter.allocate", tpl)
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 
 	return response.BodyInt(), nil
@@ -144,8 +144,10 @@ func (vc *VirtualRouterController) Chown(uid, gid int) error {
 
 // Chmod changes the permissions of a virtual router. If any perm is -1 it will not
 // change
-func (vc *VirtualRouterController) Chmod(perm *shared.Permissions) error {
-	_, err := vc.c.Client.Call("one.vrouter.chmod", perm.ToArgs(vc.ID)...)
+func (vc *VirtualRouterController) Chmod(perm shared.Permissions) error {
+	args := append([]interface{}{vc.ID}, perm.ToArgs()...)
+
+	_, err := vc.c.Client.Call("one.vrouter.chmod", args...)
 	return err
 }
 
@@ -171,7 +173,7 @@ func (vc *VirtualRouterController) Instantiate(number, tplid int, name string, h
 	response, err := vc.c.Client.Call("one.vrouter.instantiate", vc.ID, number, tplid, name, hold, extra)
 
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 
 	return response.BodyInt(), nil

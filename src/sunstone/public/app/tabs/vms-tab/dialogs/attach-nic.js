@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -19,20 +19,21 @@ define(function(require) {
     DEPENDENCIES
    */
 
-  var BaseDialog = require('utils/dialogs/dialog');
-  var TemplateHTML = require('hbs!./attach-nic/html');
-  var Sunstone = require('sunstone');
-  var Notifier = require('utils/notifier');
-  var Tips = require('utils/tips');
-  var NicTab = require('tabs/templates-tab/form-panels/create/wizard-tabs/network/nic-tab');
-  var WizardFields = require('utils/wizard-fields');
+  var OpennebulaVM = require("opennebula/vm");
+  var BaseDialog = require("utils/dialogs/dialog");
+  var TemplateHTML = require("hbs!./attach-nic/html");
+  var Sunstone = require("sunstone");
+  var Notifier = require("utils/notifier");
+  var Tips = require("utils/tips");
+  var NicTab = require("tabs/templates-tab/form-panels/create/wizard-tabs/network/nic-tab");
+  var WizardFields = require("utils/wizard-fields");
 
   /*
     CONSTANTS
    */
 
-  var DIALOG_ID = require('./attach-nic/dialogId');
-  var TAB_ID = require('../tabId')
+  var DIALOG_ID = require("./attach-nic/dialogId");
+  var TAB_ID = require("../tabId");
 
   /*
     CONSTRUCTOR
@@ -41,7 +42,7 @@ define(function(require) {
   function Dialog() {
     this.dialogId = DIALOG_ID;
 
-    this.nicTab = new NicTab(DIALOG_ID + 'NickTab');
+    this.nicTab = new NicTab(DIALOG_ID + "NickTab");
 
     BaseDialog.call(this);
   };
@@ -63,8 +64,8 @@ define(function(require) {
 
   function _html() {
     return TemplateHTML({
-      'dialogId': this.dialogId,
-      'nicTabHTML': this.nicTab.html()
+      "dialogId": this.dialogId,
+      "nicTabHTML": this.nicTab.html()
     });
   }
 
@@ -79,33 +80,38 @@ define(function(require) {
 
     $("#parent", context).hide();
 
-    $("#attach_alias", context).change(function() {
-        if(this.checked) {
-            $("#parent", context).show();
-        } else {
-            $("#parent", context).hide();
-        }
+    $("#cb_attach_alias", context).change(function() {
+      $("#parent", context).toggle(this.checked);
     });
 
-    $('#' + DIALOG_ID + 'Form', context).submit(function() {
+    $("#" + DIALOG_ID + "Form", context).submit(function() {
       var templateJSON = that.nicTab.retrieve(context);
+      var selectedNetwork = Object.keys(templateJSON).length > 0 && templateJSON.constructor === Object;
 
-      if($("#attach_alias", context).prop("checked")) {
+      if($("#cb_attach_rdp", context).prop("checked")) {
+        templateJSON.RDP = "YES";
+      }
+
+      if($("#cb_attach_alias", context).prop("checked")) {
         templateJSON.PARENT = $("#parent").val();
 
         var obj = {
             "NIC_ALIAS": templateJSON
-        }
+        };
       } else {
         var obj = {
             "NIC": templateJSON
-        }
+        };
       }
 
-      Sunstone.runAction('VM.attachnic', that.element.ID, obj);
+      if(selectedNetwork){
+        Sunstone.runAction("VM.attachnic", that.element.ID, obj);
+        Sunstone.getDialog(DIALOG_ID).hide();
+        Sunstone.getDialog(DIALOG_ID).reset();
+      }else{
+        Notifier.notifyError("Select a network");
+      }
 
-      Sunstone.getDialog(DIALOG_ID).hide();
-      Sunstone.getDialog(DIALOG_ID).reset();
       return false;
     });
 
@@ -116,12 +122,23 @@ define(function(require) {
     this.setNames( {tabId: TAB_ID} );
 
     this.nicTab.onShow(context);
+    $("#cb_attach_alias").prop("checked", false).change();
+
+    var showRdp = false, template = this.element.TEMPLATE;
+    if (template.NIC) {
+      showRdp = OpennebulaVM.hasRDP(template.NIC);
+
+      if (!showRdp && template.NIC_ALIAS) {
+        showRdp = OpennebulaVM.hasRDP(template.NIC_ALIAS);
+      }
+    }
+    $(".attach_rdp").toggle(!showRdp);
 
     return false;
   }
 
   function _setElement(element) {
-    this.element = element
+    this.element = element;
   }
 
   function _setNicsNames(nicsNames) {

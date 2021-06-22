@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -14,16 +14,14 @@
 /* limitations under the License.                                             */
 /* -------------------------------------------------------------------------- */
 
-#include <climits>
-#include <sstream>
-#include <iostream>
-#include <stdexcept>
-#include <algorithm>
-
 #include "PoolSQL.h"
 #include "RequestManagerPoolInfoFilter.h"
+#include "AclManager.h"
+#include "Nebula.h"
+#include "ClusterPool.h"
 
-#include <errno.h>
+#include <sstream>
+#include <algorithm>
 
 /* ************************************************************************** */
 /* PoolSQL constructor/destructor                                             */
@@ -276,8 +274,8 @@ PoolObjectSQL * PoolSQL::get_ro(const string& name, int uid)
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int PoolSQL::dump(string& oss, const string& elem_name, const string& column, const char* table,
-    const string& where, const string& limit, bool desc)
+int PoolSQL::dump(string& oss, const string& elem_name, const string& column, 
+        const char* table, const string& where, int sid, int eid, bool desc)
 {
     ostringstream   cmd;
 
@@ -295,9 +293,9 @@ int PoolSQL::dump(string& oss, const string& elem_name, const string& column, co
         cmd << " DESC";
     }
 
-    if ( !limit.empty() )
+    if ( eid != -1 )
     {
-        cmd << " LIMIT " << limit;
+        cmd << " " << db->limit_string(sid, eid);
     }
 
     return dump(oss, elem_name, cmd);
@@ -313,11 +311,14 @@ int PoolSQL::dump(string& oss, const string& root_elem_name,
 
     string_cb cb(1);
 
-    ostringstream oelem; 
+    ostringstream oelem;
 
-    oelem << "<" << root_elem_name << ">";
+    if (!root_elem_name.empty())
+    {
+        oelem << "<" << root_elem_name << ">";
 
-    oss.append(oelem.str());
+        oss.append(oelem.str());
+    }
 
     cb.set_callback(&oss);
 
@@ -325,11 +326,14 @@ int PoolSQL::dump(string& oss, const string& root_elem_name,
 
     cb.unset_callback();
 
-    oelem.str("");
+    if (!root_elem_name.empty())
+    {
+        oelem.str("");
 
-    oelem << "</" << root_elem_name << ">";
+        oelem << "</" << root_elem_name << ">";
 
-    oss.append(oelem.str());
+        oss.append(oelem.str());
+    }
 
     return rc;
 }

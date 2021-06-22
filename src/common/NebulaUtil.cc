@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -401,6 +401,12 @@ string one_util::trim(const string& str)
     string::const_reverse_iterator rwlast;
 
     wfirst = find_if(str.begin(), str.end(), not_space);
+
+    if (wfirst == str.end())
+    {
+        return string();
+    }
+
     rwlast = find_if(str.rbegin(),str.rend(),not_space);
 
     string::const_iterator wlast(rwlast.base());

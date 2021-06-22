@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -41,9 +41,9 @@ define(function(require) {
   var UsersTable = require("tabs/users-tab/datatable");
   var GroupTable = require("tabs/groups-tab/datatable");
   var Humanize = require("utils/humanize");
-  var TemplateUtils = require("utils/template-utils");
   var UniqueId = require("utils/unique-id");
   var ScheduleActions = require("utils/schedule_action");
+  var Leases = require("utils/leases");
 
   /*
     CONSTANTS
@@ -51,6 +51,9 @@ define(function(require) {
 
   var FORM_PANEL_ID = require("./instantiate/formPanelId");
   var TAB_ID = require("../tabId");
+  var RESOURCE = 'inst';
+  var CREATE = true;
+  var contextRow;
 
   /*
     CONSTRUCTOR
@@ -87,20 +90,47 @@ define(function(require) {
   /*
     FUNCTION DEFINITIONS
    */
-
-  function _html() {
+  
+   function _html() {
     return TemplateHTML({
       "formPanelId": this.formPanelId
     });
   }
 
   function _setup(context) {
+    if(!CREATE){
+      CREATE = true;
+    }
+    var actions = [
+      "terminate", 
+      "terminate-hard", 
+      "hold", 
+      "release", 
+      "stop", 
+      "suspend", 
+      "resume", 
+      "reboot", 
+      "reboot-hard", 
+      "poweroff", 
+      "poweroff-hard", 
+      "undeploy", 
+      "undeploy-hard", 
+      "snapshot-create",
+      "snapshot-delete", 
+      "snapshot-revert", 
+      "disk-snapshot-create", 
+      "disk-snapshot-delete", 
+      "disk-snapshot-revert"
+    ];
     var that = this;
+    var objLeases = $.extend(true, {}, that);
+    objLeases.resource = "template";
+    objLeases.__proto__ = FormPanel.prototype;
+    Leases.actions(objLeases);
 
     if(Config.isFeatureEnabled("instantiate_persistent")){
       $("input.instantiate_pers", context).on("change", function(){
         var persistent = $(this).prop("checked");
-
         if(persistent){
           $("#vm_n_times_disabled", context).show();
           $("#vm_n_times", context).hide();
@@ -108,7 +138,6 @@ define(function(require) {
           $("#vm_n_times_disabled", context).hide();
           $("#vm_n_times", context).show();
         }
-
         $.each(that.template_objects, function(index, template_json) {
           DisksResize.insert({
             template_json:    template_json,
@@ -124,24 +153,31 @@ define(function(require) {
       $("#vm_n_times", context).show();
     }
 
+    function renderCreateForm() {
+      if(CREATE){
+        ScheduleActions.htmlNewAction(actions, context, RESOURCE);
+        ScheduleActions.setup(context);
+        CREATE=false;
+      }
+    }
+
     context.off("click", "#add_scheduling_inst_action");
-    context.on("click", "#add_scheduling_inst_action", function() {
-      var actions = ["terminate", "terminate-hard", "hold", "release", "stop", "suspend", "resume", "reboot", "reboot-hard", "poweroff", "poweroff-hard", "undeploy", "undeploy-hard", "snapshot-create"];
-      $("#add_scheduling_inst_action", context).attr("disabled", "disabled");
-
-      ScheduleActions.htmlNewAction(actions, context, "inst");
-      ScheduleActions.setup(context);
-
-      return false;
+    context.on("click", "#add_scheduling_inst_action", function(e){
+      e.preventDefault();
+      renderCreateForm();
+      $("#edit_"+RESOURCE+"_action_json").hide();
+      $("#add_"+RESOURCE+"_action_json").show();
     });
 
     context.off("click", "#add_inst_action_json");
-    context.on("click" , "#add_inst_action_json", function(){
+    context.on("click", "#add_inst_action_json", function(){
       var sched_action = ScheduleActions.retrieveNewAction(context);
       if (sched_action != false) {
-        $("#sched_inst_actions_body").append(ScheduleActions.fromJSONtoActionsTable(sched_action));
+        $("#no_actions_tr", context).remove();
+        $("#sched_inst_actions_body").prepend(ScheduleActions.fromJSONtoActionsTable(sched_action));
       }
-
+      $("#input_sched_action_form").remove();
+      clear();
       return false;
     });
 
@@ -150,9 +186,39 @@ define(function(require) {
       $("#time_input").removeAttr("class");
     });
 
+    context.off("click" , "#edit_inst_action_json").on("click" , "#edit_inst_action_json", function(e){
+      e.preventDefault();
+      var id = $(this).attr("data_id");
+      if(id && id.length && contextRow){
+        $(".wickedpicker").hide();
+        var sched_action = ScheduleActions.retrieveNewAction(context);
+        if (sched_action != false) {
+          sched_action.ID = id;
+          contextRow.replaceWith(ScheduleActions.fromJSONtoActionsTable(sched_action));
+          contextRow = undefined;
+          $("#input_sched_action_form").remove();
+        }
+        clear();
+      }
+      return false;
+    });
+
     context.off("click", ".remove_action_x");
     context.on("click", ".remove_action_x", function(){
       $(this).parents("tr").remove();
+    });
+
+    context.off("click", ".edit_action_x");
+    context.on("click", ".edit_action_x", function(e){
+      e.preventDefault();
+      var id = $(this).attr("data_id");
+      if(id && id.length){
+        contextRow = $(this).closest("tr.tr_action");
+        renderCreateForm();
+        $("#edit_"+RESOURCE+"_action_json").show().attr("data_id", id);
+        $("#add_"+RESOURCE+"_action_json").hide();
+        ScheduleActions.fill($(this),context);
+      }
     });
   }
 
@@ -342,6 +408,19 @@ define(function(require) {
       capacityContext = $(".capacityContext"  + template_id, context);
       $.extend(tmp_json, CapacityInputs.retrieveChanges(capacityContext));
 
+      var topology = {}
+
+      if (tmp_json && tmp_json.CORES){
+        topology.CORES = tmp_json["CORES"];
+        topology.SOCKETS = parseInt(tmp_json["VCPU"]) / parseInt(tmp_json["CORES"]);
+        topology.THREADS = 1;
+        delete tmp_json["CORES"];
+      }
+
+      if (!$.isEmptyObject(topology)){
+        tmp_json.TOPOLOGY = topology;
+      }
+
       extra_info["template"] = tmp_json;
       for (var i = 0; i < n_times_int; i++) {
         extra_info["vm_name"] = vm_name.replace(/%i/gi, i); // replace wildcard
@@ -365,22 +444,8 @@ define(function(require) {
     var idsLength = this.selected_nodes.length;
     var idsDone = 0;
 
-    $.each(this.selected_nodes, function(index, template_id) {
-      OpenNebulaTemplate.show({
-        data : {
-          id: template_id,
-          extended: false
-        },
-        timeout: true,
-        success: function (request, template_json) {
-          that.template_base_objects[template_json.VMTEMPLATE.ID] = template_json;
-        }
-      });
-    });
-
     templatesContext.html("");
     $.each(this.selected_nodes, function(index, template_id) {
-
       OpenNebulaTemplate.show({
         data : {
           id: template_id,
@@ -388,6 +453,7 @@ define(function(require) {
         },
         timeout: true,
         success: function (request, template_json) {
+          that.template_base_objects[template_json.VMTEMPLATE.ID] = template_json;
           that.template_objects.push(template_json);
 
           var options = {
@@ -417,8 +483,15 @@ define(function(require) {
                 dsDatatable: that.datastoresTable.dataTableHTML,
                 usersDatatable: that.usersTable.dataTableHTML,
                 groupDatatable: that.groupTable.dataTableHTML,
-                table_sched_actions: ScheduleActions.htmlTable("inst")
-              }) );
+                table_sched_actions: ScheduleActions.htmlTable(RESOURCE, Leases.html())
+              }
+            )
+          );
+          var objLeases = $.extend(true, {}, that);
+          objLeases.formContext = templatesContext;
+          objLeases.resource = "template";
+          objLeases.__proto__ = FormPanel.prototype;
+          Leases.actions(objLeases);
 
           $(".provision_host_selector" + template_json.VMTEMPLATE.ID, context).data("hostsTable", that.hostsTable);
           $(".provision_ds_selector" + template_json.VMTEMPLATE.ID, context).data("dsTable", that.datastoresTable);
@@ -426,7 +499,7 @@ define(function(require) {
           $(".provision_gid_selector" + template_json.VMTEMPLATE.ID, context).data("groupTable", that.groupTable);
 
           var actions = ScheduleActions.fromJSONtoActionsTable(template_json.VMTEMPLATE.TEMPLATE.SCHED_ACTION);
-          $("#sched_inst_actions_body").append(actions);
+          $("#sched_inst_actions_body").prepend(actions);
 
           var selectOptions = {
             "selectOptions": {
@@ -541,11 +614,19 @@ define(function(require) {
           CapacityInputs.setup(capacityContext);
           CapacityInputs.fill(capacityContext, template_json.VMTEMPLATE);
 
-          if (template_json.VMTEMPLATE.TEMPLATE.HYPERVISOR == "vcenter"){
-            $(".memory_input .mb_input input", context).attr("pattern", "^([048]|\\d*[13579][26]|\\d*[24680][048])$");
-          } else {
-            $(".memory_input .mb_input input", context).removeAttr("pattern");
-          }
+          var mb_input_unit = $(".memory_input .mb_input_unit", context);
+          mb_input_unit.off("change");
+          mb_input_unit.on("change", function() {
+            var isMB = $(this).val() === "MB";
+            var isVCenter = template_json.VMTEMPLATE.TEMPLATE.HYPERVISOR == "vcenter";
+
+            if (isMB && isVCenter) {
+              $(".memory_input .mb_input input", context).attr("pattern", "^([048]|\\d*[13579][26]|\\d*[24680][048])$");
+            } else {
+              $(".memory_input .mb_input input", context).removeAttr("pattern");
+            }
+          });
+          mb_input_unit.trigger("change");
 
           var cpuCost    = template_json.VMTEMPLATE.TEMPLATE.CPU_COST;
           var memoryCost = template_json.VMTEMPLATE.TEMPLATE.MEMORY_COST;
@@ -602,13 +683,18 @@ define(function(require) {
 
   function _onShow(context) {
     Sunstone.disableFormPanelSubmit(this.tabId);
-    $("input.instantiate_pers", context).change();
-
-    var templatesContext = $(".list_of_templates", context);
-    templatesContext.html("");
-
-    Tips.setup(context);
+    if(context){
+      $("input.instantiate_pers", context).change();
+      Tips.setup(context);
+      var form = context.find("#sched_inst_actions_body");
+      form.find("tr.create,tr#schedule_base,tr#input_sched_action_form,tr#relative_time_form,tr#no_relative_time_form").remove();
+    }
+    clear();
     return false;
+  }
+
+  function clear(){
+    CREATE = true;
   }
 
   function generateRequirements(hosts_table, ds_table, context, id) {

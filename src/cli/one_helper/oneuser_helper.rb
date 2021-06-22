@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -199,6 +199,10 @@ class OneUserHelper < OpenNebulaHelper::OneHelper
             login_client = OpenNebulaHelper::OneHelper.get_client
         else
             login_client = self.get_login_client(username, options)
+        end
+
+        if (login_client.is_a? Array) && login_client[0] == -1
+            return login_client
         end
 
         user = OpenNebula::User.new(User.build_xml, login_client)

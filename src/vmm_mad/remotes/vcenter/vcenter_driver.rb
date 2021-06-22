@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                  #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                  #
 #                                                                              #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may      #
 # not use this file except in compliance with the License. You may obtain      #
@@ -37,7 +37,9 @@ end
 ENV['LANG'] = 'C'
 
 if File.directory?(GEMS_LOCATION)
-    Gem.use_paths(GEMS_LOCATION)
+    $LOAD_PATH.reject! {|l| l =~ /vendor_ruby/ }
+    require 'rubygems'
+    Gem.use_paths(File.realpath(GEMS_LOCATION))
 end
 
 $LOAD_PATH << LIB_LOCATION + '/ruby/vendors/rbvmomi/lib'
@@ -56,6 +58,7 @@ class VCenterConf < Hash
     }
 
     def initialize
+        super
         replace(DEFAULT_CONFIGURATION)
         begin
             vcenterrc_path = "#{VAR_LOCATION}/remotes/etc/vmm/vcenter/vcenterrc"
@@ -80,9 +83,15 @@ require 'resolv'
 # vCenter Library                                                              #
 # ---------------------------------------------------------------------------- #
 
-require 'vcenter_importer.rb'
+require 'vcenter_importer'
 require 'memoize'
 require 'vi_client'
+begin
+    require 'rest_client'
+    REST_CLIENT=true
+rescue LoadError
+    REST_CLIENT=false
+end
 require 'vi_helper'
 require 'datacenter'
 require 'host'
@@ -97,7 +106,6 @@ require 'vm_device'
 require 'vm_disk'
 require 'vm_nic'
 require 'vm_helper'
-require 'vm_monitor'
 
 CHECK_REFS = true
 

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -52,13 +52,14 @@ public:
      *    @return the oid assigned to the object or -1 in case of failure
      */
     int allocate(
-        int *   oid,
+        int * oid,
         const string& uname,
-        int     gid,
+        int   gid,
         const string& password,
         const string& auth,
-        bool    enabled,
+        bool  enabled,
         const set<int>& gids,
+        const set<int>& agids,
         string& error_str);
 
     /**
@@ -211,13 +212,13 @@ public:
      *  query
      *  @param oss the output stream to dump the pool contents
      *  @param where filter for the objects, defaults to all
-     *  @param limit parameters used for pagination
+     *  @param sid first element used for pagination
+     *  @param eid last element used for pagination, -1 to disable
      *  @param desc descending order of pool elements
      *
      *  @return 0 on success
      */
-    int dump(string& oss, const string& where, const string& limit,
-            bool desc);
+    int dump(string& oss, const string& where, int sid, int eid, bool desc);
 
     /**
      *  Name for the OpenNebula core authentication process

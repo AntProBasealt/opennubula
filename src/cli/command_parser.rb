@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -140,6 +140,7 @@ module CommandParser
         # @option options [String] :name
         # @option options [String] :short
         # @option options [String] :large
+        # @option options [Boolean] :multiple
         # @option options [String] :description
         # @option options [Class] :format
         # @option options [Block] :proc The block receives the value of the
@@ -294,6 +295,11 @@ module CommandParser
                     cmd[:arity]+=1 unless args.include?(nil)
                     cmd[:args_format] << args
                 elsif args.instance_of?(Hash) && args[:options]
+                    if args[:options].is_a? Array
+                        args[:options].flatten!
+                        args[:options] = args[:options].sort_by {|o| o[:name] }
+                    end
+
                     cmd[:options] << args[:options]
                 else
                     cmd[:arity]+=1
@@ -452,7 +458,7 @@ module CommandParser
 
             if comm.nil?
                 print_help
-                exit -1
+                exit 0
             end
 
             if comm[:deprecated]
@@ -463,16 +469,27 @@ module CommandParser
             parse(extra_options)
 
             if comm
-                @before_proc.call if @before_proc
+                begin
+                    @before_proc.call if @before_proc
+                rescue StandardError => e
+                    STDERR.puts e.message
+                    exit(-1)
+                end
 
                 check_args!(comm_name, comm[:arity], comm[:args_format])
 
-                rc = comm[:proc].call
-                if rc.instance_of?(Array)
-                    puts rc[1]
-                    exit rc.first
-                else
-                    exit(@exit_code || rc)
+                begin
+                    rc = comm[:proc].call
+
+                    if rc.instance_of?(Array)
+                        puts rc[1]
+                        exit rc.first
+                    else
+                        exit(@exit_code || rc)
+                    end
+                rescue StandardError => e
+                    STDERR.puts e.message
+                    exit(-1)
                 end
             end
         end
@@ -490,21 +507,28 @@ module CommandParser
                     args = []
                     args << e[:short] if e[:short]
                     args << e[:large]
+                    args << e[:multiple] if e[:multiple]
                     args << e[:format]
                     args << e[:description]
 
                     opts.on(*args) do |o|
-                        if e[:proc]
+                        if e[:proc] && !e[:multiple]
                             @options[e[:name].to_sym]=o
                             with_proc<<e
                         elsif e[:name]=="help"
                             print_help
-                            exit
+                            exit 0
                         elsif e[:name]=="version"
                             puts @version
-                            exit
-                        else
+                            exit 0
+                        elsif !e[:multiple]
                             @options[e[:name].to_sym]=o
+                        else
+                            if @options[e[:name].to_sym].nil?
+                                @options[e[:name].to_sym] = []
+                            end
+
+                            @options[e[:name].to_sym] << o
                         end
                     end
                 end
@@ -630,7 +654,7 @@ module CommandParser
             print_formatters
             puts
             if @version
-                puts "## LICENSE"
+                puts "## VERSION"
                 puts @version
             end
         end
@@ -660,7 +684,9 @@ module CommandParser
         def print_options
             puts "## OPTIONS"
 
-            shown_opts = Array.new
+            shown_opts = []
+            options    = []
+
             @command_list.each do |key|
                 value = @commands[key]
 
@@ -669,14 +695,17 @@ module CommandParser
                         next
                     else
                         shown_opts << o[:name]
-
-                        print_option(o)
+                        options << o
                     end
                 end
             end
 
-            @available_options.each do |o|
-                print_option o
+            options << @available_options
+            options.flatten!
+            options = options.sort_by {|o| o[:name] }
+
+            options.each do |o|
+                print_option(o)
             end
         end
 
@@ -704,6 +733,8 @@ module CommandParser
                 print_command(@main)
             else
                 puts "## COMMANDS"
+
+                @command_list.sort! if @command_list
 
                 @command_list.each do |key|
                     value = @commands[key]
@@ -747,6 +778,9 @@ module CommandParser
 
             cmd_format5 =  "#{' '*3}%s"
             cmd_format10 =  "#{' '*8}%s"
+
+            @formats = @formats.sort_by {|key, _| key } if @formats
+
             @formats.each{ |key,value|
                 printf cmd_format5, "* #{key}"
                 puts

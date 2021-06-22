@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -16,25 +16,20 @@
 module NSXDriver
 
     # Class Transport Zone
-    class TransportZone < NSXDriver::NSXComponent
+    class TransportZone < NSXComponent
 
         # ATTRIBUTES
         attr_reader :tz_id
 
-        # CONSTRUCTOR
-        def initialize(nsx_client)
-            super(nsx_client)
-        end
-
         def self.new_child(nsx_client)
             case nsx_client.nsx_type.upcase
-            when NSXDriver::NSXConstants::NSXT
-                NSXDriver::NSXTtz.new(nsx_client)
-            when NSXDriver::NSXConstants::NSXV
-                NSXDriver::NSXVtz.new(nsx_client)
+            when NSXConstants::NSXT
+                NSXTtz.new(nsx_client)
+            when NSXConstants::NSXV
+                NSXVtz.new(nsx_client)
             else
-                error_msg = "Unknown object type: #{nsx_client.nsx_type}"
-                error = NSXDriver::NSXError::UnknownObject.new(error_msg)
+                error_msg = "Unknown NSX type: #{nsx_client.nsx_type}"
+                error = NSXError::UnknownObject.new(error_msg)
                 raise error
             end
         end

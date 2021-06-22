@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -50,7 +50,7 @@ func (dc *DocumentsController) ByName(name string, args ...int) (int, error) {
 
 	documentPool, err := dc.Info(args...)
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 
 	match := false
@@ -59,13 +59,13 @@ func (dc *DocumentsController) ByName(name string, args ...int) (int, error) {
 			continue
 		}
 		if match {
-			return 0, errors.New("multiple resources with that name")
+			return -1, errors.New("multiple resources with that name")
 		}
 		id = documentPool.Documents[i].ID
 		match = true
 	}
 	if !match {
-		return 0, errors.New("resource not found")
+		return -1, errors.New("resource not found")
 	}
 
 	return id, nil
@@ -114,7 +114,7 @@ func (dc *DocumentController) Info(decrypt bool) (*document.Document, error) {
 func (dc *DocumentsController) Create(tpl string) (int, error) {
 	response, err := dc.c.Client.Call("one.document.allocate", tpl)
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 
 	return response.BodyInt(), nil
@@ -143,8 +143,9 @@ func (dc *DocumentController) Update(tpl string, uType parameters.UpdateType) er
 }
 
 // Chmod changes the permission bits of a document.
-func (dc *DocumentController) Chmod(perm *shared.Permissions) error {
-	_, err := dc.c.Client.Call("one.document.chmod", perm.ToArgs(dc.ID)...)
+func (dc *DocumentController) Chmod(perm shared.Permissions) error {
+	args := append([]interface{}{dc.ID}, perm.ToArgs()...)
+	_, err := dc.c.Client.Call("one.document.chmod", args...)
 	return err
 }
 

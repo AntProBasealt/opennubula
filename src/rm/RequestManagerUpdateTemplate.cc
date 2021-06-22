@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -126,4 +126,43 @@ void RequestManagerUpdateTemplate::request_execute(
     success_response(oid, att);
 
     return;
+}
+
+/* ------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------- */
+
+int ClusterUpdateTemplate::extra_updates(PoolObjectSQL * obj)
+{
+    // -------------------------------------------------------------------------
+    // Update host capacity reservations
+    // -------------------------------------------------------------------------
+    auto hpool = Nebula::instance().get_hpool();
+
+    string ccpu;
+    string cmem;
+
+    auto cluster = static_cast<Cluster*>(obj);
+
+    std::set<int> hosts = cluster->get_host_ids();
+
+    cluster->get_reserved_capacity(ccpu, cmem);
+
+    for (auto hid : hosts)
+    {
+        auto host = hpool->get(hid);
+
+        if (host == nullptr)
+        {
+            continue;
+        }
+
+        if (host->update_reserved_capacity(ccpu, cmem))
+        {
+            hpool->update(host);
+        }
+
+        host->unlock();
+    }
+
+    return 0;
 }

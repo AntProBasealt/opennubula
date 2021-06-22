@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -18,17 +18,18 @@
 
 #include "AclManager.h"
 #include "PoolObjectAuth.h"
+#include "SqlDB.h"
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
 const char * AclManager::table = "acl";
 
-const char * AclManager::db_names = "oid, user, resource, rights, zone";
+const char * AclManager::db_names = "oid, userset, resource, rights, zone";
 
 const char * AclManager::db_bootstrap = "CREATE TABLE IF NOT EXISTS "
-    "acl (oid INT PRIMARY KEY, user BIGINT, resource BIGINT, "
-    "rights BIGINT, zone BIGINT, UNIQUE(user, resource, rights, zone))";
+    "acl (oid INT PRIMARY KEY, userset BIGINT, resource BIGINT, "
+    "rights BIGINT, zone BIGINT, UNIQUE(userset, resource, rights, zone))";
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -216,11 +217,11 @@ AclManager::~AclManager()
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-const bool AclManager::authorize(
+bool AclManager::authorize(
         int                     uid,
         const set<int>&         user_groups,
         const PoolObjectAuth&   obj_perms,
-        AuthRequest::Operation  op)
+        AuthRequest::Operation  op) const
 {
     bool auth = false;
 
@@ -419,9 +420,9 @@ const bool AclManager::authorize(
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-const bool AclManager::oneadmin_authorize(
+bool AclManager::oneadmin_authorize(
         const PoolObjectAuth&   obj_perms,
-        AuthRequest::Operation  op)
+        AuthRequest::Operation  op) const
 {
     if (static_cast<long long int>(op) & 0x10LL) //No lockable object
     {
@@ -448,7 +449,7 @@ bool AclManager::match_rules_wrapper(
         long long             individual_obj_type,
         long long             group_obj_type,
         long long             cluster_obj_type,
-        const multimap<long long, AclRule*> &tmp_rules)
+        const multimap<long long, AclRule*> &tmp_rules) const
 {
     bool auth = false;
 
@@ -524,7 +525,7 @@ bool AclManager::match_rules(
         long long             resource_oid_mask,
         long long             resource_gid_mask,
         long long             resource_cid_mask,
-        const multimap<long long, AclRule*> &rules)
+        const multimap<long long, AclRule*> &rules) const
 
 {
     bool auth = false;

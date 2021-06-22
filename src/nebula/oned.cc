@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -31,10 +31,32 @@ using namespace std;
 
 static void print_license()
 {
-    cout<< "Copyright 2002-2019, OpenNebula Project, OpenNebula Systems        \n\n"
-        << Nebula::version() << " is distributed and licensed for use under the"
-        << " terms of the\nApache License, Version 2.0 "
-        << "(http://www.apache.org/licenses/LICENSE-2.0).\n";
+    ostringstream oss;
+
+    oss << Nebula::version();
+
+#ifdef ENTERPRISE
+    oss << " Enterprise Edition \n";
+#else
+    oss << "\n";
+#endif
+
+    oss << "Copyright 2002-2020, OpenNebula Project, OpenNebula Systems \n\n";
+
+#ifdef ENTERPRISE
+    oss << "Licensed under the OpenNebula Software License (the \"License\"); "
+        << "you may not\nuse this file except in compliance with the License. "
+        << "You may obtain a copy\nof the License at "
+        << "https://github.com/OpenNebula/one/blob/master/LICENSE.onsla\n";
+#else
+    oss << "Licensed under the Apache License, Version 2.0 "
+        << "(the \"License\"); you may not\nuse this file "
+        << "except in compliance with the License. You may obtain"
+        << " a copy\nof the License at "
+        << "http://www.apache.org/licenses/LICENSE-2.0\n";
+#endif
+
+    cout << oss.str();
 }
 
 static void print_usage(ostream& str)
@@ -162,7 +184,7 @@ int main(int argc, char **argv)
         var_location = nl;
         var_location += "/var/";
 
-        lockfile = var_location + ".lock";
+        lockfile = var_location + "/lock/.lock";
     }
 
     fd = open(lockfile.c_str(), O_CREAT|O_EXCL, 0640);

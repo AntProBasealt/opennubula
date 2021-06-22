@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -19,6 +19,10 @@
 #include "PoolObjectAuth.h"
 #include "Nebula.h"
 #include "Quotas.h"
+#include "ClusterPool.h"
+#include "ImagePool.h"
+#include "DispatchManager.h"
+#include "VirtualMachineManager.h"
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -501,6 +505,8 @@ void VirtualMachineAction::request_execute(xmlrpc_c::paramList const& paramList,
 
     VirtualMachine * vm;
 
+    RequestAttributes& att_aux(att);
+
     // Compatibility with 4.x
     if (action_st == "shutdown-hard" || action_st == "delete" )
     {
@@ -516,12 +522,12 @@ void VirtualMachineAction::request_execute(xmlrpc_c::paramList const& paramList,
     // Update the authorization level for the action
     att.set_auth_op(action);
 
-    if (vm_authorization(id, 0, 0, att, 0, 0, 0) == false)
+    if ((vm = get_vm_ro(id, att)) == nullptr)
     {
         return;
     }
 
-    if ((vm = get_vm(id, att)) == nullptr)
+    if (vm_authorization(id, 0, 0, att, 0, 0, 0) == false)
     {
         return;
     }
@@ -535,35 +541,6 @@ void VirtualMachineAction::request_execute(xmlrpc_c::paramList const& paramList,
         failure_response(ACTION, att);
 
         vm->unlock();
-        return;
-    }
-
-    // Generate quota information for resume action
-    RequestAttributes& att_aux(att);
-
-    if (action == VMActions::RESUME_ACTION)
-    {
-        vm->get_template_attribute("MEMORY", memory);
-        vm->get_template_attribute("CPU", cpu);
-
-        quota_tmpl.add("RUNNING_MEMORY", memory);
-        quota_tmpl.add("RUNNING_CPU", cpu);
-        quota_tmpl.add("RUNNING_VMS", 1);
-
-        quota_tmpl.add("VMS", 0);
-        quota_tmpl.add("MEMORY", 0);
-        quota_tmpl.add("CPU", 0);
-
-        att_aux.uid = vm->get_uid();
-        att_aux.gid = vm->get_gid();
-    }
-
-    vm->unlock();
-
-     if (action == VMActions::RESUME_ACTION && !quota_authorization(&quota_tmpl,
-             Quotas::VIRTUALMACHINE, att_aux, att.resp_msg))
-    {
-        failure_response(ACTION, att);
         return;
     }
 
@@ -588,7 +565,36 @@ void VirtualMachineAction::request_execute(xmlrpc_c::paramList const& paramList,
             rc = dm->suspend(id, att, error);
             break;
         case VMActions::RESUME_ACTION:
+            // Generate quota information for resume action
+            vm->get_template_attribute("MEMORY", memory);
+            vm->get_template_attribute("CPU", cpu);
+
+            quota_tmpl.add("RUNNING_MEMORY", memory);
+            quota_tmpl.add("RUNNING_CPU", cpu);
+            quota_tmpl.add("RUNNING_VMS", 1);
+
+            quota_tmpl.add("VMS", 0);
+            quota_tmpl.add("MEMORY", 0);
+            quota_tmpl.add("CPU", 0);
+
+            att_aux.uid = vm->get_uid();
+            att_aux.gid = vm->get_gid();
+
+
+            if (!quota_authorization(&quota_tmpl, Quotas::VIRTUALMACHINE, att_aux, att.resp_msg))
+            {
+                vm->unlock();
+                failure_response(ACTION, att);
+                return;
+            }
+
             rc = dm->resume(id, att, error);
+
+            if (rc < 0)
+            {
+                quota_rollback(&quota_tmpl, Quotas::VIRTUALMACHINE, att_aux);
+            }
+
             break;
         case VMActions::REBOOT_ACTION:
             rc = dm->reboot(id, false, att, error);
@@ -618,6 +624,8 @@ void VirtualMachineAction::request_execute(xmlrpc_c::paramList const& paramList,
             rc = -3;
             break;
     }
+
+    vm->unlock();
 
     switch (rc)
     {
@@ -736,6 +744,52 @@ int set_vnc_port(VirtualMachine *vm, int cluster_id, RequestAttributes& att)
     }
 
     return rc;
+}
+
+
+static int set_migrate_vnc_port(VirtualMachine *vm, int cluster_id, bool keep)
+{
+    ClusterPool * cpool = Nebula::instance().get_clpool();
+
+    VectorAttribute * graphics = vm->get_template_attribute("GRAPHICS");
+
+    unsigned int previous_port;
+    unsigned int port;
+
+    int rc;
+
+    // Do not update VM if no GRAPHICS or GRAPHICS/PORT defined
+    if (graphics == nullptr)
+    {
+        return 0;
+    }
+
+    if (graphics->vector_value("PORT", previous_port) != 0)
+    {
+        return 0;
+    }
+
+    //live migrations need to keep VNC port
+    if (keep)
+    {
+        rc = cpool->set_vnc_port(cluster_id, previous_port);
+
+        port = previous_port;
+    }
+    else
+    {
+        rc = cpool->get_vnc_port(cluster_id, vm->get_oid(), port);
+    }
+
+    if ( rc != 0 )
+    {
+        return -1;
+    }
+
+    graphics->replace("PREVIOUS_PORT", previous_port);
+    graphics->replace("PORT", port);
+
+    return 0;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1059,6 +1113,7 @@ void VirtualMachineMigrate::request_execute(xmlrpc_c::paramList const& paramList
     PoolObjectAuth * auth_ds_perms;
 
     int    c_hid;
+    int    c_cluster_id;
     int    c_ds_id;
     string c_tm_mad, tm_mad;
     bool   c_is_public_cloud;
@@ -1278,6 +1333,7 @@ void VirtualMachineMigrate::request_execute(xmlrpc_c::paramList const& paramList
     }
 
     c_is_public_cloud = host->is_public_cloud();
+    c_cluster_id      = host->get_cluster_id();
 
     host->unlock();
 
@@ -1376,7 +1432,8 @@ void VirtualMachineMigrate::request_execute(xmlrpc_c::paramList const& paramList
     {
         ostringstream oss;
 
-        oss << "Cannot migrate VM [" << id << "] to host [" << hid << "] and system datastore [" << ds_id << "]. Host is in cluster ["
+        oss << "Cannot migrate VM [" << id << "] to host [" << hid
+            << "] and system datastore [" << ds_id << "]. Host is in cluster ["
             << cluster_id << "], and the datastore is in cluster ["
             << one_util::join(ds_cluster_ids, ',') << "]";
 
@@ -1386,6 +1443,22 @@ void VirtualMachineMigrate::request_execute(xmlrpc_c::paramList const& paramList
         vm->unlock();
 
         return;
+    }
+
+    // -------------------------------------------------------------------------
+    // Request a new VNC port in the new cluster
+    // -------------------------------------------------------------------------
+    if ( c_cluster_id != cluster_id )
+    {
+        if ( set_migrate_vnc_port(vm, cluster_id, live) == -1 )
+        {
+            att.resp_msg = "No free VNC port available in the new cluster";
+            failure_response(ACTION, att);
+
+            vm->unlock();
+
+            return;
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -1412,7 +1485,7 @@ void VirtualMachineMigrate::request_execute(xmlrpc_c::paramList const& paramList
     // Migrate the VM
     // ------------------------------------------------------------------------
 
-    if (live == true && vm->get_lcm_state() == VirtualMachine::RUNNING )
+    if (live && vm->get_lcm_state() == VirtualMachine::RUNNING )
     {
         dm->live_migrate(vm, att);
     }
@@ -2453,7 +2526,6 @@ Request::ErrorCode VirtualMachineAttachNic::request_execute(int id,
     // -------------------------------------------------------------------------
     // Perform the attach
     // -------------------------------------------------------------------------
-
     rc = dm->attach_nic(id, &tmpl, att, att.resp_msg);
 
     if ( rc != 0 )

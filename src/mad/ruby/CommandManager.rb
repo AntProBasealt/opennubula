@@ -1,5 +1,5 @@
 # --------------------------------------------------------------------------
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -179,13 +179,23 @@ private
             i.write stdin_data
             i.close
 
-            out = [out_reader.value, err_reader.value, t.value]
+            # blocking wait for process termination
+            t.value
+
+            # if reader threads are not dead yet, kill them
+            [out_reader, err_reader].each do |reader|
+                next unless reader.status
+
+                reader.join(0.1)
+                reader.kill
+            end
 
             mutex.lock
             terminator.kill
             raise terminator_e if terminator_e
 
-            out
+            # return values
+            [out_reader.value, err_reader.value, t.value]
         }
     end
 

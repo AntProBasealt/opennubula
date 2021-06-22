@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -42,7 +42,7 @@ void  DispatchManager::suspend_success_action(int vid)
          vm->get_lcm_state() == VirtualMachine::DISK_SNAPSHOT_REVERT_SUSPENDED||
          vm->get_lcm_state() == VirtualMachine::DISK_SNAPSHOT_DELETE_SUSPENDED))
     {
-        get_quota_template(vm, quota_tmpl, true);
+        vm->get_quota_template(quota_tmpl, true);
 
         vm->set_state(VirtualMachine::SUSPENDED);
 
@@ -94,7 +94,7 @@ void  DispatchManager::stop_success_action(int vid)
         (vm->get_lcm_state() == VirtualMachine::EPILOG_STOP ||
          vm->get_lcm_state() == VirtualMachine::PROLOG_RESUME))
     {
-        get_quota_template(vm, quota_tmpl, true);
+        vm->get_quota_template(quota_tmpl, true);
 
         vm->set_state(VirtualMachine::STOPPED);
 
@@ -154,7 +154,7 @@ void  DispatchManager::undeploy_success_action(int vid)
          vm->get_lcm_state() == VirtualMachine::DISK_RESIZE_UNDEPLOYED ||
          vm->get_lcm_state() == VirtualMachine::PROLOG_UNDEPLOY))
     {
-        get_quota_template(vm, quota_tmpl, true);
+        vm->get_quota_template(quota_tmpl, true);
 
         vm->set_state(VirtualMachine::UNDEPLOYED);
 
@@ -222,9 +222,10 @@ void  DispatchManager::poweroff_success_action(int vid)
          vm->get_lcm_state() == VirtualMachine::DISK_SNAPSHOT_REVERT_POWEROFF ||
          vm->get_lcm_state() == VirtualMachine::DISK_SNAPSHOT_DELETE_POWEROFF ||
          vm->get_lcm_state() == VirtualMachine::DISK_RESIZE_POWEROFF ||
+         vm->get_lcm_state() == VirtualMachine::HOTPLUG_NIC_POWEROFF ||
          vm->get_lcm_state() == VirtualMachine::PROLOG_MIGRATE_POWEROFF_FAILURE))
     {
-        get_quota_template(vm, quota_tmpl, true);
+        vm->get_quota_template(quota_tmpl, true);
 
         vm->set_state(VirtualMachine::POWEROFF);
 

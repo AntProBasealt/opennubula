@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -109,7 +109,7 @@ func TestSGAllocate(t *testing.T) {
 	testCtrl.SecurityGroup(clone_id).Delete()
 
 	//Change permission of SG
-	err = sgC.Chmod(&shared.Permissions{1, 1, 1, 1, 1, 1, 1, 1, 1})
+	err = sgC.Chmod(shared.Permissions{1, 1, 1, 1, 1, 1, 1, 1, 1})
 
 	if err != nil {
 		t.Errorf("Test failed:\n" + err.Error())

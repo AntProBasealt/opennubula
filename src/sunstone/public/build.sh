@@ -5,11 +5,12 @@ set -e
 #-------------------------------------------------------------------------------
 usage() {
  echo
- echo "Usage: build.sh [-d] [-c] [-l] [-h]"
+ echo "Usage: build.sh [-d] [-c] [-l] [-h] [-e]"
  echo
  echo "-d: install build dependencies (bower, grunt)"
  echo "-c: clean build"
  echo "-l: preserve main.js"
+ echo "-e: apply enterprise edition patchs"
  echo "-h: prints this help"
 }
 
@@ -23,6 +24,26 @@ dependencies() {
     npm install grunt-cli
 
     export PATH=$PATH:$PWD/node_modules/.bin
+}
+
+install_enterprise_patch() {
+    PATCH_DIR="./patches/enterprise"
+
+    for i in `ls ${PATCH_DIR}` ; do
+        if [ -f "${PATCH_DIR}/$i" ]; then
+            if [ "$ENTERPRISE" = "yes" ]; then
+                # If the patch is not applied then apply it.
+                if ! patch -f -s -R -d.. -p1 --dry-run < "${PATCH_DIR}/$i"; then
+                    patch -d.. -p1 <"${PATCH_DIR}/$i"
+                fi
+            else
+                # If the patch is not applied then apply it.
+                if ! patch -f -s -d.. -p1 --dry-run < "${PATCH_DIR}/$i"; then
+                    patch -R -d.. -p1 <"${PATCH_DIR}/$i"
+                fi
+            fi
+        fi
+    done
 }
 
 install_patch() {
@@ -41,6 +62,8 @@ install_patch() {
         fi
     done
 
+    install_enterprise_patch
+
     if [ "$DO_LINK" = "yes" ]; then
         mv -f dist/main.js ./main.js
     fi
@@ -58,7 +81,7 @@ install_patch() {
 }
 #-------------------------------------------------------------------------------
 
-PARAMETERS="dlch"
+PARAMETERS="dlche"
 
 if [ $(getopt --version | tr -d " ") = "--" ]; then
     TEMP_OPT=`getopt $PARAMETERS "$@"`
@@ -69,6 +92,7 @@ fi
 DEPENDENCIES="no"
 CLEAN="no"
 DO_LINK="no"
+ENTERPRISE="no"
 
 eval set -- "$TEMP_OPT"
 
@@ -77,6 +101,7 @@ while true ; do
         -d) DEPENDENCIES="yes"   ; shift ;;
         -c) CLEAN="yes"   ; shift ;;
         -l) DO_LINK="yes"   ; shift ;;
+        -e) ENTERPRISE="yes"; shift;;
         -h) usage; exit 0;;
         --) shift ; break ;;
         *)  usage; exit 1 ;;

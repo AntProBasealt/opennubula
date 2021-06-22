@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -37,11 +37,7 @@ void LifeCycleManager::start_prolog_migrate(VirtualMachine* vm)
         vm->delete_snapshots();
     }
 
-    vm->reset_info();
-
     vm->set_previous_etime(the_time);
-
-    vm->set_previous_vm_info();
 
     vm->set_previous_running_etime(the_time);
 
@@ -58,6 +54,8 @@ void LifeCycleManager::start_prolog_migrate(VirtualMachine* vm)
     if ( vm->get_hid() != vm->get_previous_hid() )
     {
         hpool->del_capacity(vm->get_previous_hid(), sr);
+
+        vm->release_previous_vnc_port();
     }
 
     vmpool->update(vm);
@@ -81,8 +79,6 @@ void LifeCycleManager::revert_migrate_after_failure(VirtualMachine* vm)
 
     vm->set_etime(the_time);
 
-    vm->set_vm_info();
-
     vmpool->update_history(vm);
 
     vm->get_capacity(sr);
@@ -90,11 +86,11 @@ void LifeCycleManager::revert_migrate_after_failure(VirtualMachine* vm)
     if ( vm->get_hid() != vm->get_previous_hid() )
     {
         hpool->del_capacity(vm->get_hid(), sr);
+
+        vm->rollback_previous_vnc_port();
     }
 
     vm->set_previous_etime(the_time);
-
-    vm->set_previous_vm_info();
 
     vm->set_previous_running_etime(the_time);
 
@@ -108,18 +104,12 @@ void LifeCycleManager::revert_migrate_after_failure(VirtualMachine* vm)
 
     vm->set_running_stime(the_time);
 
-    vm->set_last_poll(0);
-
     vmpool->insert_history(vm);
 
     vmpool->update(vm);
 
     vm->log("LCM", Log::INFO, "Fail to save VM state while migrating."
-            " Assuming that the VM is still RUNNING (will poll VM).");
-
-    //----------------------------------------------------
-
-    vmm->trigger(VMMAction::POLL,vm->get_oid());
+            " Assuming that the VM is still RUNNING.");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -143,8 +133,6 @@ void  LifeCycleManager::save_success_action(int vid)
     }
     else if (vm->get_lcm_state() == VirtualMachine::SAVE_SUSPEND)
     {
-        time_t the_time = time(0);
-
         //----------------------------------------------------
         //                SUSPENDED STATE
         //----------------------------------------------------
@@ -152,19 +140,9 @@ void  LifeCycleManager::save_success_action(int vid)
         if ( !vmm->is_keep_snapshots(vm->get_vmm_mad()) )
         {
             vm->delete_snapshots();
+
+            vmpool->update(vm);
         }
-
-        vm->reset_info();
-
-        vm->set_running_etime(the_time);
-
-        vm->set_etime(the_time);
-
-        vm->set_vm_info();
-
-        vmpool->update_history(vm);
-
-        vmpool->update(vm);
 
         //----------------------------------------------------
 
@@ -184,8 +162,6 @@ void  LifeCycleManager::save_success_action(int vid)
         {
             vm->delete_snapshots();
         }
-
-        vm->reset_info();
 
         vm->set_epilog_stime(the_time);
 
@@ -241,11 +217,7 @@ void  LifeCycleManager::save_failure_action(int vid)
         vmpool->update(vm);
 
         vm->log("LCM", Log::INFO, "Fail to save VM state."
-                " Assuming that the VM is still RUNNING (will poll VM).");
-
-        //----------------------------------------------------
-
-        vmm->trigger(VMMAction::POLL,vid);
+                " Assuming that the VM is still RUNNING.");
     }
     else
     {
@@ -281,13 +253,9 @@ void  LifeCycleManager::deploy_success_action(int vid)
 
         vm->set_running_stime(the_time);
 
-        vm->set_last_poll(0);
-
         vmpool->update_history(vm);
 
         vm->set_previous_etime(the_time);
-
-        vm->set_previous_vm_info();
 
         vm->set_previous_running_etime(the_time);
 
@@ -296,6 +264,8 @@ void  LifeCycleManager::deploy_success_action(int vid)
         vm->get_capacity(sr);
 
         hpool->del_capacity(vm->get_previous_hid(), sr);
+
+        vm->release_previous_vnc_port();
 
         vm->set_state(VirtualMachine::RUNNING);
 
@@ -318,6 +288,16 @@ void  LifeCycleManager::deploy_success_action(int vid)
               vm->get_lcm_state() == VirtualMachine::BOOT_UNDEPLOY_FAILURE ||
               vm->get_lcm_state() == VirtualMachine::BOOT_FAILURE )
     {
+        if ( vm->get_lcm_state() == VirtualMachine::BOOT_SUSPENDED ||
+             vm->get_lcm_state() == VirtualMachine::BOOT_POWEROFF )
+        {
+            vm->set_previous_etime(time(0));
+
+            vm->set_previous_running_etime(time(0));
+
+            vmpool->update_previous_history(vm);
+        }
+
         vm->set_state(VirtualMachine::RUNNING);
 
         vm->clear_action();
@@ -326,7 +306,7 @@ void  LifeCycleManager::deploy_success_action(int vid)
 
         vmpool->update(vm);
     }
-    else
+    else if ( vm->get_lcm_state() != VirtualMachine::RUNNING)
     {
         vm->log("LCM",Log::ERROR,"deploy_success_action, VM in a wrong state");
     }
@@ -349,8 +329,6 @@ void  LifeCycleManager::deploy_failure_action(int vid)
         return;
     }
 
-    time_t  the_time = time(0);
-
     if ( vm->get_lcm_state() == VirtualMachine::MIGRATE )
     {
         HostShareCapacity sr;
@@ -365,13 +343,9 @@ void  LifeCycleManager::deploy_failure_action(int vid)
 
         vm->set_etime(the_time);
 
-        vm->set_vm_info();
-
         vmpool->update_history(vm);
 
         vm->set_previous_etime(the_time);
-
-        vm->set_previous_vm_info();
 
         vm->set_previous_running_etime(the_time);
 
@@ -381,6 +355,8 @@ void  LifeCycleManager::deploy_failure_action(int vid)
 
         hpool->del_capacity(vm->get_hid(), sr);
 
+        vm->rollback_previous_vnc_port();
+
         // --- Add new record by copying the previous one
 
         vm->cp_previous_history();
@@ -389,18 +365,12 @@ void  LifeCycleManager::deploy_failure_action(int vid)
 
         vm->set_running_stime(the_time);
 
-        vm->set_last_poll(0);
-
         vmpool->insert_history(vm);
 
         vmpool->update(vm);
 
         vm->log("LCM", Log::INFO, "Fail to live migrate VM."
-                " Assuming that the VM is still RUNNING (will poll VM).");
-
-        //----------------------------------------------------
-
-        vmm->trigger(VMMAction::POLL,vid);
+                " Assuming that the VM is still RUNNING.");
     }
     else if (vm->get_lcm_state() == VirtualMachine::BOOT)
     {
@@ -422,24 +392,16 @@ void  LifeCycleManager::deploy_failure_action(int vid)
     }
     else if (vm->get_lcm_state() == VirtualMachine::BOOT_POWEROFF)
     {
-        vm->set_etime(the_time);
-        vm->set_running_etime(the_time);
-
         vm->set_state(VirtualMachine::POWEROFF);
         vm->set_state(VirtualMachine::LCM_INIT);
 
-        vmpool->update_history(vm);
         vmpool->update(vm);
     }
     else if (vm->get_lcm_state() == VirtualMachine::BOOT_SUSPENDED)
     {
-        vm->set_etime(the_time);
-        vm->set_running_etime(the_time);
-
         vm->set_state(VirtualMachine::SUSPENDED);
         vm->set_state(VirtualMachine::LCM_INIT);
 
-        vmpool->update_history(vm);
         vmpool->update(vm);
     }
     else if (vm->get_lcm_state() == VirtualMachine::BOOT_STOPPED)
@@ -493,8 +455,6 @@ void  LifeCycleManager::shutdown_success_action(int vid)
             vm->delete_snapshots();
         }
 
-        vm->reset_info();
-
         vm->set_epilog_stime(the_time);
 
         vm->set_running_etime(the_time);
@@ -516,19 +476,9 @@ void  LifeCycleManager::shutdown_success_action(int vid)
         if ( !vmm->is_keep_snapshots(vm->get_vmm_mad()) )
         {
             vm->delete_snapshots();
+
+            vmpool->update(vm);
         }
-
-        vm->reset_info();
-
-        vm->set_running_etime(the_time);
-
-        vm->set_etime(the_time);
-
-        vm->set_vm_info();
-
-        vmpool->update_history(vm);
-
-        vmpool->update(vm);
 
         //----------------------------------------------------
 
@@ -546,8 +496,6 @@ void  LifeCycleManager::shutdown_success_action(int vid)
         {
             vm->delete_snapshots();
         }
-
-        vm->reset_info();
 
         vm->set_epilog_stime(the_time);
 
@@ -604,11 +552,7 @@ void  LifeCycleManager::shutdown_failure_action(int vid)
         vmpool->update(vm);
 
         vm->log("LCM", Log::INFO, "Fail to shutdown VM."
-                " Assuming that the VM is still RUNNING (will poll VM).");
-
-        //----------------------------------------------------
-
-        vmm->trigger(VMMAction::POLL,vid);
+                " Assuming that the VM is still RUNNING.");
     }
     else if (vm->get_lcm_state() == VirtualMachine::SAVE_MIGRATE)
     {
@@ -701,8 +645,6 @@ void LifeCycleManager::prolog_success_action(int vid)
 
             vm->set_running_stime(the_time);
 
-            vm->set_last_poll(0);
-
             vmpool->update_history(vm);
 
             vmpool->update(vm);
@@ -722,15 +664,7 @@ void LifeCycleManager::prolog_success_action(int vid)
                 vm->delete_snapshots();
             }
 
-            vm->reset_info();
-
-            vm->set_etime(the_time);
-
             vm->set_prolog_etime(the_time);
-
-            vm->set_last_poll(0);
-
-            vm->set_vm_info();
 
             vmpool->update_history(vm);
 
@@ -820,8 +754,6 @@ void  LifeCycleManager::prolog_failure_action(int vid)
             vm->set_prolog_etime(t);
             vm->set_etime(t);
 
-            vm->set_vm_info();
-
             vmpool->update_history(vm);
 
             switch (vm->get_lcm_state())
@@ -851,7 +783,6 @@ void  LifeCycleManager::prolog_failure_action(int vid)
 
             vm->set_stime(t);
             vm->set_prolog_stime(t);
-            vm->set_last_poll(0);
 
             hpool->add_capacity(vm->get_hid(), sr);
 
@@ -951,8 +882,6 @@ void  LifeCycleManager::epilog_success_action(int vid)
 
     vm->set_etime(the_time);
 
-    vm->set_vm_info();
-
     VectorAttribute * graphics = vm->get_template_attribute("GRAPHICS");
 
     //Do not free VNC ports for STOP as it is stored in checkpoint file
@@ -965,11 +894,11 @@ void  LifeCycleManager::epilog_success_action(int vid)
 
     vmpool->update_history(vm);
 
-    vmpool->update(vm);
-
     vm->get_capacity(sr);
 
     hpool->del_capacity(vm->get_hid(), sr);
+
+    vmpool->update(vm);
 
     //----------------------------------------------------
 
@@ -1070,8 +999,6 @@ void  LifeCycleManager::monitor_suspend_action(int vid)
 {
     VirtualMachine *    vm;
 
-    time_t  the_time = time(0);
-
     vm = vmpool->get(vid);
 
     if ( vm == nullptr )
@@ -1096,14 +1023,6 @@ void  LifeCycleManager::monitor_suspend_action(int vid)
         {
             vm->delete_snapshots();
         }
-
-        vm->reset_info();
-
-        vm->set_running_etime(the_time);
-
-        vm->set_etime(the_time);
-
-        vm->set_vm_info();
 
         vm->set_internal_action(VMActions::MONITOR_ACTION);
 
@@ -1179,24 +1098,14 @@ void  LifeCycleManager::monitor_poweroff_action(int vid)
 
         vm->log("LCM",Log::INFO,"VM running but monitor state is POWEROFF");
 
-        time_t the_time = time(0);
-
         if ( !vmm->is_keep_snapshots(vm->get_vmm_mad()) )
         {
             vm->delete_snapshots();
         }
 
-        vm->reset_info();
-
         vm->set_resched(false);
 
         vm->set_state(VirtualMachine::SHUTDOWN_POWEROFF);
-
-        vm->set_running_etime(the_time);
-
-        vm->set_etime(the_time);
-
-        vm->set_vm_info();
 
         vm->set_internal_action(VMActions::MONITOR_ACTION);
 
@@ -1235,27 +1144,42 @@ void  LifeCycleManager::monitor_poweron_action(int vid)
         return;
     }
 
-    if ( vm->get_state() == VirtualMachine::POWEROFF )
+    if ( vm->get_state() == VirtualMachine::POWEROFF ||
+         vm->get_state() == VirtualMachine::SUSPENDED )
     {
-            vm->log("VMM",Log::INFO,"VM found again by the drivers");
+        vm->log("VMM",Log::INFO,"VM found again by the drivers");
 
-            time_t the_time = time(0);
+        VirtualMachineTemplate quota_tmpl;
 
-            vm->set_state(VirtualMachine::ACTIVE);
+        string error;
 
-            vm->set_state(VirtualMachine::RUNNING);
+        int uid = vm->get_uid();
 
-            vm->cp_history();
+        int gid = vm->get_gid();
 
-            vm->set_stime(the_time);
+        time_t the_time = time(0);
 
-            vm->set_running_stime(the_time);
+        vm->set_state(VirtualMachine::ACTIVE);
 
-            vm->set_last_poll(the_time);
+        vm->set_state(VirtualMachine::RUNNING);
 
-            vmpool->insert_history(vm);
+        vm->set_etime(the_time);
 
-            vmpool->update(vm);
+        vmpool->update_history(vm);
+
+        vm->cp_history();
+
+        vm->set_stime(the_time);
+
+        vm->set_running_stime(the_time);
+
+        vmpool->insert_history(vm);
+
+        vm->get_quota_template(quota_tmpl, true);
+
+        vmpool->update(vm);
+
+        Quotas::vm_check(uid, gid, &quota_tmpl, error);
     }
     else if ( vm->get_state() == VirtualMachine::ACTIVE )
     {
@@ -1656,6 +1580,15 @@ void LifeCycleManager::attach_nic_success_action(int vid)
         vmpool->update(vm);
         vmpool->update_search(vm);
     }
+    else if ( vm->get_lcm_state() == VirtualMachine::HOTPLUG_NIC_POWEROFF )
+    {
+        vm->clear_attach_nic();
+
+        vmpool->update(vm);
+        vmpool->update_search(vm);
+
+        dm->trigger(DMAction::POWEROFF_SUCCESS,vid);
+    }
     else
     {
         vm->log("LCM",Log::ERROR,"attach_nic_success_action, VM in a wrong state");
@@ -1697,6 +1630,14 @@ void LifeCycleManager::attach_nic_failure_action(int vid)
 
         vm->unlock();
     }
+    else if ( vm->get_lcm_state() == VirtualMachine::HOTPLUG_NIC_POWEROFF )
+    {
+        vm->unlock();
+
+        vmpool->delete_attach_nic(vid);
+
+        dm->trigger(DMAction::POWEROFF_SUCCESS, vid);
+    }
     else
     {
         vm->log("LCM",Log::ERROR,"attach_nic_failure_action, VM in a wrong state");
@@ -1735,14 +1676,31 @@ void LifeCycleManager::detach_nic_success_action(int vid)
 
         vmpool->update(vm);
         vmpool->update_search(vm);
-
+    }
+    else if ( vm->get_lcm_state() == VirtualMachine::HOTPLUG_NIC_POWEROFF )
+    {
         vm->unlock();
+
+        vmpool->delete_attach_nic(vid);
+
+        vm = vmpool->get(vid);
+
+        if ( vm == nullptr )
+        {
+            return;
+        }
+
+        vmpool->update(vm);
+        vmpool->update_search(vm);
+
+        dm->trigger(DMAction::POWEROFF_SUCCESS, vid);
     }
     else
     {
         vm->log("LCM",Log::ERROR,"detach_nic_success_action, VM in a wrong state");
-        vm->unlock();
     }
+
+    vm->unlock();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1766,6 +1724,14 @@ void LifeCycleManager::detach_nic_failure_action(int vid)
         vm->set_state(VirtualMachine::RUNNING);
 
         vmpool->update(vm);
+    }
+    else if ( vm->get_lcm_state() == VirtualMachine::HOTPLUG_NIC_POWEROFF )
+    {
+        vm->clear_attach_nic();
+
+        vmpool->update(vm);
+
+        dm->trigger(DMAction::POWEROFF_SUCCESS, vid);
     }
     else
     {

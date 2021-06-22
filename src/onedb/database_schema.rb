@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -52,8 +52,8 @@ class OneDBBacKEnd
 
         group_quotas: "group_oid INTEGER PRIMARY KEY, body MEDIUMTEXT",
 
-        document_pool: "oid INTEGER PRIMARY KEY, name VARCHAR(128), " << 
-            "body MEDIUMTEXT, type INTEGER, uid INTEGER, gid INTEGER, " << 
+        document_pool: "oid INTEGER PRIMARY KEY, name VARCHAR(128), " <<
+            "body MEDIUMTEXT, type INTEGER, uid INTEGER, gid INTEGER, " <<
             "owner_u INTEGER, group_u INTEGER, other_u INTEGER"
     }
 
@@ -109,10 +109,30 @@ class OneDBBacKEnd
         "5.10.0" => {
             logdb: "log_index BIGINT UNSIGNED PRIMARY KEY, term INTEGER, sqlcmd MEDIUMTEXT, " <<
                 "timestamp INTEGER, fed_index BIGINT UNSIGNED, applied BOOLEAN"
+        },
+        "5.12.0" => {
+            host_monitoring: "hid INTEGER, " <<
+                "last_mon_time INTEGER, body MEDIUMTEXT, " <<
+                "PRIMARY KEY(hid, last_mon_time)",
+            host_pool: "oid INTEGER PRIMARY KEY, " <<
+                "name VARCHAR(128), body MEDIUMTEXT, state INTEGER, " <<
+                "uid INTEGER, gid INTEGER, " <<
+                "owner_u INTEGER, group_u INTEGER, other_u INTEGER, " <<
+                "cid INTEGER",
+            vm_monitoring: "vmid INTEGER, " <<
+                "last_poll INTEGER, body MEDIUMTEXT, " <<
+                "PRIMARY KEY(vmid, last_poll)",
+            vm_pool: "oid INTEGER PRIMARY KEY, name VARCHAR(128), " <<
+                "body MEDIUMTEXT, uid INTEGER, gid INTEGER, " <<
+                "state INTEGER, lcm_state INTEGER, " <<
+                "owner_u INTEGER, group_u INTEGER, other_u INTEGER, short_body MEDIUMTEXT, " <<
+                "search_token MEDIUMTEXT",
+            acl: "oid INT PRIMARY KEY, userset BIGINT, resource BIGINT, " <<
+                 "rights BIGINT, zone BIGINT, UNIQUE(userset, resource, rights, zone)"
         }
     }
 
-    LATEST_DB_VERSION = "5.10.0"
+    LATEST_DB_VERSION = "5.12.0"
 
     def get_schema(type, version = nil)
         if !version

@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -17,6 +17,7 @@
 require 'one_helper'
 require 'one_helper/onevm_helper'
 require 'rubygems'
+require 'time'
 
 # implements onehost command
 class OneHostHelper < OpenNebulaHelper::OneHelper
@@ -48,25 +49,25 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
         :az => {
             :help => <<-EOT.unindent
                 #-----------------------------------------------------------------------
-                # Supported AZURE AUTH ATTRIBUTTES:
+                # Mandatory AZURE ATTRIBUTTES:
                 #
-                #  AZ_ID   = <azure classic id>
-                #  AZ_CERT = <azure classic certificate>
+                # AZ_SUB    = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                # AZ_CLIENT = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                # AZ_SECRET = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                # AZ_TENANT = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                # AZ_REGION = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
                 #
-                #  REGION_NAME = <the name of the azure region>
+                # CAPACITY=[
+                #   STANDARD_B1LS =<number of machines Standard_B1ls>,
+                #   STANDARD_A1_V2=<number of machines Standard_A1_v2>
+                # ]
                 #
-                #  CAPACITY = [
-                #    Small = <number of small machines>,
-                #    Medium = <number of medium machines>,
-                #    Large = <number of large machines
-                #  ]
+                # Optional AZURE ATTRIBUTES:
                 #
-                # You can set any machine type supported by azure classic
+                # AZ_RGROUP = ""
+                #
+                # You can set any machine type supported by azure
                 # See your az_driver.conf for more information
-                #
-                # Optionally you can set a endpoint
-                #
-                #  AZ_ENDPOINT = <endpoint address>
                 #
                 #-----------------------------------------------------------------------
             EOT
@@ -74,6 +75,15 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
     }
 
     VERSION_XPATH = "#{TEMPLATE_XPATH}/VERSION"
+
+    MONITORING = {
+        'FREE_CPU'    => 'CAPACITY',
+        'FREE_MEMORY' => 'CAPACITY',
+        'USED_CPU'    => 'CAPACITY',
+        'USED_MEMORY' => 'CAPACITY',
+        'NETRX'       => 'SYSTEM',
+        'NETTX'       => 'SYSTEM'
+    }
 
     def self.rname
         'HOST'
@@ -93,7 +103,7 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
     def format_pool(options)
         config_file = self.class.table_conf
 
-        table = CLIHelper::ShowTable.new(config_file, self) do
+        CLIHelper::ShowTable.new(config_file, self) do
             column :ID, 'ONE identifier for Host', :size => 4 do |d|
                 d['ID']
             end
@@ -223,8 +233,6 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
             default :ID, :NAME, :CLUSTER, :TVM,
                     :ALLOCATED_CPU, :ALLOCATED_MEM, :STAT
         end
-
-        table
     end
 
     def set_hybrid(type, path)
@@ -359,14 +367,15 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
 
                     print_update_info(total - size, total, host['NAME'])
 
-                    if options[:rsync]
-                        sync_cmd = "rsync -Laz --delete #{REMOTES_LOCATION}" \
-                                   " #{host['NAME']}:#{remote_dir}"
-                    else
+                    if options[:ssh]
                         sync_cmd = "ssh #{host['NAME']}" \
+                                   " rm -rf '#{remote_dir}' 2>/dev/null;" \
                                    " mkdir -p '#{remote_dir}' 2>/dev/null &&" \
                                    " scp -rp #{REMOTES_LOCATION}/*" \
                                    " #{host['NAME']}:#{remote_dir} 2> /dev/null"
+                    else
+                        sync_cmd = "rsync -Laz --delete #{REMOTES_LOCATION}/" \
+                                   " #{host['NAME']}:#{remote_dir}/"
                     end
 
                     retries = 3
@@ -424,8 +433,7 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
         rc = pool.info
         return -1, rc.message if OpenNebula.is_error?(rc)
 
-        # Assign hosts to threads
-        queue = []
+        host_errors = []
 
         pool.each do |host|
             if host_ids
@@ -434,7 +442,6 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
                 next if host['CLUSTER_ID'].to_i != cluster_id
             end
 
-            vm_mad = host['VM_MAD'].downcase
             state = host['STATE']
 
             # Skip this host from remote syncing if it's a PUBLIC_CLOUD host
@@ -443,52 +450,10 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
             # Skip this host from remote syncing if it's OFFLINE
             next if Host::HOST_STATES[state.to_i] == 'OFFLINE'
 
-            # Skip this host if it is a vCenter cluster
-            next if vm_mad == 'vcenter'
+            rc = host.forceupdate
 
-            queue << host
+            host_errors << host['NAME'] if OpenNebula.is_error?(rc)
         end
-
-        # Run the jobs in threads
-        host_errors = []
-        queue_lock = Mutex.new
-        error_lock = Mutex.new
-        total = queue.length
-
-        if total.zero?
-            puts 'No hosts are going to be forced.'
-            exit(0)
-        end
-
-        ts = (1..NUM_THREADS).map do |_t|
-            Thread.new do
-                loop do
-                    host = nil
-                    size = 0
-
-                    queue_lock.synchronize do
-                        host = queue.shift
-                        size = queue.length
-                    end
-
-                    break unless host
-
-                    cmd = 'cat /tmp/one-collectd-client.pid | xargs kill -HUP'
-                    system("ssh #{host['NAME']} \"#{cmd}\" 2>/dev/null")
-
-                    if !$CHILD_STATUS.success?
-                        error_lock.synchronize do
-                            host_errors << host['NAME']
-                        end
-                    else
-                        puts "#{host['NAME']} monitoring forced"
-                    end
-                end
-            end
-        end
-
-        # Wait for threads to finish
-        ts.each {|t| t.join }
 
         if host_errors.empty?
             puts 'All hosts updated successfully.'
@@ -497,6 +462,92 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
             STDERR.puts 'Failed to update the following hosts:'
             host_errors.each {|h| STDERR.puts "* #{h}" }
             -1
+        end
+    end
+
+    def monitoring(host, attr, options)
+        unit    = options[:unit] || 'G'
+        start_d = options[:start]
+        end_d   = options[:end]
+        n_elems = options[:n_elems] || 8
+
+        # Different available size units
+        units = %w[K M G T]
+
+        # Attrs that need units conversion
+        attrs = %w[FREE_MEMORY USED_MEMORY]
+
+        if unit && !units.include?(unit)
+            STDERR.puts "Invalid unit `#{unit}`"
+            exit(-1)
+        end
+
+        attr      = attr.upcase
+        start_d   = Time.parse(start_d) if start_d
+        end_d     = Time.parse(end_d) if end_d
+
+        # Get monitoring data from user path
+        #
+        #   0 -> timestamp
+        #   1 -> data retrieved
+        monitoring_data = host.monitoring(["#{MONITORING[attr]}/#{attr}"])
+        monitoring_data = monitoring_data["#{MONITORING[attr]}/#{attr}"]
+
+        if monitoring_data.empty?
+            STDERR.puts 'No monitoring data found'
+            return
+        end
+
+        # Get data max and min date
+        start_d ||= Time.at(monitoring_data.min {|v| v[0].to_i }[0].to_i)
+        end_d   ||= Time.at(monitoring_data.max {|v| v[0].to_i }[0].to_i)
+
+        # Filter data betwen dates
+        monitoring_data.reject! do |v|
+            v[0].to_i < start_d.to_i || v[0].to_i > end_d.to_i
+        end
+
+        if monitoring_data.empty?
+            STDERR.puts "No monitoring data found between #{start_d} " \
+                        "and #{end_d}"
+            return
+        end
+
+        start_d = start_d.strftime('%d/%m/%Y %H:%M')
+        end_d   = end_d.strftime('%d/%m/%Y %H:%M')
+
+        # Parse dcollected data
+        x = monitoring_data.collect {|v| Time.at(v[0].to_i).strftime('%H:%M') }
+        y = monitoring_data.collect do |v|
+            if attrs.include?(attr)
+                # GB is the default unit
+                v = OpenNebulaHelper.bytes_to_unit(v[1].to_i, unit).round(2)
+                "#{v} #{unit}B"
+            else
+                v[1]
+            end
+        end
+
+        title = ''
+        title << "Host #{host.id} #{attr} "
+        title << "in #{unit}B " if unit && attrs.include?(attr)
+        title << "from #{start_d} to #{end_d}"
+
+        x = x.last(n_elems)
+        y = y.last(n_elems)
+
+        if options[:table]
+            print_monitoring_table(x, y, title)
+        elsif options[:csv]
+            csv = ''
+
+            csv << "TIME#{options[:csv]}VALUE\n"
+
+            x.zip(y) {|x_v, y_v| csv << "#{x_v}#{options[:csv]}#{y_v}\n" }
+
+            puts csv
+        else
+            puts OpenNebulaHelper.get_plot(x, y, attr, title)
         end
     end
 
@@ -565,7 +616,7 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
         puts format(str, 'IM_MAD', host['IM_MAD'])
         puts format(str, 'VM_MAD', host['VM_MAD'])
         puts format(str, 'LAST MONITORING TIME',
-                    OpenNebulaHelper.time_to_str(host['LAST_MON_TIME']))
+                    OpenNebulaHelper.time_to_str(host['MONITORING/TIMESTAMP']))
         puts
 
         CLIHelper.print_header(str_h1 % 'HOST SHARES', false)
@@ -579,8 +630,9 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
                     OpenNebulaHelper.unit_to_str(host['HOST_SHARE/MAX_MEM']
                                     .to_i, {}))
         puts format(str, '  USED (REAL)',
-                    OpenNebulaHelper.unit_to_str(host['HOST_SHARE/USED_MEM']
-                                    .to_i, {}))
+                    OpenNebulaHelper
+                    .unit_to_str(host['MONITORING/CAPACITY/USED_MEMORY']
+                    .to_i, {}))
         puts format(str, '  USED (ALLOCATED)',
                     OpenNebulaHelper.unit_to_str(host['HOST_SHARE/MEM_USAGE']
                                     .to_i, {}))
@@ -588,7 +640,7 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
         CLIHelper.print_header(str_h1 % 'CPU', false)
         puts format(str, '  TOTAL', host['HOST_SHARE/TOTAL_CPU'])
         puts format(str, '  TOTAL +/- RESERVED', host['HOST_SHARE/MAX_CPU'])
-        puts format(str, '  USED (REAL)', host['HOST_SHARE/USED_CPU'])
+        puts format(str, '  USED (REAL)', host['MONITORING/CAPACITY/USED_CPU'])
         puts format(str, '  USED (ALLOCATED)', host['HOST_SHARE/CPU_USAGE'])
         puts
 
@@ -662,13 +714,13 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
                                    .split("\n")
                 name   = wild['VM_NAME']
                 import = wild_tmplt.select do |line|
-                             line[/^IMPORT_VM_ID/]
+                             line[/DEPLOY_ID/]
                          end[0].split('=')[1].tr('"', ' ').strip
                 memory = wild_tmplt.select do |line|
-                             line[/^MEMORY/]
+                             line[/MEMORY/]
                          end[0].split('=')[1].tr('"', ' ').strip
                 cpu    = wild_tmplt.select do |line|
-                             line[/^CPU/]
+                             line[/CPU/]
                          end[0].split('=')[1].tr('"', ' ').strip
             else
                 name = wild['DEPLOY_ID']
@@ -916,6 +968,32 @@ class OneHostHelper < OpenNebulaHelper::OneHelper
         end
 
         table.show(hugepages)
+    end
+
+    def print_monitoring_table(x, y, title)
+        puts
+        CLIHelper.print_header(title, true)
+        puts
+
+        table = CLIHelper::ShowTable.new(nil, self) do
+            column :TIME, 'Timestamp', :size => 8, :left => false do |d|
+                d['TIME']
+            end
+
+            column :VALUE, 'Value', :size => 8, :left => false do |d|
+                d['VALUE']
+            end
+
+            default :TIME, :VALUE
+        end
+
+        data = []
+
+        x.zip(y) do |x_v, y_v|
+            data << { 'TIME' => x_v, 'VALUE' => y_v }
+        end
+
+        table.show(data)
     end
 
 end

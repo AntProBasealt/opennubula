@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -177,7 +177,7 @@ define(function(require) {
     'updateFn': _updateFn,
     'list': _list,
     'clearLabelsFilter': _clearLabelsFilter,
-    'getLabelsFilter': _getLabelsFilter,
+    'getLabelsFilter': _getLabelsFilter
   }
 
   return TabDatatable;
@@ -694,6 +694,7 @@ define(function(require) {
 
     if (that.postUpdateView) {
       that.postUpdateView();
+      $("ul.ips-dropdown").foundation();
     }
 
     if(that.conf.searchDropdownHTML != undefined){
@@ -904,7 +905,7 @@ define(function(require) {
             $("td", row).addClass('markrowchecked');
             $('input.check_item', row).prop('checked', true);
           }
-
+          
           var attr = {row_id:row_id, class:"radius label"};
           var span = $("<span/>",attr).text(row_name);
           $('#selected_ids_row_' + that.dataTableId, section).append(span);
@@ -970,28 +971,28 @@ define(function(require) {
     } else {
       $('#' + that.dataTableId + ' tbody', section).delegate("tr", "click", function(e) {
         that.dataTable.unbind("draw");
+        var wasChecked = $("td.markrow", this).hasClass("markrow");
         var aData = that.dataTable.fnGetData(this);
+        var check = aData != undefined && !wasChecked;
 
-        $("td.markrow", that.dataTable).removeClass('markrow');
-        $('tbody input.check_item', that.dataTable).prop('checked', false);
+        $("td", that.dataTable).removeClass('markrow');
+        $("td", this).toggleClass('markrow', check);
+        $('tbody input.check_item', that.dataTable).prop('checked', check);
 
-        if (aData != undefined){
-          $("td", this).addClass('markrow');
-          $('input.check_item', this).prop('checked', true);
+        $('#selected_resource_' + that.dataTableId, section).toggle(check);
+        $('#select_resource_' + that.dataTableId, section).toggle(!check);
 
-          $('#selected_resource_' + that.dataTableId, section).show();
-          $('#select_resource_' + that.dataTableId, section).hide();
+        $('#selected_resource_id_' + that.dataTableId, section)
+          .val(function() { return check ? aData[that.selectOptions.id_index] : "" }).trigger("change");
+        $('#selected_resource_name_' + that.dataTableId, section)
+          .text(function() { return check ? aData[that.selectOptions.name_index] : "" }).trigger("change");
 
-          $('#selected_resource_id_' + that.dataTableId, section).val(aData[that.selectOptions.id_index]).trigger("change");
-
-          $('#selected_resource_name_' + that.dataTableId, section).text(aData[that.selectOptions.name_index]).trigger("change");
-          $('#selected_resource_name_' + that.dataTableId, section).show();
-
-          that.selectOptions.select_callback(aData, that.selectOptions);
-        }
+        $('#selected_resource_name_' + that.dataTableId, section).toggle(check);
 
         $('#selected_resource_id_' + that.dataTableId, section).removeData("pending_select");
 
+        var callback = check ? "select_callback" : "unselect_callback";
+        that.selectOptions[callback](aData, that.selectOptions);
         return true;
       });
     }
@@ -1011,12 +1012,13 @@ define(function(require) {
     $('tbody input.check_item', that.dataTable).prop('checked', false);
 
     $('#' + that.dataTableId + '_search', section).val("").trigger("input");
+    $('#selected_resource_id_' + that.dataTableId, section).val("").trigger("change");
+    $('#selected_resource_name_' + that.dataTableId, section).text("").trigger("change").hide();
     $('#refresh_button_' + that.dataTableId).click();
-
-    $('#selected_resource_name_' + that.dataTableId, section).text("").hide();
 
     $('#selected_resource_' + that.dataTableId, section).hide();
     $('#select_resource_' + that.dataTableId, section).show();
+
   }
 
   // Returns an ID, or an array of IDs for that.selectOptions.multiple_choice
@@ -1212,7 +1214,7 @@ define(function(require) {
           delete fixed_ids_map[this[that.xmlRoot].ID];
         }
       });
-
+      
       that.updateView(null, list_array, true);
 
       var section = $('#' + that.dataTableId + 'Container');

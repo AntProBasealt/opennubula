@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -115,7 +115,7 @@ class OneAclHelper < OpenNebulaHelper::OneHelper
     def format_pool(_options)
         config_file = self.class.table_conf
 
-        table = CLIHelper::ShowTable.new(config_file, self) do
+        CLIHelper::ShowTable.new(config_file, self) do
             column :ID,
                    'Rule Identifier',
                    :size => 5 do |d|
@@ -157,8 +157,6 @@ class OneAclHelper < OpenNebulaHelper::OneHelper
 
             default :ID, :USER, :RES_VHNIUTGDCOZSvRMAPt, :RID, :OPE_UMAC, :ZONE
         end
-
-        table
     end
     # rubocop:enable Lint/IneffectiveAccessModifier
 

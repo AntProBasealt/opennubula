@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -30,11 +30,7 @@ include OpenNebula
 module OpenNebulaHelper
     ONE_VERSION=<<-EOT
 OpenNebula #{OpenNebula::VERSION}
-Copyright 2002-2019, OpenNebula Project, OpenNebula Systems
-
-Licensed under the Apache License, Version 2.0 (the "License"); you may
-not use this file except in compliance with the License. You may obtain
-a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+Copyright 2002-2020, OpenNebula Project, OpenNebula Systems
 EOT
 
     if ONE_LOCATION
@@ -1203,6 +1199,18 @@ EOT
         end
     end
 
+    def OpenNebulaHelper.bytes_to_unit(value, unit = 'K')
+        j = 0
+        i = BinarySufix.index(unit).to_i
+
+        while j < i do
+            value /= 1024.0
+            j += 1
+        end
+
+        value
+    end
+
     # If the cluster name is empty, returns a '-' char.
     #
     # @param str [String || Hash] Cluster name, or empty Hash (when <CLUSTER/>)
@@ -1696,4 +1704,248 @@ EOT
             "-"
         end
     end
+
+    def OpenNebulaHelper.parse_user_inputs(inputs, get_defaults = false)
+        unless get_defaults
+            puts 'There are some parameters that require user input. ' \
+                 'Use the string <<EDITOR>> to launch an editor ' \
+                 '(e.g. for multi-line inputs)'
+        end
+
+        answers = {}
+
+        inputs.each do |key, val|
+            input_cfg = val.split('|', -1)
+
+            if input_cfg.length < 3
+                STDERR.puts 'Malformed user input. It should have at least 3 '\
+                            "parts separated by '|':"
+                STDERR.puts "  #{key}: #{val}"
+                exit(-1)
+            end
+
+            mandatory, type, description, params, initial = input_cfg
+            optional = mandatory.strip == 'O'
+            type.strip!
+            description.strip!
+
+            if input_cfg.length > 3
+                if input_cfg.length != 5
+                    STDERR.puts 'Malformed user input. It should have 5 parts'\
+                                " separated by '|':"
+                    STDERR.puts "  #{key}: #{val}"
+                    exit(-1)
+                end
+
+                params.strip!
+                initial.strip!
+            end
+
+            if get_defaults
+                answers[key]= initial unless mandatory == 'M'
+                next
+            end
+
+            puts "  * (#{key}) #{description}"
+
+            header = '    '
+            if !initial.nil? && initial != ''
+                header += "Press enter for default (#{initial}). "
+            end
+
+            case type
+            when 'text', 'text64'
+                print header
+
+                answer = STDIN.readline.chop
+
+                if answer == '<<EDITOR>>'
+                    answer = OpenNebulaHelper.editor_input
+                end
+
+                # use default in case it's empty
+                answer = initial if answer.empty?
+
+                if type == 'text64'
+                    answer = Base64.encode64(answer).strip.delete("\n")
+                end
+
+            when 'boolean'
+                print header
+
+                answer = STDIN.readline.chop
+
+                # use default in case it's empty
+                answer = initial if answer.empty?
+
+                unless %w[YES NO].include?(answer)
+                    STDERR.puts "Invalid boolean '#{answer}'"
+                    STDERR.puts 'Boolean has to be YES or NO'
+                    exit(-1)
+                end
+
+            when 'password'
+                print header
+
+                answer = OpenNebulaHelper::OneHelper.get_password
+
+                # use default in case it's empty
+                answer = initial if answer.empty?
+
+            when 'number', 'number-float'
+                if type == 'number'
+                    header += 'Integer: '
+                    exp = INT_EXP
+                else
+                    header += 'Float: '
+                    exp = FLOAT_EXP
+                end
+
+                begin
+                    print header
+                    answer = STDIN.readline.chop
+
+                    answer = initial if answer == ''
+                        noanswer = ((answer == '') && optional)
+                end while !noanswer && (answer =~ exp) == nil
+
+                if noanswer
+                    next
+                end
+
+            when 'range', 'range-float'
+                min, max = params.split('..')
+
+                if min.nil? || max.nil?
+                    STDERR.puts 'Malformed user input. '\
+                                "Parameters should be 'min..max':"
+                    STDERR.puts "  #{key}: #{val}"
+                    exit(-1)
+                end
+
+                if type == 'range'
+                    exp = INT_EXP
+                    min = min.to_i
+                    max = max.to_i
+
+                    header += "Integer in the range [#{min}..#{max}]: "
+                else
+                    exp = FLOAT_EXP
+                    min = min.to_f
+                    max = max.to_f
+
+                    header += "Float in the range [#{min}..#{max}]: "
+                end
+
+                begin
+                    print header
+                    answer = STDIN.readline.chop
+
+                    answer = initial if answer == ''
+
+                    noanswer = (answer == '') && optional
+                end while !noanswer && ((answer =~ exp) == nil ||
+                          answer.to_f < min || answer.to_f > max)
+
+                if noanswer
+                    next
+                end
+
+            when 'list'
+                options = params.split(',')
+
+                options.each_with_index do |opt, i|
+                    puts "    #{i}  #{opt}"
+                end
+
+                puts
+
+                header += 'Please type the selection number: '
+
+                begin
+                    print header
+                    answer = STDIN.readline.chop
+
+                    if answer == ''
+                        answer = initial
+                    else
+                        answer = options[answer.to_i]
+                    end
+
+                    noanswer = ((answer == '') && optional)
+                end while !noanswer && !options.include?(answer)
+
+                if noanswer
+                    next
+                end
+
+            when 'fixed'
+                puts "    Fixed value of (#{initial}). Cannot be changed"
+                answer = initial
+
+            else
+                STDERR.puts 'Wrong type for user input:'
+                STDERR.puts "  #{key}: #{val}"
+                exit(-1)
+            end
+
+            answers[key] = answer
+        end
+
+        answers
+    end
+
+    # Returns plot object to print it on the CLI
+    #
+    # @param x     [Array]  Data to x axis (Time axis)
+    # @param y     [Array]  Data to y axis
+    # @param attr  [String] Parameter to y axis
+    # @param title [String] Plot title
+    #
+    # @return Gnuplot plot object
+    def OpenNebulaHelper.get_plot(x, y, attr, title)
+        # Require gnuplot gem only here
+        begin
+            require 'gnuplot'
+        rescue LoadError, Gem::LoadError
+            STDERR.puts(
+                'Gnuplot gem is not installed, run `gem install gnuplot` '\
+                'to install it'
+            )
+            exit(-1)
+        end
+
+        # Check if gnuplot is installed on the system
+        unless system('gnuplot --version')
+            STDERR.puts(
+                'Gnuplot is not installed, install it depending on your distro'
+            )
+            exit(-1)
+        end
+
+        Gnuplot.open do |gp|
+            Gnuplot::Plot.new(gp) do |p|
+                p.title title
+
+                p.xlabel 'Time'
+                p.ylabel attr
+
+                p.xdata   'time'
+                p.timefmt "'%H:%M'"
+                p.format  "x '%H:%M'"
+
+                p.style    'data lines'
+                p.terminal 'dumb'
+
+                p.data << Gnuplot::DataSet.new([x, y]) do |ds|
+                    ds.with      = 'linespoints'
+                    ds.linewidth = '3'
+                    ds.using     = '1:2'
+
+                    ds.notitle
+                end
+            end
+        end
+    end
+
 end

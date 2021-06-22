@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -260,7 +260,7 @@ namespace one_util
      * @return the joined strings
      */
     template <class T>
-    std::string join(const std::set<T> values, char delim)
+    std::string join(const std::set<T>& values, char delim)
     {
         return join(values.begin(), values.end(), delim);
     }

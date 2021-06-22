@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -17,6 +17,7 @@
 define(function(require) {
 //  require('foundation.alert');
   var OpenNebula = require("opennebula");
+  var Sunstone = require("sunstone");
   var OpenNebulaService = require("opennebula/service");
   var OpenNebulaVm = require("opennebula/vm");
   var Locale = require("utils/locale");
@@ -133,7 +134,7 @@ define(function(require) {
     provision_flows_datatable = $(".provision_flows_table", context).dataTable({
       "iDisplayLength": 6,
       "sDom" : "<\"H\">t<\"F\"lp>",
-      "aLengthMenu": [[6, 12, 36, 72], [6, 12, 36, 72]],
+      "aLengthMenu": Sunstone.getPaginate(),
       "aaSorting"  : [[0, "desc"]],
       "aoColumnDefs": [
           { "bVisible": false, "aTargets": ["all"]}
@@ -402,26 +403,32 @@ define(function(require) {
 
       var role = $(this).closest(".provision_role_ul").data("role");
       $(".provision_info_flow", context).data("role_id", role.name);
-      var vms = [];
 
       if (role.nodes && role.nodes.length > 0) {
-        $.each(role.nodes, function(index, node){
+        var vms = [];
+
+        $.each(role.nodes, function(_, node){
           if(node.vm_info != undefined){
-            vms.push(node.vm_info);
+            OpenNebulaVm.show({
+              data : { id: node.deploy_id },
+              timeout: true,
+              success: function (_, vm_json) {
+                vms.push(vm_json);
+                ProvisionVmsList.generate(
+                  $(".provision_role_vms_container", context),
+                  {
+                    title: role.name + " " + Locale.tr("VMs"),
+                    active: true,
+                    refresh: false,
+                    create: false,
+                    filter: false,
+                    data: vms
+                  });
+              }
+            });
           }
         });
       }
-
-      ProvisionVmsList.generate(
-        $(".provision_role_vms_container", context),
-        {
-          title: role.name + " " + Locale.tr("VMs"),
-          active: true,
-          refresh: false,
-          create: false,
-          filter: false,
-          data: vms
-        });
     });
 
     context.on("click", ".provision_role_cardinality_button", function(){

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -19,7 +19,7 @@
 
 #include "Template.h"
 
-#include <string.h>
+#include <string>
 
 using namespace std;
 
@@ -40,6 +40,16 @@ public:
     ~VirtualMachineTemplate(){};
 
     VirtualMachineTemplate(VirtualMachineTemplate& vmt):Template(vmt){};
+
+    VirtualMachineTemplate& operator=(const VirtualMachineTemplate& t)
+    {
+        if (this != &t)
+        {
+            Template::operator=(t);
+        }
+
+        return *this;
+    }
 
     void set_xml_root(const char * _xml_root)
     {

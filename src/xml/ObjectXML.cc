@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -19,6 +19,8 @@
 #include <cstring>
 #include <iostream>
 #include <sstream>
+#include <libxml/parser.h>
+#include <libxml/relaxng.h>
 
 #include "expr_arith.h"
 #include "expr_bool.h"
@@ -461,6 +463,44 @@ int ObjectXML::rename_nodes(const char * xpath_expr, const char * new_name)
     return renamed;
 }
 
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+int ObjectXML::remove_nodes(const char * xpath_expr)
+{
+    xmlXPathObjectPtr obj = xmlXPathEvalExpression(
+        reinterpret_cast<const xmlChar *>(xpath_expr), ctx);
+
+    if (obj == 0 || obj->nodesetval == 0)
+    {
+        return 0;
+    }
+
+    xmlNodeSetPtr ns = obj->nodesetval;
+
+    int size    = ns->nodeNr;
+    int removed = size;
+
+    for(int i = 0; i < size; ++i)
+    {
+        xmlNodePtr cur = ns->nodeTab[i];
+
+        if ( cur == 0 || cur->type != XML_ELEMENT_NODE )
+        {
+            removed--;
+            continue;
+        }
+
+        xmlUnlinkNode(cur);
+
+        xmlFreeNode(cur);
+    }
+
+    xmlXPathFreeObject(obj);
+
+    return removed;
+}
+
 /* ************************************************************************ */
 /* Host :: Parse functions to compute rank and evaluate requirements        */
 /* ************************************************************************ */
@@ -538,3 +578,34 @@ error_yy:
 /* ------------------------------------------------------------------------ */
 /* ------------------------------------------------------------------------ */
 
+int ObjectXML::validate_rng(const std::string &xml_doc, const string& schema_path)
+{
+    int rc;
+    xmlDocPtr doc = 0;
+    xmlRelaxNGPtr schema;
+    xmlRelaxNGValidCtxtPtr validctxt;
+    xmlRelaxNGParserCtxtPtr rngparser;
+
+    doc = xmlParseMemory (xml_doc.c_str(),xml_doc.length());
+
+    if (doc == 0)
+    {
+        return -1;
+    }
+
+    rngparser = xmlRelaxNGNewParserCtxt(schema_path.c_str());
+    schema = xmlRelaxNGParse(rngparser);
+    validctxt = xmlRelaxNGNewValidCtxt(schema);
+
+    rc = xmlRelaxNGValidateDoc(validctxt, doc);
+
+    xmlRelaxNGFree(schema);
+    xmlRelaxNGFreeValidCtxt(validctxt);
+    xmlRelaxNGFreeParserCtxt(rngparser);
+    xmlFreeDoc(doc);
+
+    return rc;
+}
+
+/* ------------------------------------------------------------------------ */
+/* ------------------------------------------------------------------------ */

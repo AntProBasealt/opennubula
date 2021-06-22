@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -83,9 +83,10 @@ module OpenNebulaCloudAuth
 
             # Check if the user authenticated with a scoped token. In this case
             # encode the EGID in the username as "user:egid"
-            auth_name = user.name
+            egid = nil
+            egid = user["//LOGIN_TOKEN [ TOKEN = \"#{password}\" ]/EGID"] if password.match(/^[a-z0-9]+$/)
 
-            egid = user["//LOGIN_TOKEN [ TOKEN = \"#{password}\" ]/EGID"] rescue nil
+            auth_name = user.name
             auth_name = "#{auth_name}:#{egid}" if egid
 
             return auth_name

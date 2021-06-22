@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -13,18 +13,6 @@
 /* See the License for the specific language governing permissions and        */
 /* limitations under the License.                                             */
 /* -------------------------------------------------------------------------- */
-#include <limits.h>
-#include <string.h>
-#include <time.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <regex.h>
-#include <unistd.h>
-
-#include <iostream>
-#include <sstream>
-#include <queue>
-
 #include "VirtualMachine.h"
 #include "VirtualNetworkPool.h"
 #include "ImagePool.h"
@@ -36,6 +24,8 @@
 
 #include "vm_file_var_syntax.h"
 #include "vm_var_syntax.h"
+
+#include <sstream>
 
 /* -------------------------------------------------------------------------- */
 /* Context constants                                                          */
@@ -59,6 +49,7 @@ const std::vector<ContextVariable> NETWORK_CONTEXT = {
     {"DNS", "DNS", "", true},
     {"SEARCH_DOMAIN", "SEARCH_DOMAIN", "", true},
     {"MTU", "GUEST_MTU", "", true},
+    {"METRIC", "METRIC", "", true},
     {"VLAN_ID", "VLAN_ID", "", true},
     {"VROUTER_IP", "VROUTER_IP", "", false},
     {"VROUTER_MANAGEMENT", "VROUTER_MANAGEMENT", "", false},
@@ -69,6 +60,7 @@ const std::vector<ContextVariable> NETWORK6_CONTEXT = {
     {"IP6", "IP6_GLOBAL", "IP6", false},
     {"IP6_ULA", "IP6_ULA", "", false},
     {"GATEWAY6", "GATEWAY6", "", true},
+    {"METRIC6", "METRIC6", "", true},
     {"CONTEXT_FORCE_IPV4", "CONTEXT_FORCE_IPV4", "", true},
     {"IP6_PREFIX_LENGTH", "PREFIX_LENGTH", "", true},
     {"VROUTER_IP6", "VROUTER_IP6_GLOBAL", "VROUTER_IP6", false},
@@ -98,6 +90,8 @@ int VirtualMachine::generate_context(string &files, int &disk_id,
     {
         return -1;
     }
+
+    decrypt();
 
     VectorAttribute * context = obj_template->get("CONTEXT");
 

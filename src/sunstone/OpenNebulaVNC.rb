@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -97,6 +97,7 @@ VNC_STATES = [
         "62" #DISK_RESIZE
         #63, #DISK_RESIZE_POWEROFF
         #64  #DISK_RESIZE_UNDEPLOYED
+        #65  #HOTPLUG_NIC_POWEROFF
 ]
 
 class OpenNebulaVNC
@@ -151,7 +152,10 @@ class OpenNebulaVNC
             proxy_options << " -6"
         end
 
-        cmd ="python3 #{@proxy_path} #{proxy_options} #{@proxy_port}"
+        python = 'python3' if system("python3 -c True")
+#         python = 'python' if system("python -c True")
+
+        cmd ="#{python} #{@proxy_path} #{proxy_options} #{@proxy_port}"
 
         begin
             @logger.info { "Starting VNC proxy: #{cmd}" }

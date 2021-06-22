@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -597,14 +597,6 @@ private:
 
     void user_action(const ActionRequest& ar);
 
-    /**
-    * Fill a template only with the necessary attributes to update the quotas
-    *   @param vm with the attributes
-    *   @param template that will be filled
-    *   @param only_running true to not add CPU, MEMORY and VMS counters
-    */
-    void get_quota_template(VirtualMachine * vm,
-            VirtualMachineTemplate& quota_tmpl, bool only_running);
 };
 
 #endif /*DISPATCH_MANAGER_H*/

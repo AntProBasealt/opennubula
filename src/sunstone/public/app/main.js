@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -117,8 +117,8 @@ require.config({
     /* Tabs */
     "app": {
       deps: [
-        "foundation",
         "jquery",
+        "foundation",
         "tabs/provision-tab",
         "tabs/dashboard-tab",
         "tabs/system-top-tab",
@@ -152,7 +152,6 @@ require.config({
         "tabs/settings-tab",
         "tabs/support-tab",
         "tabs/official-support-tab",
-        "tabs/upgrade-top-tab",
         "tabs/vmgroup-tab",
         "addons/start",
         "addons/end"
@@ -171,7 +170,7 @@ require.config({
 
     /* Foundation */
     "foundation": {
-        deps: ["jquery"]
+      deps: ["jquery"]
     },
     //'foundation.core': {
     //  deps: ['jquery', 'modernizr'],
@@ -243,6 +242,12 @@ require.config({
     /* Flot Graphs */
     "flot": {
       deps: ["jquery"]
+    },
+    "flot.navigate": {
+      deps: ["flot"]
+    },
+    "flot.canvas": {
+      deps: ["flot"]
     },
     "flot.stack": {
       deps: ["flot"]

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -36,6 +36,7 @@ define(function(require) {
   var CapacityTable = require("utils/custom-tags-table");
   var EC2Tr = require("utils/panel/ec2-tr");
   var OpenNebulaAction = require("opennebula/action");
+  var Notifier = require("utils/notifier");
 
   /*
     TEMPLATES
@@ -71,6 +72,7 @@ define(function(require) {
     //  object to be used when the host info is updated.
     that.unshownTemplate = {};
     that.strippedTemplateVcenter = {};
+    that.strippedTemplateNSX = {};
     that.strippedTemplate = {};
     var unshownKeys = ["HOST", "VM", "WILDS", "ZOMBIES", "RESERVED_CPU", "RESERVED_MEM", "EC2_ACCESS", "EC2_SECRET", "CAPACITY", "REGION_NAME"];
     $.each(that.element.TEMPLATE, function(key, value) {
@@ -79,6 +81,9 @@ define(function(require) {
       }
       else if (!key.match(/^VCENTER_RESOURCE_POOL$/) && key.match(/^VCENTER_*/)){
         that.strippedTemplateVcenter[key] = value;
+      }
+      else if (key.match(/^NSX_*/)){
+        that.strippedTemplateNSX[key] = value;
       }
       else {
         that.strippedTemplate[key] = value;
@@ -119,8 +124,8 @@ define(function(require) {
     var cpuBars = CPUBars.html(elementAux);
     var memoryBars = MemoryBars.html(elementAux);
     var datastoresCapacityTableHTML = DatastoresCapacityTable.html(this.element);
-    var realCPU = parseInt(this.element.HOST_SHARE.TOTAL_CPU);
-    var realMEM = parseInt(this.element.HOST_SHARE.TOTAL_MEM);
+    var realCPU = parseInt(this.element.HOST_SHARE.TOTAL_CPU,10);
+    var realMEM = parseInt(this.element.HOST_SHARE.TOTAL_MEM,10);
 
     return TemplateInfo({
       "element": this.element,
@@ -201,22 +206,20 @@ define(function(require) {
 
     //.off and .on prevent multiple clicks events
     $(context).off("click", "#update_reserved_hosts").on("click", "#update_reserved_hosts", function(){
-      $("#update_reserved_hosts", context).prop("disabled", true);
-      var reservedCPU = parseInt($("#textInput_reserved_cpu_hosts", context).val());
-      var CPU = parseInt(that.element.HOST_SHARE.FREE_CPU);
-      var reservedMem = parseInt(Humanize.sizeToMB($("#textInput_reserved_mem_hosts").val()) * 1024);
-      var MEM = parseInt(that.element.HOST_SHARE.FREE_MEM);
-      if (parseInt(that.element.HOST_SHARE.USED_CPU) > 0){
-        CPU += parseInt(that.element.HOST_SHARE.USED_CPU);
+      var CPU = that && that.element && that.element.HOST_SHARE && that.element.HOST_SHARE.TOTAL_CPU;
+      var MEMORY = that && that.element && that.element.HOST_SHARE && that.element.HOST_SHARE.MAX_MEM;
+      if(CPU && MEMORY){
+        $("#update_reserved_hosts", context).prop("disabled", true);
+        var reservedCPU = parseInt($("#textInput_reserved_cpu_hosts", context).val(),10);
+        var inputNumber = Humanize.sizeToMB($("#textInput_reserved_mem_hosts").val());
+        var reservedMem = parseInt(inputNumber * 1024, 10);
+        var CPU = parseInt(CPU||0,10);
+        var MEM = parseInt(MEMORY||0,10);
+        reservedCPU = CPU - reservedCPU;
+        reservedMem = MEM - reservedMem;
+        var obj = { RESERVED_CPU: reservedCPU, RESERVED_MEM: reservedMem };
+        Sunstone.runAction("Host.append_template", that.element.ID, TemplateUtils.templateToString(obj));
       }
-      reservedCPU = CPU - reservedCPU;
-      if (parseInt(that.element.HOST_SHARE.USED_MEM) > 0){
-        MEM += parseInt(that.element.HOST_SHARE.USED_MEM);
-      }
-      reservedMem = MEM - reservedMem;
-
-      var obj = { RESERVED_CPU: reservedCPU, RESERVED_MEM: reservedMem };
-      Sunstone.runAction("Host.append_template", that.element.ID, TemplateUtils.templateToString(obj));
     });
 
     $("#change_bar_cpu_hosts", context).on("input", function(){
@@ -224,7 +227,21 @@ define(function(require) {
       $("#textInput_reserved_cpu_hosts", context).val($("#change_bar_cpu_hosts", context).val());
     });
 
-    $("#textInput_reserved_cpu_hosts", context).on("input", function(){
+    $("#textInput_reserved_cpu_hosts", context).on("keyup", function(){
+      var element = $(this);
+      var slider = $("#change_bar_cpu_hosts", context);
+      var min = slider.attr("min");
+      var max = slider.attr("max");
+      if(parseInt(element.val(),10) >= parseInt(min, 10) && parseInt(element.val(),10) <= parseInt(max, 10)){
+        slider.prop("disabled", false);
+        slider.attr("value", element.val());
+      }else{
+        if(parseInt(element.val(),10) <= parseInt(min, 10)){
+          Notifier.notifyError(Locale.tr("it must not be a negative number"));
+        }
+        slider.attr("value", element.attr("mid"));
+        slider.prop("disabled", true);
+      }
       changeInputCPU(that.element.HOST_SHARE.TOTAL_CPU);
     });
 

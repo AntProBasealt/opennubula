@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -72,6 +72,10 @@ define(function(require) {
           nics = [template_nic];
         }
 
+        nics.map(function(nic){
+          nic.FROM = 'TEMPLATE';
+        })
+
         var pcis = [];
 
         if ($.isArray(template_json.VMTEMPLATE.TEMPLATE.PCI)){
@@ -100,7 +104,10 @@ define(function(require) {
         });
 
         _generate_provision_network_accordion(
-          $(".provision_network_selector", context), options);
+          $(".provision_network_selector", context),
+          options,
+          template_json
+        );
 
         $.each(nics, function(index, nic) {
           var opt = $.extend({}, options);
@@ -114,7 +121,9 @@ define(function(require) {
 
           _generate_provision_network_table(
             $(".provision_nic_accordion", context),
-            opt);
+            opt,
+            template_json
+          );
 
            nicId ++;
         });
@@ -123,7 +132,10 @@ define(function(require) {
       }
     } catch(err) {
       _generate_provision_network_accordion(
-        $(".provision_network_selector", context), options);
+        $(".provision_network_selector", context),
+        options,
+        template_json
+      );
     }
   }
 
@@ -134,24 +146,19 @@ define(function(require) {
       // template_nic is the original NIC definition in an instantiate action.
       // We try to use it replacing only the settings offered in this
       // module, to preserve any other potential settings (such as IP6_GLOBAL)
-
       if ($(this).data("template_nic") != undefined) {
         nic = $(this).data("template_nic");
       } else {
         nic = {};
       }
-
       var that = this;
-
       if( $("input#"+that.id+"_network_mode", $(this)).prop("checked") ){
         nic["NETWORK_MODE"] = "auto";
         var req = $("input#"+that.id+"_SCHED_REQUIREMENTS", $(this)).val();
         var rank = $("input#"+that.id+"_SCHED_RANK", $(this)).val();
-
         if ( req && req !== "" ){
           nic["SCHED_REQUIREMENTS"] = req;
         }
-
         if ( rank && rank !== "" ){
           nic["SCHED_RANK"] = rank;
         }
@@ -171,72 +178,74 @@ define(function(require) {
           delete nic["PARENT"];
       }
 
+      (Boolean($("input#" + that.id + "_rdp", context).prop("checked")))
+        ? nic["RDP"] = "YES"
+        : delete nic["RDP"];
+
       if ( !nic["NETWORK_MODE"] || ( nic["NETWORK_MODE"] && nic["NETWORK_MODE"] !== "auto" ) )
       {
-
-        var val = $(this).data("vnetsTable").retrieveResourceTableSelect();
-
-        if (val == undefined || val == ""){
-          if (nic["NETWORK"] == undefined && nic["NETWORK_ID"] == undefined ){
-            // No network name or id in original NIC, and no selection done
-            return true; //continue
-          } else {
-            return nic;
-          }
-        }
-
-        delete nic["NETWORK"];
-        delete nic["NETWORK_ID"];
-        delete nic["NETWORK_UNAME"];
-        delete nic["NETWORK_UID"];
-
-        nic["NETWORK_ID"] = val;
-
-        delete nic["FLOATING_IP"];
-        if ($("input.floating_ip", $(this)).prop("checked")){
-          nic["FLOATING_IP"] = "YES";
-        }
-
         var ip4 = $("input.manual_ip4", $(this)).val();
-
         if (ip4 != undefined){
           delete nic["IP"];
-
           if (ip4 != ""){
             nic["IP"] = ip4;
           }
         }
-
         var ip6 = $("input.manual_ip6", $(this)).val();
-
         if (ip6 != undefined){
           delete nic["IP6"];
-
           if (ip6 != ""){
             nic["IP6"] = ip6;
           }
         }
+        var val = $(this).data("vnetsTable").retrieveResourceTableSelect();
+        var tempNetwork = nic["NETWORK"];
+        var preserveNetwork = false;
+        if (val == undefined || val == ""){
+          if (nic["NETWORK"] == undefined && nic["NETWORK_ID"] == undefined ){
+            // No network name or id in original NIC, and no selection done
+            delete nic['FROM'];
+            return; //continue
+          }
+          preserveNetwork = true;
+        }else{
+          if(nic && nic.FROM && nic.FROM==='TEMPLATE'){
+            delete nic['FROM'];
+            nics.push(nic);
+            return; //continue
+          }
+        }
+        delete nic["NETWORK"];
+        delete nic["NETWORK_ID"];
+        delete nic["NETWORK_UNAME"];
+        delete nic["NETWORK_UID"];
+        delete nic["FROM"];
+        if(preserveNetwork){
+          nic["NETWORK"] = tempNetwork;
+          preserveNetwork = false;
+        }
+        if(val && val.length){
+          nic["NETWORK_ID"] = val;
+        }
+        delete nic["FLOATING_IP"];
+        if ($("input.floating_ip", $(this)).prop("checked")){
+          nic["FLOATING_IP"] = "YES";
+        }
         delete nic["VROUTER_MANAGEMENT"];
-
         if ($("input.management", $(this)).prop("checked")){
           nic["VROUTER_MANAGEMENT"] = "YES";
         }
-
         var sgTable = $(this).data("sgTable");
-
         if (sgTable){
           delete nic["SECURITY_GROUPS"];
-
           var secgroups = sgTable.retrieveResourceTableSelect();
           if (secgroups != undefined && secgroups.length != 0) {
             nic["SECURITY_GROUPS"] = secgroups.join(",");
           }
         }
       }
-
       nics.push(nic);
     });
-
     return nics;
   }
 
@@ -253,7 +262,7 @@ define(function(require) {
    *                                - securityGroups {bool}: true to select SGs
    *                                - pci {bool}: true if this is a PCI interface
    */
-  function _generate_provision_network_table(context, options) {
+  function _generate_provision_network_table(context, options, template_json) {
     context.off();
     var nic_span;
 
@@ -285,13 +294,31 @@ define(function(require) {
 
       sgHtml = sgTable.dataTableHTML;
     }
-
+    var displayType = true;
+    var displaySelection = true;
+    var displayRDP = true;
+    if(
+      template_json && 
+      template_json.VMTEMPLATE && 
+      template_json.VMTEMPLATE.TEMPLATE &&  
+      template_json.VMTEMPLATE.TEMPLATE.SUNSTONE
+    ){
+      var templateType = template_json.VMTEMPLATE.TEMPLATE.SUNSTONE.NETWORK_ALIAS;
+      var templateSelection = template_json.VMTEMPLATE.TEMPLATE.SUNSTONE.NETWORK_AUTO;
+      var templateRDP = template_json.VMTEMPLATE.TEMPLATE.SUNSTONE.NETWORK_RDP;
+      displayType = templateType && templateType.toUpperCase()==='NO'? false : true;
+      displaySelection = templateSelection && templateSelection.toUpperCase()==='NO'? false : true;
+      displayRDP = templateRDP && templateRDP.toUpperCase()==='NO'? false : true;
+    }
     var dd_context = $(TemplateDD({
       vnetsTableHTML: vnetsTable.dataTableHTML,
       vnetsTableAutoHTML: vnetsTableAuto.dataTableHTML,
       securityGroupsTableHTML: sgHtml,
       provision_nic_accordion_dd_id: provision_nic_accordion_dd_id,
-      options: options
+      options: options,
+      displayType: displayType,
+      displaySelection: displaySelection,
+      displayRDP: displayRDP
     })).appendTo(context);
 
     dd_context["nic_id"] = nicId;
@@ -579,7 +606,7 @@ define(function(require) {
    *                                management checkbox
    *                                - securityGroups {bool}: true to select SGs
    */
-  function _generate_provision_network_accordion(context, options) {
+  function _generate_provision_network_accordion(context, options, template_json) {
     context.off();
     var name = "Network";
     if (options.name){
@@ -605,7 +632,7 @@ define(function(require) {
           _nics.push({"NAME": "NIC" + nicId, "ALIAS": false, "DD_ID": provision_nic_accordion_dd_id});
       }
 
-      _generate_provision_network_table($(".accordion", context), options);
+      _generate_provision_network_table($(".accordion", context), options, template_json);
 
       nicId ++;
 

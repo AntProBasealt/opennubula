@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -20,6 +20,7 @@
 #include "RequestManagerVMTemplate.h"
 #include "PoolObjectAuth.h"
 #include "Nebula.h"
+#include "VirtualMachineDisk.h"
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -116,6 +117,9 @@ Request::ErrorCode RequestManagerClone::clone(int source_id, const string &name,
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
+const std::vector<const char*> VMTemplateClone::REMOVE_DISK_ATTRS = {
+    "IMAGE", "IMAGE_UNAME", "IMAGE_UID", "OPENNEBULA_MANAGED"};
+
 Request::ErrorCode VMTemplateClone::clone(int source_id, const string &name,
         int &new_id, bool recursive, const string& s_uattr, RequestAttributes& att)
 {
@@ -195,9 +199,10 @@ Request::ErrorCode VMTemplateClone::clone(int source_id, const string &name,
                 goto error_images;
             }
 
-            (*disk)->remove("IMAGE");
-            (*disk)->remove("IMAGE_UNAME");
-            (*disk)->remove("IMAGE_UID");
+            for (auto attr : REMOVE_DISK_ATTRS)
+            {
+                (*disk)->remove(attr);
+            }
 
             (*disk)->replace("IMAGE_ID", new_img_id);
 

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -72,21 +72,15 @@ public:
         const string&           file_name) const = 0;
 
     /**
-     * Updates the VM with the information gathered by the drivers
-     *
-     * @param id VM id
-     * @param monitor_str String returned by the poll driver call
+     *  Validates de VM raws section
+     *    @param raw_section raw section of the VM.
+     *    @param error description on error
+     *    @return 0 on success
      */
-    static void process_poll(int id, const string &monitor_str);
-
-    /**
-     * Updates the VM with the information gathered by the drivers
-     *
-     * @param vm VM to update, must be locked
-     * @param monitor_str String returned by the poll driver call
-     */
-    static void process_poll(VirtualMachine* vm, const string &monitor_str);
-
+    virtual int validate_raw(const string& raw, string& error) const
+    {
+        return 0;
+    }
     /**
      *  Check if action is supported for imported VMs
      *    @param action
@@ -111,6 +105,14 @@ public:
     bool is_ds_live_migration() const
     {
         return ds_live_migration;
+    }
+
+    /**
+     *  @return true if cold nic attach
+     */
+    bool is_cold_nic_attach() const
+    {
+        return cold_nic_attach;
     }
 
 protected:
@@ -271,6 +273,11 @@ private:
      * Set to true if live migration between datastores is allowed.
      */
     bool ds_live_migration;
+
+    /**
+    * Set to true if cold nic attach/detach calls (pre, post, clean scripts)
+    */
+    bool cold_nic_attach;
 
     /**
      *  Pointer to the Virtual Machine Pool, to access VMs

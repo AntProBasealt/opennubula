@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                */
+/* Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                */
 /*                                                                            */
 /* Licensed under the Apache License, Version 2.0 (the "License"); you may    */
 /* not use this file except in compliance with the License. You may obtain    */
@@ -850,16 +850,6 @@ int VirtualNetwork::nic_attribute(
         nic->replace("BRIDGE_TYPE", bridge_type);
     }
 
-    for (it = inherit_attrs.begin(); it != inherit_attrs.end(); it++)
-    {
-        PoolObjectSQL::get_template_attribute(*it, inherit_val);
-
-        if (!inherit_val.empty())
-        {
-            nic->replace(*it, inherit_val);
-        }
-    }
-
     //--------------------------------------------------------------------------
     //  Get the lease from the Virtual Network
     //--------------------------------------------------------------------------
@@ -897,6 +887,17 @@ int VirtualNetwork::nic_attribute(
     {
         rc = allocate_addr(PoolObjectSQL::VM, vid, nic->vector_attribute(),
                 inherit_attrs);
+    }
+
+    for (it = inherit_attrs.begin(); it != inherit_attrs.end(); it++)
+    {
+        string current_val = nic->vector_value(*it);
+        PoolObjectSQL::get_template_attribute(*it, inherit_val);
+
+        if (current_val.empty() && !inherit_val.empty())
+        {
+            nic->replace(*it, inherit_val);
+        }
     }
 
     //--------------------------------------------------------------------------
@@ -1065,9 +1066,9 @@ int VirtualNetwork::update_ar(
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int VirtualNetwork::rm_ar(unsigned int ar_id, string& error_msg)
+int VirtualNetwork::rm_ar(unsigned int ar_id, bool force, string& error_msg)
 {
-    return ar_pool.rm_ar(ar_id, error_msg);
+    return ar_pool.rm_ar(ar_id, force, error_msg);
 }
 
 /* -------------------------------------------------------------------------- */

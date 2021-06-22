@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -46,9 +46,11 @@ READLINK=${READLINK:-readlink}
 RM=${RM:-rm}
 CP=${CP:-cp}
 SCP=${SCP:-scp}
+SCP_FWD=${SCP_FWD:-scp -o ForwardAgent=yes -o ControlMaster=no -o ControlPath=none}
 SED=${SED:-sed}
 SSH=${SSH:-ssh}
-SUDO=${SUDO:-sudo}
+SSH_FWD=${SSH_FWD:-ssh -o ForwardAgent=yes -o ControlMaster=no -o ControlPath=none}
+SUDO=${SUDO:-sudo -n}
 SYNC=${SYNC:-sync}
 TAR=${TAR:-tar}
 TGTADM=${TGTADM:-tgtadm}
@@ -361,6 +363,26 @@ function mkfs_command {
     fi
 }
 
+# This function will accept command as an argument for which it will override
+# the env. variables SSH and SCP with their agent forwarding alternative
+ssh_forward()
+{
+    _ssh_cmd_saved="$SSH"
+    _scp_cmd_saved="$SCP"
+
+    SSH="$SSH_FWD"
+    SCP="$SCP_FWD"
+
+    "$@"
+
+    _ssh_forward_result=$?
+
+    SSH="$_ssh_cmd_saved"
+    SCP="$_scp_cmd_saved"
+
+    return $_ssh_forward_result
+}
+
 #This function executes $2 at $1 host and report error $3 but does not exit
 function ssh_exec_and_log_no_error
 {
@@ -556,7 +578,7 @@ function tgtadm_next_tid {
 
 function tgt_admin_dump_config {
     FILE_PATH="$1"
-    echo "$TGTADMIN --dump |sudo tee $FILE_PATH > /dev/null 2>&1"
+    echo "$TGTADMIN --dump |sudo -n tee $FILE_PATH > /dev/null 2>&1"
 }
 
 ###
@@ -1018,8 +1040,77 @@ function get_nic_information {
     ORDER="${XPATH_ELEMENTS[j++]}"
 }
 
-function hup_collectd
-{
-    SEND_HUP='kill -HUP `cat /tmp/one-collectd-client.pid` || true'
-    ssh_exec_and_log_no_error $1 "$SEND_HUP"
+# Send message to monitor daemon
+# This function reads monitor network and encryption settings from monitord.conf,
+# packs and optionally encrypt the message and sends it to monitor daemon
+# Parameters
+#   $1 Message type: MONITOR_VM, BEACON_HOST, MONITOR_HOST, SYSTEM_HOST, STATE_VM, LOG, ...
+#   $2 Result of the operation:
+#        0 or "SUCCESS" means succesful monitoring
+#        everything else is failure
+#   $3 Object ID, use -1 if not relevant
+#   $4 Message payload (the monitoring data)
+function send_to_monitor {
+    msg_type="$1"
+    msg_result="$2"
+    msg_oid="$3"
+    msg_payload="$4"
+
+    if [ "$msg_result" = "0" -o "$msg_result" = "SUCCESS" ]; then
+        msg_result="SUCCESS"
+    else
+        msg_result="FAILURE"
+    fi
+
+    # Read monitord config
+    if [ -z "${ONE_LOCATION}" ]; then
+        mon_conf=/etc/one/monitord.conf
+    else
+        mon_conf=$ONE_LOCATION/etc/monitord.conf
+    fi
+
+    mon_config=$(augtool -L -l $mon_conf ls /files/$mon_conf/NETWORK)
+    mon_address=$(echo "$mon_config" | grep MONITOR_ADDRESS | awk '{print $3}')
+    mon_port=$(echo "$mon_config" | grep PORT | awk '{print $3}')
+    mon_key=$(echo "$mon_config" | grep PUBKEY | awk '{print $3}' | \
+        sed 's/^"\(.*\)"$/\1/')
+
+    if [[ $mon_address == *"auto"* ]]; then
+        mon_address="127.0.0.1"
+    fi
+
+    # Encrypt message
+    if [ -n "$mon_key" -a -r "$mon_key" ]; then
+        # Read block size from public key
+        block_size=$(openssl rsa -RSAPublicKey_in -in "$mon_key" -text -noout \
+            | grep "Public-Key" | tr -dc '0-9')
+        block_size=$(( block_size / 8 ))
+
+        # Convert public key to format known to openssl
+        pub_key=$(mktemp)
+        openssl rsa -RSAPublicKey_in -in "$mon_key" -pubout -out "$pub_key"
+            \2>/dev/null
+
+        # Encrypt payload per block_size to temporary file
+        tmp_file=$(mktemp)
+        for line in $(echo "$msg_payload" | fold -w$block_size); do
+            echo $line | openssl rsautl -encrypt -pubin -inkey "$pub_key" \
+                >>$tmp_file
+        done
+
+        payload_b64="$(cat "$tmp_file" | \
+            ruby -e "require 'zlib'; puts Zlib::Deflate.deflate(STDIN.read)" \
+            | base64 -w 0)"
+
+        rm "$tmp_file"
+        rm "$pub_key"
+    else
+        payload_b64="$(echo $msg_payload | \
+            ruby -e "require 'zlib'; puts Zlib::Deflate.deflate(STDIN.read)" \
+            | base64 -w 0)"
+    fi
+
+    # Send message
+    echo "$msg_type $msg_result $msg_oid $payload_b64" |
+        nc -u -w1 $mon_address $mon_port
 }

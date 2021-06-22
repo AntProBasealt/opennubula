@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+# Copyright 2002-2020, OpenNebula Project, OpenNebula Systems                #
 #                                                                            #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may    #
 # not use this file except in compliance with the License. You may obtain    #
@@ -122,6 +122,7 @@ module OpenNebula
             DISK_RESIZE
             DISK_RESIZE_POWEROFF
             DISK_RESIZE_UNDEPLOYED
+            HOTPLUG_NIC_POWEROFF
         }
 
         SHORT_VM_STATES={
@@ -202,7 +203,8 @@ module OpenNebula
             "PROLOG_MIGRATE_UNKNOWN_FAILURE" => "fail",
             "DISK_RESIZE"            => "drsz",
             "DISK_RESIZE_POWEROFF"   => "drsz",
-            "DISK_RESIZE_UNDEPLOYED" => "drsz"
+            "DISK_RESIZE_UNDEPLOYED" => "drsz",
+            "HOTPLUG_NIC_POWEROFF"   => "hotp"
         }
 
         HISTORY_ACTION=%w{none migrate live-migrate shutdown shutdown-hard
@@ -560,18 +562,17 @@ module OpenNebula
         #   the requested xpath expressions, and an Array of 'timestamp, value'.
         #
         # @example
-        #   vm.monitoring( ['MONITORING/CPU', 'MONITORING/NETTX'] )
+        #   vm.monitoring( ['CPU', 'NETTX'] )
         #
         #   {
-        #    "MONITORING/CPU"=>[["1435085098", "47"], ["1435085253", "5"],
+        #    "CPU"=>[["1435085098", "47"], ["1435085253", "5"],
         #      ["1435085410", "48"], ["1435085566", "3"], ["1435088136", "2"]],
-        #    "MONITORING/NETTX"=>[["1435085098", "0"], ["1435085253", "50"],
+        #    "NETTX"=>[["1435085098", "0"], ["1435085253", "50"],
         #      ["1435085410", "50"], ["1435085566", "50"], ["1435085723", "50"]]
         #   }
         #
         def monitoring(xpath_expressions)
-            return super(VM_METHODS[:monitoring], 'VM',
-                'LAST_POLL', xpath_expressions)
+            return super(VM_METHODS[:monitoring], xpath_expressions)
         end
 
         # Retrieves this VM's monitoring data from OpenNebula, in XML

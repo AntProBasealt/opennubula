@@ -16,7 +16,7 @@
 Name: opennebula
 Summary: Cloud computing solution for Data Center Virtualization
 Version: 5.12.0.4
-Release: alt1
+Release: alt1.1
 License: Apache-2.0
 Group: System/Servers
 Url: https://opennebula.io
@@ -47,10 +47,12 @@ BuildRequires: node node-gyp npm node-devel node-sass libsass
 BuildRequires: ronn
 BuildRequires: groff-base
 
-%gem_replace_version highline ~> 2.0
-%gem_replace_version i18n ~> 1.0
-%gem_replace_version activesupport ~> 6.0
-%gem_replace_version rbvmomi ~> 2.2
+%ruby_use_gem_dependency faraday_middleware >= 0,faraday_middleware < 2
+%ruby_use_gem_dependency faraday >= 0,faraday < 2
+%ruby_use_gem_dependency rbvmomi >= 2,rbvmomi < 3
+%ruby_use_gem_dependency highline >= 2.0,highline < 3
+%ruby_use_gem_dependency i18n >= 1.0,i18n < 2
+%ruby_use_gem_dependency activesupport >= 6.0,faraday < 7
 %add_findreq_skiplist %ruby_gemslibdir/**/*
 
 %description
@@ -315,7 +317,7 @@ scons -j2 \
 
 
 %ruby_build \
-	--ignore=packethost \
+	--ignore-names=packethost \
 	--use=install_gems --alias=opennebula-common --join=lib:bin \
 	--use=flow --alias=opennebula-flow --join=lib:bin \
 	--srclibdir= --srcconfdir= # --use=opennebula-cli --join=lib:bin
@@ -822,6 +824,9 @@ fi
 %exclude %_man1dir/oneprovision.1*
 
 %changelog
+* Thu Jul 08 2021 Pavel Skrylev <majioa@altlinux.org> 5.12.0.4-alt1.1
+- * ruby macros, and call to ruby build
+
 * Tue Jun 22 2021 Alexey Shabalin <shaba@altlinux.org> 5.12.0.4-alt1
 - 5.12.0.4
 - drop support sysV init scripts
